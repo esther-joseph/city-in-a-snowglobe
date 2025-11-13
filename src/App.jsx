@@ -5,8 +5,7 @@ import { OrbitControls, PerspectiveCamera, RenderTexture } from '@react-three/dr
 import { XR, Controllers, startSession, stopSession } from '@react-three/xr'
 import City from './components/City'
 import WeatherEffects from './components/WeatherEffects'
-import WeatherUI from './components/WeatherUI'
-import ModeToggle from './components/ModeToggle'
+import WeatherDrawer from './components/WeatherDrawer'
 import { SNOW_GLOBE_CONTENT_SCALE } from './components/SnowGlobe'
 import Sun from './components/environment/Sun'
 import Moon from './components/environment/Moon'
@@ -956,46 +955,34 @@ function App() {
         background: renderMode === '3d' ? celestialData.backgroundColor : '#060810'
       }}
     >
-      <div
-        style={{
-          width: 'min(400px, 34vw)',
-          padding: '24px 20px',
-          boxSizing: 'border-box',
-          overflowY: 'auto',
-          pointerEvents: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px'
-        }}
-      >
-      <WeatherUI 
+      <WeatherDrawer
         weatherData={weatherData}
-          hourlyForecast={hourlyForecast}
-          weeklyForecast={weeklyForecast}
-          celestialData={celestialData}
+        hourlyForecast={hourlyForecast}
+        weeklyForecast={weeklyForecast}
+        celestialData={celestialData}
         loading={loading}
         error={error}
         onSearch={handleSearch}
         currentCity={city}
-          onTimeAdjust={(value) => {
-            if (value === null || Number.isNaN(value)) {
-              setManualHour(null)
-              setTimeTick(Date.now())
-            } else {
-              setManualHour(value)
-            }
-          }}
-          timeOverride={manualHour}
-          displayHour={displayHour}
-          onThunderToggle={setForceThunder}
-          forceThunder={forceThunder}
-          onSnowToggle={setForceSnow}
-          forceSnow={forceSnow}
-        />
-        <ModeToggle mode={renderMode} onChange={setRenderMode} />
-      </div>
+        onTimeAdjust={(value) => {
+          if (value === null || Number.isNaN(value)) {
+            setManualHour(null)
+            setTimeTick(Date.now())
+          } else {
+            setManualHour(value)
+          }
+        }}
+        timeOverride={manualHour}
+        displayHour={displayHour}
+        onThunderToggle={setForceThunder}
+        forceThunder={forceThunder}
+        onSnowToggle={setForceSnow}
+        forceSnow={forceSnow}
+        renderMode={renderMode}
+        onRenderModeChange={setRenderMode}
+      />
 
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
         {renderMode === '3d' ? (
           <Canvas camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}>
             <Suspense fallback={null}>
