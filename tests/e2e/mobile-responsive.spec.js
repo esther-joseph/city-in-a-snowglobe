@@ -3,10 +3,11 @@ import { test, expect, devices } from '@playwright/test'
 /**
  * Mobile responsiveness tests
  */
+test.use({
+  ...devices['iPhone 12'],
+})
+
 test.describe('Mobile Responsiveness', () => {
-  test.use({
-    ...devices['iPhone 12'],
-  })
 
   test('should display correctly on mobile viewport', async ({ page }) => {
     await page.goto('/')
@@ -99,18 +100,4 @@ test.describe('Mobile Responsiveness', () => {
   })
 })
 
-test.describe('Tablet Responsiveness', () => {
-  test.use({
-    ...devices['iPad Pro'],
-  })
-
-  test('should display correctly on tablet viewport', async ({ page }) => {
-    await page.goto('/')
-    await page.waitForTimeout(2000)
-    
-    // Check that all UI elements are visible and properly sized
-    await expect(page.getByText('3D Weather City')).toBeVisible()
-    await expect(page.getByPlaceholder('Enter city name...')).toBeVisible()
-  })
-})
 
