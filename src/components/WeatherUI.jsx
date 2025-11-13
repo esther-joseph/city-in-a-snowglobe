@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import './WeatherUI.css'
 import SunPositionDiagram from './SunPositionDiagram'
 
@@ -20,9 +20,12 @@ function getWeatherIcon(weatherMain) {
 }
 
 function TemperatureTrend({ data }) {
+  const containerRef = useRef(null)
+  const hoursRef = useRef(null)
+
   if (!data?.points?.length) return null
 
-  const { points, min, max } = data
+  const { points, min, max, selectedIndex } = data
   // Calculate width based on number of points - give each point 60px of space
   const pointSpacing = 60
   const paddingX = 20
@@ -47,18 +50,43 @@ function TemperatureTrend({ data }) {
     return `${acc} L ${segment}`
   }, '')
 
+  // Scroll to selected time when it changes
+  useEffect(() => {
+    if (selectedIndex !== undefined && selectedIndex >= 0 && containerRef.current && hoursRef.current) {
+      const selectedPoint = plottedPoints[selectedIndex]
+      if (selectedPoint) {
+        // Calculate scroll position to center the selected point
+        const scrollPosition = selectedPoint.x - containerRef.current.clientWidth / 2
+        containerRef.current.scrollTo({
+          left: Math.max(0, scrollPosition),
+          behavior: 'smooth'
+        })
+        // Also scroll the hours container
+        hoursRef.current.scrollTo({
+          left: Math.max(0, scrollPosition),
+          behavior: 'smooth'
+        })
+      }
+    }
+  }, [selectedIndex, plottedPoints])
+
   return (
     <div className="temperature-graph">
-      <div className="temperature-chart-container">
+      <div ref={containerRef} className="temperature-chart-container">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="temperature-chart"
           preserveAspectRatio="xMinYMid meet"
         >
           {path && <path d={path} className="temperature-chart-line" />}
-          {plottedPoints.map((point) => (
+          {plottedPoints.map((point, index) => (
             <g key={point.id ?? point.hourLabel}>
-              <circle cx={point.x} cy={point.y} r="1.6" className="temperature-chart-node" />
+              <circle 
+                cx={point.x} 
+                cy={point.y} 
+                r={point.isSelected ? "2.2" : "1.6"} 
+                className={`temperature-chart-node ${point.isSelected ? 'temperature-chart-node-selected' : ''}`}
+              />
               <text
                 x={point.x}
                 y={point.y - 6}
@@ -81,9 +109,14 @@ function TemperatureTrend({ data }) {
           ))}
         </svg>
       </div>
-      <div className="temperature-chart-hours">
+      <div ref={hoursRef} className="temperature-chart-hours">
         {plottedPoints.map((point) => (
-          <span key={`hour-${point.id ?? point.hourLabel}`}>{point.hourLabel}</span>
+          <span 
+            key={`hour-${point.id ?? point.hourLabel}`}
+            className={point.isSelected ? 'temperature-hour-selected' : ''}
+          >
+            {point.hourLabel}
+          </span>
         ))}
       </div>
     </div>
@@ -169,17 +202,50 @@ function WeatherUI({
         ? hourlyForecast.timezoneOffset
         : weatherData?.timezone ?? 0
 
-    const slice = entries.slice(0, 12)
+    // Get the selected hour (timeOverride or displayHour or current hour)
+    const selectedHour = timeOverride !== null && timeOverride !== undefined
+      ? timeOverride
+      : (displayHour !== null && displayHour !== undefined ? displayHour : new Date().getHours())
+
+    // Calculate the target timestamp for the selected hour
+    const now = new Date()
+    const selectedTime = new Date(now)
+    selectedTime.setHours(selectedHour, 0, 0, 0)
+    const selectedTimestamp = Math.floor(selectedTime.getTime() / 1000)
+
+    // Find the entry closest to the selected time
+    // Forecast entries are in 3-hour intervals, so we find the closest one
+    let closestIndex = 0
+    let minDiff = Infinity
+    entries.forEach((entry, index) => {
+      const entryTimestamp = entry.dt + timezoneOffset
+      const diff = Math.abs(entryTimestamp - selectedTimestamp)
+      if (diff < minDiff) {
+        minDiff = diff
+        closestIndex = index
+      }
+    })
+
+    // Start from the closest entry, show 12 hours forward (4 entries = 12 hours at 3-hour intervals)
+    // But we want to show 12 data points, so we need 12 entries
+    startIndex = Math.max(0, Math.min(closestIndex, entries.length - 12))
+    const slice = entries.slice(startIndex, startIndex + 12)
     if (slice.length === 0) return null
 
-    const points = slice.map((entry) => {
+    const points = slice.map((entry, index) => {
       const timestamp = (entry.dt + timezoneOffset) * 1000
       const date = new Date(timestamp)
       const hourLabel = date.toLocaleTimeString([], { hour: 'numeric' })
+      const entryHour = date.getHours()
       // Forecast API uses main.temp, onecall uses temp directly
       const tempValue = typeof entry.temp === 'number' 
         ? entry.temp 
         : (typeof entry.main?.temp === 'number' ? entry.main.temp : NaN)
+      // Check if this entry matches the selected hour (within 1.5 hours since entries are 3-hour intervals)
+      const entryTimestamp = entry.dt + timezoneOffset
+      const timeDiff = Math.abs(entryTimestamp - selectedTimestamp)
+      const isSelected = timeDiff <= 5400 // 1.5 hours in seconds (closest match)
+      
       return {
         id: entry.dt,
         temp: tempValue,
@@ -187,7 +253,10 @@ function WeatherUI({
         hourLabel,
         icon: getWeatherIcon(entry.weather?.[0]?.main),
         condition: entry.weather?.[0]?.main || '',
-        description: entry.weather?.[0]?.description || ''
+        description: entry.weather?.[0]?.description || '',
+        hour: entryHour,
+        isSelected,
+        index: startIndex + index
       }
     }).filter((point) => Number.isFinite(point.temp))
 
@@ -197,8 +266,8 @@ function WeatherUI({
     const min = Math.min(...temps)
     const max = Math.max(...temps)
 
-    return { points, min, max }
-  }, [hourlyForecast, weatherData])
+    return { points, min, max, selectedIndex: points.findIndex(p => p.isSelected) }
+  }, [hourlyForecast, weatherData, timeOverride, displayHour])
 
   return (
     <div className="weather-ui">
