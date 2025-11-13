@@ -35,15 +35,12 @@ The app will open in your browser at `http://localhost:3000`
 
 ### 4. Set Up API Key
 
-**Option A: Environment Variable (Recommended for Vercel)**
+**Option A: Environment Variable (Required for Vercel)**
 1. Create a `.env` file in the root directory
-2. Add: `VITE_OPENWEATHER_API_KEY=your_api_key_here`
-3. For Vercel: Set `VITE_OPENWEATHER_API_KEY` in your Vercel project settings under Environment Variables
+2. Add: `OPENWEATHER_API_KEY=your_api_key_here`
+3. For Vercel: Set `OPENWEATHER_API_KEY` in your Vercel project settings under Environment Variables
 
-**Option B: Manual Entry**
-- Click the 🔑 button in the top bar
-- Paste your OpenWeatherMap API key
-- Your key will be saved locally for future use
+**Note:** The API key must be set as an environment variable. Manual entry is no longer available.
 
 ## Usage
 
@@ -77,7 +74,7 @@ The app will open in your browser at `http://localhost:3000`
 2. Import your repository in Vercel
 3. Add environment variable:
    - Go to Project Settings → Environment Variables
-   - Add `VITE_OPENWEATHER_API_KEY` with your OpenWeatherMap API key
+   - Add `OPENWEATHER_API_KEY` with your OpenWeatherMap API key
 4. Deploy!
 
 The app will automatically build and deploy. The `vercel.json` file is configured for Vite.

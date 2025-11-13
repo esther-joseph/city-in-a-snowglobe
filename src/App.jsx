@@ -669,7 +669,7 @@ function App() {
 
   const fetchWeather = async (cityName) => {
     // Get API key from Vercel environment variable
-    const envApiKey = import.meta.env.VITE_OPENWEATHER_API_KEY || import.meta.env.OPENWEATHER_API_KEY
+    const envApiKey = import.meta.env.OPENWEATHER_API_KEY
     
     if (!envApiKey) {
       setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
@@ -731,7 +731,7 @@ function App() {
 
   useEffect(() => {
     // Get API key from Vercel environment variable
-    const envApiKey = import.meta.env.VITE_OPENWEATHER_API_KEY || import.meta.env.OPENWEATHER_API_KEY
+    const envApiKey = import.meta.env.OPENWEATHER_API_KEY
     
     if (envApiKey) {
       fetchWeather(city)
