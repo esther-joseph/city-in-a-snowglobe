@@ -1,0 +1,726 @@
+import React, { useRef, useMemo, useEffect, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Icosahedron, Sphere } from '@react-three/drei'
+import * as THREE from 'three'
+
+function RainParticles() {
+  const instancedMeshRef = useRef()
+  const count = 1000
+
+  const teardropGeometry = useMemo(() => {
+    // Create a teardrop shape using lathe geometry
+    const points = []
+    const segments = 16
+    const scale = 3.5 // Increased size multiplier
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments
+      // Teardrop curve: wider at top, narrows to point at bottom
+      const radius = t < 0.7 ? 0.08 * scale * (1 - t * 0.5) : 0.08 * scale * (1 - t) * 3
+      points.push(new THREE.Vector2(radius, -t * 0.3 * scale))
+    }
+    return new THREE.LatheGeometry(points, 8)
+  }, [])
+
+  const particles = useMemo(() => {
+    const positions = new Float32Array(count * 3)
+    const velocities = new Float32Array(count)
+    const horizontalSpan = 58
+    const verticalSpan = 25
+    const baseHeight = 25 // Raised starting height
+    
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
+      positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
+      positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
+      velocities[i] = Math.random() * 0.35 + 0.25
+    }
+
+    return { positions, velocities, horizontalSpan, verticalSpan, baseHeight }
+  }, [])
+
+  useEffect(() => {
+    if (!instancedMeshRef.current) return
+    const matrix = new THREE.Matrix4()
+    for (let i = 0; i < count; i++) {
+      matrix.makeRotationX(Math.PI) // Rotate 180 degrees to point downward
+      matrix.setPosition(
+        particles.positions[i * 3],
+        particles.positions[i * 3 + 1],
+        particles.positions[i * 3 + 2]
+      )
+      instancedMeshRef.current.setMatrixAt(i, matrix)
+    }
+    instancedMeshRef.current.instanceMatrix.needsUpdate = true
+  }, [particles, count])
+
+  useFrame(() => {
+    if (!instancedMeshRef.current) return
+    
+    const positions = particles.positions
+    
+    for (let i = 0; i < count; i++) {
+      positions[i * 3 + 1] -= particles.velocities[i]
+      
+      if (positions[i * 3 + 1] < -6) {
+        positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
+        positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
+        positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
+      }
+    }
+    
+    // Update instanced mesh positions and rotations (teardrops point downward)
+    const matrix = new THREE.Matrix4()
+    for (let i = 0; i < count; i++) {
+      matrix.makeRotationX(Math.PI) // Rotate 180 degrees to point downward
+      matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+      instancedMeshRef.current.setMatrixAt(i, matrix)
+    }
+    instancedMeshRef.current.instanceMatrix.needsUpdate = true
+  })
+
+  return (
+    <instancedMesh ref={instancedMeshRef} args={[teardropGeometry, null, count]}>
+      <meshStandardMaterial
+        color="#87CEEB"
+        transparent
+        opacity={0.7}
+        roughness={0.1}
+        metalness={0.1}
+      />
+    </instancedMesh>
+  )
+}
+
+function SnowParticles() {
+  const points = useRef()
+  const count = 800
+
+  const particles = useMemo(() => {
+    const positions = new Float32Array(count * 3)
+    const velocities = new Float32Array(count)
+    const horizontalSpan = 24
+    const verticalSpan = 26
+    
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
+      positions[i * 3 + 1] = Math.random() * verticalSpan + 3
+      positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
+      velocities[i] = Math.random() * 0.1 + 0.05
+    }
+    
+    return { positions, velocities, horizontalSpan, verticalSpan }
+  }, [])
+
+  useFrame((state) => {
+    if (!points.current) return
+    
+    const positions = points.current.geometry.attributes.position.array
+    const time = state.clock.elapsedTime
+    
+    for (let i = 0; i < count; i++) {
+      positions[i * 3 + 1] -= particles.velocities[i]
+      positions[i * 3] += Math.sin(time + i) * 0.01
+      
+      if (positions[i * 3 + 1] < 0) {
+        positions[i * 3 + 1] = particles.verticalSpan + 3
+        positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
+        positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
+      }
+    }
+    
+    points.current.geometry.attributes.position.needsUpdate = true
+  })
+
+  return (
+    <points ref={points}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={count}
+          array={particles.positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.3}
+        color="#FFFFFF"
+        transparent
+        opacity={0.8}
+        sizeAttenuation
+      />
+    </points>
+  )
+}
+
+function ThunderboltParticles() {
+  const instancedMeshRef = useRef()
+  const glowMeshRef = useRef()
+  const count = 15 // Fewer bolts than rain drops
+
+  // Create zigzag lightning bolt geometry
+  const boltGeometry = useMemo(() => {
+    const shape = new THREE.Shape()
+    const width = 0.15
+    const height = 2.5
+    
+    // Create zigzag path
+    shape.moveTo(0, 0)
+    shape.lineTo(width * 0.3, height * 0.2)
+    shape.lineTo(-width * 0.2, height * 0.4)
+    shape.lineTo(width * 0.4, height * 0.6)
+    shape.lineTo(-width * 0.3, height * 0.8)
+    shape.lineTo(width * 0.2, height)
+    shape.lineTo(0, height)
+    shape.lineTo(-width * 0.2, height * 0.8)
+    shape.lineTo(width * 0.3, height * 0.6)
+    shape.lineTo(-width * 0.4, height * 0.4)
+    shape.lineTo(width * 0.2, height * 0.2)
+    shape.lineTo(0, 0)
+    
+    const extrudeSettings = {
+      depth: 0.1,
+      bevelEnabled: false
+    }
+    return new THREE.ExtrudeGeometry(shape, extrudeSettings)
+  }, [])
+
+  const particles = useMemo(() => {
+    const positions = new Float32Array(count * 3)
+    const velocities = new Float32Array(count)
+    const visibilities = new Float32Array(count) // Track if bolt is visible/flashing
+    const horizontalSpan = 58
+    const verticalSpan = 25
+    const baseHeight = 35 // Start at cloud height
+    
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
+      positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
+      positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
+      velocities[i] = Math.random() * 0.8 + 0.6 // Faster than rain
+      visibilities[i] = 0 // Start invisible
+    }
+
+    return { positions, velocities, visibilities, horizontalSpan, verticalSpan, baseHeight }
+  }, [])
+
+  useEffect(() => {
+    if (!instancedMeshRef.current || !glowMeshRef.current) return
+    const matrix = new THREE.Matrix4()
+    for (let i = 0; i < count; i++) {
+      // Rotate to point downward
+      matrix.makeRotationX(Math.PI / 2)
+      matrix.setPosition(
+        particles.positions[i * 3],
+        particles.positions[i * 3 + 1],
+        particles.positions[i * 3 + 2]
+      )
+      instancedMeshRef.current.setMatrixAt(i, matrix)
+      glowMeshRef.current.setMatrixAt(i, matrix)
+    }
+    instancedMeshRef.current.instanceMatrix.needsUpdate = true
+    glowMeshRef.current.instanceMatrix.needsUpdate = true
+  }, [particles, count])
+
+  useFrame(() => {
+    if (!instancedMeshRef.current || !glowMeshRef.current) return
+    
+    const positions = particles.positions
+    const visibilities = particles.visibilities
+    
+    for (let i = 0; i < count; i++) {
+      // Update visibility (flashing effect - fade out quickly)
+      if (visibilities[i] > 0) {
+        visibilities[i] -= 0.08 // Fade out faster
+      }
+      
+      // Move bolt downward
+      positions[i * 3 + 1] -= particles.velocities[i]
+      
+      // Respawn at top when it reaches bottom or becomes invisible
+      if (positions[i * 3 + 1] < -6 || visibilities[i] <= 0) {
+        // Random chance to spawn a new bolt
+        if (Math.random() < 0.015) { // 1.5% chance per frame
+          positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
+          positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
+          positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
+          visibilities[i] = 1.0 // Make visible
+          particles.velocities[i] = Math.random() * 0.8 + 0.6
+        } else {
+          // Keep it hidden at bottom
+          positions[i * 3 + 1] = -10
+          visibilities[i] = 0
+        }
+      }
+    }
+    
+    // Update instanced mesh positions and scales
+    for (let i = 0; i < count; i++) {
+      // Main bolt
+      const matrix = new THREE.Matrix4()
+      matrix.makeRotationX(Math.PI / 2) // Point downward
+      matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+      instancedMeshRef.current.setMatrixAt(i, matrix)
+      
+      // Glow effect (scaled up)
+      const glowMatrix = new THREE.Matrix4()
+      glowMatrix.makeRotationX(Math.PI / 2)
+      glowMatrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+      glowMatrix.scale(new THREE.Vector3(1.3, 1.3, 1.3))
+      glowMeshRef.current.setMatrixAt(i, glowMatrix)
+    }
+    instancedMeshRef.current.instanceMatrix.needsUpdate = true
+    glowMeshRef.current.instanceMatrix.needsUpdate = true
+    
+    // Update material opacity per instance would require custom shader
+    // For now, use average visibility for all bolts
+    const avgVisibility = visibilities.reduce((a, b) => a + b, 0) / count
+    if (instancedMeshRef.current.material) {
+      instancedMeshRef.current.material.opacity = Math.max(0, Math.min(1, avgVisibility * 0.95))
+    }
+    if (glowMeshRef.current.material) {
+      glowMeshRef.current.material.opacity = Math.max(0, Math.min(1, avgVisibility * 0.4))
+    }
+  })
+
+  return (
+    <>
+      {/* Main bolts */}
+      <instancedMesh ref={instancedMeshRef} args={[boltGeometry, null, count]}>
+        <meshStandardMaterial
+          color="#FFFFAA"
+          emissive="#FFFF88"
+          emissiveIntensity={2}
+          transparent
+          opacity={0.95}
+        />
+      </instancedMesh>
+      {/* Glow effect */}
+      <instancedMesh ref={glowMeshRef} args={[boltGeometry, null, count]}>
+        <meshStandardMaterial
+          color="#AAAAFF"
+          emissive="#8888FF"
+          emissiveIntensity={1.5}
+          transparent
+          opacity={0.4}
+        />
+      </instancedMesh>
+    </>
+  )
+}
+
+function Thunderbolts({ weatherType, weatherDescription, forceThunder = false }) {
+  const hasThunder = forceThunder || weatherType?.includes('thunder') || weatherDescription?.includes('thunder')
+  if (!hasThunder) return null
+
+  return <ThunderboltParticles />
+}
+
+function CloudLayer({ weatherType, windDirection, windSpeed, weatherData }) {
+  const density = useMemo(() => {
+    // Get cloud coverage percentage from API (0-100)
+    const cloudCoverage = weatherData?.clouds?.all ?? 0
+    const cloudCoverageFactor = cloudCoverage / 100 // Normalize to 0-1
+    
+    // Base density from weather type
+    // Increased rain density significantly for more dramatic effect
+    let baseDensity = 0.4
+    if (weatherType.includes('storm')) baseDensity = 1
+    else if (weatherType.includes('rain') || weatherType.includes('drizzle')) baseDensity = 0.95
+    else if (weatherType.includes('cloud')) baseDensity = 0.6
+    
+    // When raining, prioritize base density more heavily for denser clouds
+    const isRaining = weatherType.includes('rain') || weatherType.includes('drizzle')
+    const weatherWeight = isRaining ? 0.7 : 0.4 // Give rain condition 70% weight
+    const coverageWeight = isRaining ? 0.3 : 0.6 // Cloud coverage has less weight when raining
+    
+    // Combine weather type with cloud coverage for more accurate density
+    const combinedDensity = baseDensity * weatherWeight + cloudCoverageFactor * coverageWeight
+    
+    // Ensure density is between 0.2 and 1.0
+    return Math.max(0.2, Math.min(1.0, combinedDensity))
+  }, [weatherType, weatherData])
+
+  const windVector = useMemo(() => {
+    if (!windDirection && windDirection !== 0) return { x: 0.05, z: 0.03 }
+    const radians = (windDirection * Math.PI) / 180
+    const speedFactor = 0.05 + Math.min(windSpeed, 15) / 60
+    return {
+      x: Math.sin(radians) * speedFactor,
+      z: Math.cos(radians) * speedFactor
+    }
+  }, [windDirection, windSpeed])
+
+  const cloudConfigs = useMemo(() => {
+    const cloudCount = Math.round(6 + density * 6)
+    const baseRadius = 40
+    const radiusJitter = 11
+    // Raise clouds higher when raining to be above rain particles (rain is at y=25-50)
+    const isRaining = weatherType.includes('rain') || weatherType.includes('drizzle')
+    const minHeight = isRaining ? 35 : 28
+    const heightJitter = 10
+    return Array.from({ length: cloudCount }).map((_, index) => {
+      const angle = (index / cloudCount) * Math.PI * 2 + Math.random() * 0.4
+      const radius = baseRadius + Math.random() * radiusJitter
+      const height = minHeight + Math.random() * heightJitter
+      const baseScale = 1.85 + Math.random() * 1.25 * density
+      const puffCount = 4 + Math.floor(Math.random() * 3)
+
+      const puffs = Array.from({ length: puffCount }).map((__, puffIndex) => {
+        const puffScale = 0.65 + Math.random() * 0.45
+        const puffOffsetAngle = (puffIndex / puffCount) * Math.PI * 2
+        const puffRadius = 0.6 + Math.random() * 0.3
+        return {
+          key: `cloud-${index}-puff-${puffIndex}`,
+          scale: puffScale,
+          offset: [
+            Math.cos(puffOffsetAngle) * puffRadius,
+            (Math.random() - 0.5) * 0.45,
+            Math.sin(puffOffsetAngle) * puffRadius
+          ],
+          wobblePhase: {
+            x: Math.random() * Math.PI * 2,
+            y: Math.random() * Math.PI * 2,
+            z: Math.random() * Math.PI * 2
+          }
+        }
+      })
+
+      return {
+        key: `cloud-${index}`,
+        position: [Math.cos(angle) * radius, height, Math.sin(angle) * radius],
+        scale: baseScale,
+        opacity: 0.28 + density * 0.22 + Math.random() * 0.08,
+        speed: 0.35 + Math.random() * 0.25,
+        wobble: {
+          x: Math.random() * Math.PI * 2,
+          y: Math.random() * Math.PI * 2,
+          z: Math.random() * Math.PI * 2
+        },
+        puffs
+      }
+    })
+  }, [density, weatherType])
+
+  const cloudRefs = useMemo(
+    () => cloudConfigs.map(() => React.createRef()),
+    [cloudConfigs.length]
+  )
+
+  const driftVector = useMemo(() => ({ x: windVector.x, z: windVector.z }), [windVector])
+
+  useFrame((state, delta) => {
+    const moveX = driftVector.x * delta * 12
+    const moveZ = driftVector.z * delta * 12
+    const wrapRadius = 52
+    const time = state.clock.elapsedTime
+
+    cloudRefs.forEach((ref, index) => {
+      const cloud = ref.current
+      if (!cloud) return
+
+      const config = cloudConfigs[index]
+      cloud.position.x += moveX + config.speed * 0.03
+      cloud.position.z += moveZ
+      cloud.position.y += Math.sin(time * 0.25 + index) * 0.02
+
+      const wobble = config.wobble
+      cloud.children.forEach((child, childIndex) => {
+        if (childIndex === 0) return
+        const puff = config.puffs[childIndex - 1]
+        const offset = puff.offset
+        const wobblePhase = puff.wobblePhase
+        child.position.x =
+          offset[0] + Math.sin(time * 0.6 + wobble.x + wobblePhase.x) * 0.12
+        child.position.z =
+          offset[2] + Math.cos(time * 0.55 + wobble.z + wobblePhase.z) * 0.12
+        child.position.y =
+          offset[1] + Math.sin(time * 0.7 + wobble.y + wobblePhase.y) * 0.08
+        child.rotation.y += delta * 0.12
+      })
+
+      if (cloud.position.x > wrapRadius) cloud.position.x = -wrapRadius
+      if (cloud.position.x < -wrapRadius) cloud.position.x = wrapRadius
+      if (cloud.position.z > wrapRadius) cloud.position.z = -wrapRadius
+      if (cloud.position.z < -wrapRadius) cloud.position.z = wrapRadius
+    })
+  })
+
+
+  return (
+    <group>
+      {cloudConfigs.map((cloud, index) => (
+        <group
+          key={cloud.key}
+          ref={cloudRefs[index]}
+          position={cloud.position}
+          scale={[cloud.scale * 2.6, cloud.scale * 1.9, cloud.scale * 2.6]}
+        >
+          <Icosahedron args={[0.95, 1]}>
+            <meshStandardMaterial
+              color="#ffffff"
+              transparent
+              opacity={cloud.opacity}
+              roughness={0.22}
+              metalness={0.02}
+            />
+          </Icosahedron>
+          {cloud.puffs.map((puff) => (
+            <group key={puff.key} position={puff.offset} scale={puff.scale}>
+              <Sphere args={[0.6, 16, 16]}>
+                <meshStandardMaterial
+                  color="#fefeff"
+                  transparent
+                  opacity={cloud.opacity * 0.95}
+                  roughness={0.3}
+                  metalness={0.02}
+                />
+              </Sphere>
+              <Icosahedron args={[0.45, 1]}>
+          <meshStandardMaterial
+                  color="#ffffff"
+            transparent
+                  opacity={cloud.opacity * 0.85}
+                  roughness={0.25}
+                  metalness={0.015}
+                />
+              </Icosahedron>
+            </group>
+          ))}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+function StarLayer({ windDirection, windSpeed }) {
+  const windVector = useMemo(() => {
+    if (!windDirection && windDirection !== 0) return { x: 0.03, z: 0.05 }
+    const radians = (windDirection * Math.PI) / 180
+    const speedFactor = 0.03 + Math.min(windSpeed || 0, 12) / 70
+    return {
+      x: Math.sin(radians) * speedFactor,
+      z: Math.cos(radians) * speedFactor
+    }
+  }, [windDirection, windSpeed])
+
+  const driftVector = useMemo(() => ({ x: windVector.x, z: windVector.z }), [windVector])
+
+  const starConfigs = useMemo(() => {
+    const count = 26
+    return Array.from({ length: count }).map((_, index) => {
+      const angle = (index / count) * Math.PI * 2 + Math.random() * 0.4
+      const radius = 34 + Math.random() * 26
+      const height = 39 + Math.random() * 6
+      const baseScale = 0.55 + Math.random() * 0.6
+      return {
+        key: `night-star-${index}`,
+        position: [Math.cos(angle) * radius, height, Math.sin(angle) * radius],
+        baseScale,
+        speed: 0.2 + Math.random() * 0.35,
+        twinkleSpeed: 0.8 + Math.random() * 1.4,
+        twinklePhase: Math.random() * Math.PI * 2,
+        initialXRotation: Math.random() * Math.PI * 2, // Random x-orientation
+        initialYRotation: Math.random() * Math.PI * 2, // Random y-orientation
+        initialZRotation: Math.random() * Math.PI * 2 // Random z-orientation
+      }
+    })
+  }, [])
+
+  return (
+    <group>
+      {starConfigs.map((star) => (
+        <CuteStarInstance
+          key={star.key}
+          config={star}
+          driftVector={driftVector}
+          wrapRadius={68}
+        />
+      ))}
+    </group>
+  )
+}
+
+const starGeometry = (() => {
+  // Create a stellated octahedron (stella octangula) - a proper stellated polyhedron
+  // This creates a star shape with 8 spikes extending from a central octahedron
+  const baseRadius = 0.3
+  const spikeLength = 0.4
+  
+  // Create vertices for a stellated octahedron
+  // An octahedron has 6 vertices, we'll create spikes from each face
+  const vertices = []
+  const indices = []
+  
+  // Base octahedron vertices (6 vertices)
+  const octahedronVerts = [
+    [0, baseRadius, 0],      // Top
+    [0, -baseRadius, 0],     // Bottom
+    [baseRadius, 0, 0],      // Right
+    [-baseRadius, 0, 0],     // Left
+    [0, 0, baseRadius],      // Front
+    [0, 0, -baseRadius]      // Back
+  ]
+  
+  // For each face of the octahedron, create a spike
+  // An octahedron has 8 triangular faces
+  const faces = [
+    // Top faces
+    [0, 2, 4], [0, 4, 3], [0, 3, 5], [0, 5, 2],
+    // Bottom faces
+    [1, 4, 2], [1, 3, 4], [1, 5, 3], [1, 2, 5]
+  ]
+  
+  let vertexIndex = 0
+  
+  // Create spikes by extending each face outward
+  faces.forEach((face, faceIndex) => {
+    // Calculate face center
+    const v0 = octahedronVerts[face[0]]
+    const v1 = octahedronVerts[face[1]]
+    const v2 = octahedronVerts[face[2]]
+    
+    const centerX = (v0[0] + v1[0] + v2[0]) / 3
+    const centerY = (v0[1] + v1[1] + v2[1]) / 3
+    const centerZ = (v0[2] + v1[2] + v2[2]) / 3
+    
+    // Normalize to get direction
+    const length = Math.sqrt(centerX * centerX + centerY * centerY + centerZ * centerZ)
+    const nx = centerX / length
+    const ny = centerY / length
+    const nz = centerZ / length
+    
+    // Spike tip
+    const spikeTip = [
+      nx * (baseRadius + spikeLength),
+      ny * (baseRadius + spikeLength),
+      nz * (baseRadius + spikeLength)
+    ]
+    
+    // Add the three base vertices and spike tip
+    const baseV0 = vertexIndex++
+    const baseV1 = vertexIndex++
+    const baseV2 = vertexIndex++
+    const tip = vertexIndex++
+    
+    vertices.push(...v0, ...v1, ...v2, ...spikeTip)
+    
+    // Create three triangular faces from base to tip
+    indices.push(baseV0, baseV1, tip)
+    indices.push(baseV1, baseV2, tip)
+    indices.push(baseV2, baseV0, tip)
+  })
+  
+  // Create geometry
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  
+  return geometry
+})()
+
+function CuteStarInstance({ config, driftVector, wrapRadius }) {
+  const starRef = useRef()
+
+  // Set initial x, y, and z rotations
+  useEffect(() => {
+    if (starRef.current) {
+      if (config.initialXRotation !== undefined) {
+        starRef.current.rotation.x = config.initialXRotation
+      }
+      if (config.initialYRotation !== undefined) {
+        starRef.current.rotation.y = config.initialYRotation
+      }
+      if (config.initialZRotation !== undefined) {
+        starRef.current.rotation.z = config.initialZRotation
+      }
+    }
+  }, [config.initialXRotation, config.initialYRotation, config.initialZRotation])
+
+  useFrame((state, delta) => {
+    if (!starRef.current) return
+    const { speed, baseScale, twinkleSpeed, twinklePhase } = config
+    starRef.current.position.x += driftVector.x * delta * 10 + speed * 0.02
+    starRef.current.position.z += driftVector.z * delta * 10
+    const time = state.clock.elapsedTime
+    const twinkle = 0.25 + Math.sin(time * twinkleSpeed + twinklePhase) * 0.18
+    const scaleValue = baseScale + twinkle
+    starRef.current.scale.set(scaleValue, scaleValue, scaleValue)
+    starRef.current.rotation.z += delta * 0.35
+
+    if (starRef.current.position.x > wrapRadius) starRef.current.position.x = -wrapRadius
+    if (starRef.current.position.x < -wrapRadius) starRef.current.position.x = wrapRadius
+    if (starRef.current.position.z > wrapRadius) starRef.current.position.z = -wrapRadius
+    if (starRef.current.position.z < -wrapRadius) starRef.current.position.z = wrapRadius
+  })
+
+  return (
+    <group ref={starRef} position={config.position}>
+      <mesh geometry={starGeometry}>
+        <meshStandardMaterial
+          color="#ffd966"
+          emissive="#ffefa1"
+          emissiveIntensity={0.85}
+          roughness={0.35}
+          metalness={0.1}
+        />
+      </mesh>
+    </group>
+  )
+}
+
+function WeatherEffects({
+  weatherData,
+  forceClouds = false,
+  suppressClouds = false,
+  enableNightStars = false,
+  forceThunder = false,
+  forceSnow = false
+}) {
+  const weatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
+  const weatherDescription = weatherData?.weather?.[0]?.description?.toLowerCase?.() || ''
+  const windSpeed = weatherData?.wind?.speed || 0
+  const windDirection = weatherData?.wind?.deg
+
+  const hasRain = weatherType.includes('rain') || weatherType.includes('drizzle')
+  const hasSnow = weatherType.includes('snow') || forceSnow
+  const hasCuteClouds =
+    !suppressClouds &&
+    (forceClouds ||
+    forceThunder || // Show clouds when thunder is forced
+    forceSnow || // Show clouds when snow is forced
+    hasRain || // Show clouds when raining
+    weatherType.includes('cloud') ||
+    weatherDescription.includes('scattered') ||
+    weatherDescription.includes('broken clouds') ||
+    weatherDescription.includes('few clouds') ||
+    weatherDescription.includes('overcast'))
+  const hasWind = false
+
+  const hasThunderstorm = weatherType.includes('thunder') || weatherDescription.includes('thunder') || forceThunder
+
+  return (
+    <>
+      {hasRain && <RainParticles />}
+      {(hasSnow || forceSnow) && <SnowParticles />}
+      {hasCuteClouds && (
+        <CloudLayer
+          weatherType={weatherType}
+          windDirection={windDirection}
+          windSpeed={windSpeed}
+          weatherData={weatherData}
+        />
+      )}
+      {(hasThunderstorm || forceThunder) && (
+        <Thunderbolts 
+          weatherType={weatherType} 
+          weatherDescription={weatherDescription} 
+          forceThunder={forceThunder}
+        />
+      )}
+      {enableNightStars && <StarLayer windDirection={windDirection} windSpeed={windSpeed} />}
+    </>
+  )
+}
+
+export default WeatherEffects

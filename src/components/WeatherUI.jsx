@@ -1,0 +1,426 @@
+import React, { useState, useMemo } from 'react'
+import './WeatherUI.css'
+
+const WEATHER_ICON_MAP = {
+  Clear: '☀️',
+  Clouds: '☁️',
+  Rain: '🌧️',
+  Drizzle: '🌦️',
+  Thunderstorm: '⛈️',
+  Snow: '❄️',
+  Mist: '🌫️',
+  Fog: '🌫️',
+  Haze: '🌫️'
+}
+
+function getWeatherIcon(weatherMain) {
+  if (!weatherMain) return '🌤️'
+  return WEATHER_ICON_MAP[weatherMain] || '🌤️'
+}
+
+function TemperatureTrend({ data }) {
+  if (!data?.points?.length) return null
+
+  const { points, min, max } = data
+  const width = 100
+  const height = 80
+  const paddingX = 8
+  const paddingY = 18
+  const innerWidth = width - paddingX * 2
+  const innerHeight = height - paddingY * 2
+  const range = max - min === 0 ? 1 : max - min
+
+  const plottedPoints = points.map((point, index) => {
+    const ratio = points.length > 1 ? index / (points.length - 1) : 0.5
+    const x = paddingX + ratio * innerWidth
+    const normalized = (point.temp - min) / range
+    const y = paddingY + (1 - normalized) * innerHeight
+    return { ...point, x, y }
+  })
+
+  const path = plottedPoints.reduce((acc, point, index) => {
+    const segment = `${point.x.toFixed(2)} ${point.y.toFixed(2)}`
+    if (index === 0) return `M ${segment}`
+    return `${acc} L ${segment}`
+  }, '')
+
+  return (
+    <div className="temperature-graph">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="temperature-chart"
+        preserveAspectRatio="none"
+      >
+        {path && <path d={path} className="temperature-chart-line" />}
+        {plottedPoints.map((point) => (
+          <g key={point.id ?? point.hourLabel}>
+            <circle cx={point.x} cy={point.y} r="1.6" className="temperature-chart-node" />
+            <text
+              x={point.x}
+              y={point.y - 6}
+              textAnchor="middle"
+              fontSize="6"
+              className="temperature-chart-icon"
+            >
+              {point.icon}
+            </text>
+            <text
+              x={point.x}
+              y={point.y + 8}
+              textAnchor="middle"
+              fontSize="6"
+              className="temperature-chart-temp"
+            >
+              {`${point.roundedTemp}°`}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="temperature-chart-hours">
+        {plottedPoints.map((point) => (
+          <span key={`hour-${point.id ?? point.hourLabel}`}>{point.hourLabel}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function WeatherUI({
+  weatherData,
+  hourlyForecast,
+  loading,
+  error,
+  onSearch,
+  currentCity,
+  onTimeAdjust,
+  timeOverride,
+  displayHour,
+  onThunderToggle,
+  forceThunder = false,
+  onSnowToggle,
+  forceSnow = false
+}) {
+  const [city, setCity] = useState(currentCity)
+  const [apiKey, setApiKey] = useState('')
+  const [showApiInput, setShowApiInput] = useState(false)
+  const [viewMode, setViewMode] = useState('informational')
+  const VIEW_MODES = [
+    { id: 'minimal', label: 'Minimal' },
+    { id: 'compact', label: 'Compact' },
+    { id: 'informational', label: 'Informational' }
+  ]
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (city.trim()) {
+      onSearch(city, apiKey)
+      setShowApiInput(false)
+    }
+  }
+
+  const formattedTimeLabel = useMemo(() => {
+    const formatHour = (hour) => {
+      if (hour === null || hour === undefined || Number.isNaN(hour)) return '--'
+      return String(Math.round(hour)).padStart(2, '0')
+    }
+    if (timeOverride !== null && timeOverride !== undefined) {
+      return `${formatHour(timeOverride)}:00`
+    }
+    if (displayHour !== null && displayHour !== undefined) {
+      return `Auto (${formatHour(displayHour)}:00)`
+    }
+    return 'Auto (--:00)'
+  }, [timeOverride, displayHour])
+
+  const formatLocalTime = (seconds) => {
+    if (!seconds || !weatherData) return '--'
+    const timezone = weatherData.timezone ?? 0
+    const date = new Date((seconds + timezone) * 1000)
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const temperatureC = weatherData?.main?.temp
+  const temperatureF =
+    typeof temperatureC === 'number' ? (temperatureC * 9) / 5 + 32 : undefined
+  const temperatureLabel =
+    temperatureC !== undefined && temperatureF !== undefined
+      ? `${Math.round(temperatureC)}°C / ${Math.round(temperatureF)}°F`
+      : '--'
+  const feelsLike = weatherData?.main?.feels_like
+  const humidity = weatherData?.main?.humidity
+  const windSpeed = weatherData?.wind?.speed
+  const description = weatherData?.weather?.[0]?.description
+  const iconMain = weatherData?.weather?.[0]?.main
+  const sunrise = formatLocalTime(weatherData?.sys?.sunrise)
+  const sunset = formatLocalTime(weatherData?.sys?.sunset)
+
+  const hourlyTrend = useMemo(() => {
+    const entries = hourlyForecast?.entries
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return null
+    }
+
+    const timezoneOffset =
+      typeof hourlyForecast?.timezoneOffset === 'number'
+        ? hourlyForecast.timezoneOffset
+        : weatherData?.timezone ?? 0
+
+    const slice = entries.slice(0, 12)
+    if (slice.length === 0) return null
+
+    const points = slice.map((entry) => {
+      const timestamp = (entry.dt + timezoneOffset) * 1000
+      const date = new Date(timestamp)
+      const hourLabel = date.toLocaleTimeString([], { hour: 'numeric' })
+      const tempValue = typeof entry.temp === 'number' ? entry.temp : NaN
+      return {
+        id: entry.dt,
+        temp: tempValue,
+        roundedTemp: Number.isFinite(tempValue) ? Math.round(tempValue) : '--',
+        hourLabel,
+        icon: getWeatherIcon(entry.weather?.[0]?.main),
+        condition: entry.weather?.[0]?.main || '',
+        description: entry.weather?.[0]?.description || ''
+      }
+    }).filter((point) => Number.isFinite(point.temp))
+
+    if (points.length === 0) return null
+
+    const temps = points.map((point) => point.temp)
+    const min = Math.min(...temps)
+    const max = Math.max(...temps)
+
+    return { points, min, max }
+  }, [hourlyForecast, weatherData])
+
+  return (
+    <div className="weather-ui">
+      <div className="weather-header controls-top">
+        <div className="controls-hint">
+          <p>🖱️ Left click + drag to rotate | Scroll to zoom | Right click + drag to pan</p>
+        </div>
+        <h1>3D Weather City</h1>
+        <form onSubmit={handleSubmit} className="search-form">
+          <input
+            type="text"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="Enter city name..."
+            className="city-input"
+          />
+          <button type="submit" className="search-button" disabled={loading}>
+            {loading ? '⏳' : '🔍'}
+          </button>
+          <button 
+            type="button" 
+            className="api-button"
+            onClick={() => setShowApiInput(!showApiInput)}
+            title="Set API Key"
+          >
+            🔑
+          </button>
+        </form>
+        <div className="view-toggle">
+          {VIEW_MODES.map((mode) => (
+            <button
+              type="button"
+              key={mode.id}
+              className={`view-toggle-button${viewMode === mode.id ? ' active' : ''}`}
+              onClick={() => setViewMode(mode.id)}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {onThunderToggle && (
+            <button
+              type="button"
+              className={`thunder-toggle${forceThunder ? ' active' : ''}`}
+              onClick={() => onThunderToggle(!forceThunder)}
+              title="Toggle Thunder Test Mode"
+            >
+              ⚡ {forceThunder ? 'Thunder ON' : 'Thunder OFF'}
+            </button>
+          )}
+          {onSnowToggle && (
+            <button
+              type="button"
+              className={`snow-toggle${forceSnow ? ' active' : ''}`}
+              onClick={() => onSnowToggle(!forceSnow)}
+              title="Toggle Snow Test Mode"
+            >
+              ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {showApiInput && (
+        <div className="api-input-container">
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="Enter OpenWeatherMap API key..."
+            className="api-input"
+          />
+          <p className="api-hint">
+            Get your free API key at{' '}
+            <a 
+              href="https://openweathermap.org/api" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              openweathermap.org
+            </a>
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="error-message">
+          <p>⚠️ {error}</p>
+          {!apiKey && (
+            <p className="hint">Click the 🔑 button to add your API key</p>
+          )}
+        </div>
+      )}
+
+      <div className="weather-stack">
+        {weatherData && !loading ? (
+          viewMode === 'minimal' ? (
+            <div className="weather-summary">
+              <div className="summary-main">
+                <span className="summary-icon">{getWeatherIcon(iconMain)}</span>
+                <div className="summary-meta">
+                  <h2>{weatherData?.name}, {weatherData?.sys?.country}</h2>
+                  <p className="summary-temp">
+                    {temperatureLabel}
+                  </p>
+                  <p className="summary-desc">{description}</p>
+                </div>
+              </div>
+              <div className="summary-stats">
+                <span>💧 {humidity !== undefined ? `${humidity}%` : '--'}</span>
+                <span>💨 {windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
+                <span>🌅 {sunrise}</span>
+                <span>🌇 {sunset}</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className={`weather-info weather-info--${viewMode}`}>
+                <div className="weather-icon">
+                  {getWeatherIcon(iconMain)}
+                </div>
+                <div className="weather-details">
+                  <h2>{weatherData?.name}, {weatherData?.sys?.country}</h2>
+                  <p className="temperature">
+                    {temperatureLabel}
+                  </p>
+                  <p className="condition">{description}</p>
+                  <div className={`extra-info${viewMode === 'compact' ? ' extra-info--compact' : ''}`}>
+                    <span>💨 {windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
+                    <span>💧 {humidity !== undefined ? `${humidity}%` : '--'}</span>
+                    {viewMode === 'informational' && (
+                      <span>
+                        👁️ {weatherData?.visibility !== undefined
+                          ? `${(weatherData.visibility / 1000).toFixed(1)} km`
+                          : '--'}
+                      </span>
+                    )}
+                    {viewMode === 'informational' && feelsLike !== undefined && (
+                      <span>🌡️ Feels {Math.round(feelsLike)}°C</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {viewMode === 'informational' && (
+                <div className="time-card">
+                  <div className="time-card-header">
+                    <h3>Sun & Moon Timeline</h3>
+                    <span>{formattedTimeLabel}</span>
+                  </div>
+                  <div className="time-slider-container">
+                    <input
+                      id="time-of-day-slider"
+                      className="time-slider"
+                      type="range"
+                      min="0"
+                      max="23"
+                      step="1"
+                      value={timeOverride ?? displayHour ?? 0}
+                      onChange={(event) => {
+                        const newValue = Number(event.target.value)
+                        if (!Number.isNaN(newValue)) {
+                          onTimeAdjust(newValue)
+                        }
+                      }}
+                    />
+                    <div className="time-slider-markers">
+                      <span>Dawn</span>
+                      <span>Noon</span>
+                      <span>Dusk</span>
+                      <span>Midnight</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="time-reset-button"
+                      onClick={() => onTimeAdjust(null)}
+                    >
+                      Reset to Current Time
+                    </button>
+                  </div>
+                  <div className="time-details">
+                    <span>🌅 Sunrise {sunrise}</span>
+                    <span>🌇 Sunset {sunset}</span>
+                  </div>
+                </div>
+              )}
+
+              {viewMode === 'informational' && hourlyTrend && (
+                <div className="temperature-card">
+                  <div className="temperature-card-header">
+                    <h3>12-Hour Temperature</h3>
+                    <span>
+                      {`${Math.round(hourlyTrend.min)}° / ${Math.round(hourlyTrend.max)}°`}
+                    </span>
+                  </div>
+                  <TemperatureTrend data={hourlyTrend} />
+                </div>
+              )}
+
+              {viewMode === 'compact' && (
+                <div className="time-card time-card--compact">
+                  <div className="time-basic">
+                    <div>
+                      <span>Sunrise</span>
+                      <strong>{sunrise}</strong>
+                    </div>
+                    <div>
+                      <span>Sunset</span>
+                      <strong>{sunset}</strong>
+                    </div>
+                    <div>
+                      <span>Feels</span>
+                      <strong>{feelsLike !== undefined ? `${Math.round(feelsLike)}°C` : '--'}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )
+        ) : (
+          <div className="empty-panel">
+            Search for a city to see local weather and celestial timeline.
+          </div>
+        )}
+      </div>
+
+    </div>
+  )
+}
+
+export default WeatherUI

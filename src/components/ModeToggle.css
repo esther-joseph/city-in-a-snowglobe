@@ -1,0 +1,89 @@
+.mode-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: rgba(20, 24, 36, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 32px rgba(5, 8, 18, 0.28);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.mode-toggle__header h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  color: #f7f9ff;
+}
+
+.mode-toggle__header p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(226, 233, 255, 0.75);
+}
+
+.mode-toggle__options {
+  display: grid;
+  gap: 12px;
+}
+
+.mode-toggle__button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(30, 36, 52, 0.4);
+  color: #e9f0ff;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+  text-align: left;
+}
+
+.mode-toggle__button:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.mode-toggle__button.active {
+  border-color: rgba(118, 162, 255, 0.9);
+  background: linear-gradient(
+    145deg,
+    rgba(76, 128, 255, 0.28),
+    rgba(68, 106, 220, 0.21)
+  );
+  box-shadow: 0 12px 24px rgba(74, 118, 255, 0.22);
+}
+
+.mode-toggle__label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.mode-toggle__description {
+  font-size: 0.76rem;
+  color: rgba(208, 220, 250, 0.7);
+}
+
+.mode-toggle__footnote {
+  font-size: 0.72rem;
+  color: rgba(184, 194, 220, 0.68);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .mode-toggle {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .mode-toggle__button {
+    padding: 11px 12px;
+  }
+}
+
+
