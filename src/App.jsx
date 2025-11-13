@@ -717,6 +717,16 @@ function App() {
     }
   }
 
+  // Reload page on first launch
+  useEffect(() => {
+    const hasReloaded = sessionStorage.getItem('app-has-reloaded')
+    if (!hasReloaded) {
+      sessionStorage.setItem('app-has-reloaded', 'true')
+      window.location.reload()
+      return
+    }
+  }, [])
+
   useEffect(() => {
     if (weatherService) {
       fetchWeather(city)
