@@ -29,7 +29,7 @@ function WeatherDrawer({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed top-4 left-4 z-50 bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-lg shadow-lg hover:bg-black/90 transition-all duration-200 flex items-center gap-2 border border-white/10"
-        aria-label="Toggle Weather Info"
+        aria-label={isOpen ? "Close Weather Info" : "Open Weather Info"}
       >
         <svg
           className={`w-5 h-5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
@@ -39,7 +39,7 @@ function WeatherDrawer({
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
-        <span className="font-medium">Open Weather Info</span>
+        <span className="font-medium">{isOpen ? 'Close Weather Info' : 'Open Weather Info'}</span>
       </button>
 
       {/* Overlay */}
@@ -61,22 +61,6 @@ function WeatherDrawer({
         }}
       >
         <div className="p-6 flex flex-col gap-5">
-          {/* Close Button */}
-          <button
-            onClick={() => setIsOpen(false)}
-            className="self-end text-white/70 hover:text-white transition-colors p-2 -mr-2 -mt-2"
-            aria-label="Close drawer"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
           {/* Weather UI Components */}
           <WeatherUI
             weatherData={weatherData}
