@@ -228,7 +228,7 @@ function WeatherUI({
 
     // Start from the closest entry, show 12 hours forward (4 entries = 12 hours at 3-hour intervals)
     // But we want to show 12 data points, so we need 12 entries
-    startIndex = Math.max(0, Math.min(closestIndex, entries.length - 12))
+    const startIndex = Math.max(0, Math.min(closestIndex, entries.length - 12))
     const slice = entries.slice(startIndex, startIndex + 12)
     if (slice.length === 0) return null
 
