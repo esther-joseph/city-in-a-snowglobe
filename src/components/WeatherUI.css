@@ -430,19 +430,19 @@
 }
 
 .temperature-grid-line {
-  stroke: rgba(255, 255, 255, 1);
-  stroke-width: 0.8;
+  stroke: rgba(173, 216, 230, 0.7);
+  stroke-width: 0.5;
   vector-effect: non-scaling-stroke;
 }
 
 .temperature-grid-line-horizontal {
-  stroke: rgba(255, 255, 255, 1);
-  stroke-dasharray: 2, 4;
+  stroke: rgba(173, 216, 230, 0.7);
+  stroke-dasharray: none;
 }
 
 .temperature-grid-line-vertical {
-  stroke: rgba(255, 255, 255, 1);
-  stroke-dasharray: 1, 3;
+  stroke: rgba(173, 216, 230, 0.7);
+  stroke-dasharray: none;
 }
 
 .temperature-chart-line {
