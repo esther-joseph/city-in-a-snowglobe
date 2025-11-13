@@ -23,10 +23,12 @@ function TemperatureTrend({ data }) {
   if (!data?.points?.length) return null
 
   const { points, min, max } = data
-  const width = 100
-  const height = 80
-  const paddingX = 8
+  // Calculate width based on number of points - give each point 60px of space
+  const pointSpacing = 60
+  const paddingX = 20
   const paddingY = 18
+  const width = points.length * pointSpacing + paddingX * 2
+  const height = 80
   const innerWidth = width - paddingX * 2
   const innerHeight = height - paddingY * 2
   const range = max - min === 0 ? 1 : max - min
@@ -47,36 +49,38 @@ function TemperatureTrend({ data }) {
 
   return (
     <div className="temperature-graph">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="temperature-chart"
-        preserveAspectRatio="none"
-      >
-        {path && <path d={path} className="temperature-chart-line" />}
-        {plottedPoints.map((point) => (
-          <g key={point.id ?? point.hourLabel}>
-            <circle cx={point.x} cy={point.y} r="1.6" className="temperature-chart-node" />
-            <text
-              x={point.x}
-              y={point.y - 6}
-              textAnchor="middle"
-              fontSize="6"
-              className="temperature-chart-icon"
-            >
-              {point.icon}
-            </text>
-            <text
-              x={point.x}
-              y={point.y + 8}
-              textAnchor="middle"
-              fontSize="6"
-              className="temperature-chart-temp"
-            >
-              {`${point.roundedTemp}°`}
-            </text>
-          </g>
-        ))}
-      </svg>
+      <div className="temperature-chart-container">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="temperature-chart"
+          preserveAspectRatio="xMinYMid meet"
+        >
+          {path && <path d={path} className="temperature-chart-line" />}
+          {plottedPoints.map((point) => (
+            <g key={point.id ?? point.hourLabel}>
+              <circle cx={point.x} cy={point.y} r="1.6" className="temperature-chart-node" />
+              <text
+                x={point.x}
+                y={point.y - 6}
+                textAnchor="middle"
+                fontSize="6"
+                className="temperature-chart-icon"
+              >
+                {point.icon}
+              </text>
+              <text
+                x={point.x}
+                y={point.y + 8}
+                textAnchor="middle"
+                fontSize="6"
+                className="temperature-chart-temp"
+              >
+                {`${point.roundedTemp}°`}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
       <div className="temperature-chart-hours">
         {plottedPoints.map((point) => (
           <span key={`hour-${point.id ?? point.hourLabel}`}>{point.hourLabel}</span>

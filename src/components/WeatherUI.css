@@ -299,12 +299,40 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+}
+
+.temperature-chart-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.temperature-chart-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.temperature-chart-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.temperature-chart-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.temperature-chart-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .temperature-chart {
-  width: 100%;
+  min-width: 100%;
   height: 140px;
   overflow: visible;
+  display: block;
 }
 
 .temperature-chart-line {
@@ -329,11 +357,39 @@
 }
 
 .temperature-chart-hours {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 4px;
+  display: flex;
+  gap: 0;
   font-size: 11px;
   opacity: 0.75;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  padding-bottom: 4px;
+}
+
+.temperature-chart-hours::-webkit-scrollbar {
+  height: 6px;
+}
+
+.temperature-chart-hours::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.temperature-chart-hours::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.temperature-chart-hours::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.temperature-chart-hours span {
+  flex: 0 0 60px;
+  min-width: 60px;
   text-align: center;
 }
 
@@ -684,8 +740,8 @@
     text-align: center;
   }
 
-  .temperature-chart-hours {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    row-gap: 6px;
+  .temperature-chart-hours span {
+    flex: 0 0 50px;
+    min-width: 50px;
   }
 }
