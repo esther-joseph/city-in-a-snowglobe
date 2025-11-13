@@ -44,15 +44,6 @@ function WeatherDrawer({
         <span className="font-medium">{isOpen ? 'Close Weather Info' : 'Open Weather Info'}</span>
       </button>
 
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
-          onClick={() => setIsOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
       {/* Drawer */}
       <div
         className={`fixed top-0 left-0 h-full w-full max-w-md bg-black/30 backdrop-blur-xl z-[90] transform transition-transform duration-300 ease-in-out overflow-y-auto ${
@@ -83,7 +74,13 @@ function WeatherDrawer({
             forceSnow={forceSnow}
             weatherService={weatherService}
           />
-          <ModeToggle mode={renderMode} onChange={onRenderModeChange} />
+          <ModeToggle 
+            mode={renderMode} 
+            onChange={(newMode) => {
+              onRenderModeChange?.(newMode)
+              setIsOpen(false)
+            }} 
+          />
         </div>
       </div>
     </>

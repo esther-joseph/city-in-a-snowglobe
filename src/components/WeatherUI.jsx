@@ -135,23 +135,23 @@ function TemperatureTrend({ data }) {
               <circle 
                 cx={point.x} 
                 cy={point.y} 
-                r={point.isSelected ? "2.2" : "1.6"} 
+                r={point.isSelected ? "3.5" : "2.5"} 
                 className={`temperature-chart-node ${point.isSelected ? 'temperature-chart-node-selected' : ''}`}
               />
               <text
                 x={point.x}
-                y={point.y - 6}
+                y={point.y - 8}
                 textAnchor="middle"
-                fontSize="6"
+                fontSize="10"
                 className="temperature-chart-icon"
               >
                 {point.icon}
               </text>
               <text
                 x={point.x}
-                y={point.y + 8}
+                y={point.y + 12}
                 textAnchor="middle"
-                fontSize="6"
+                fontSize="9"
                 className="temperature-chart-temp"
               >
                 {`${point.roundedTemp}°`}

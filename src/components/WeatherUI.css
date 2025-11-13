@@ -426,22 +426,22 @@
 }
 
 .temperature-grid {
-  opacity: 0.3;
+  opacity: 1;
 }
 
 .temperature-grid-line {
-  stroke: rgba(255, 255, 255, 0.4);
-  stroke-width: 0.5;
+  stroke: rgba(255, 255, 255, 1);
+  stroke-width: 0.8;
   vector-effect: non-scaling-stroke;
 }
 
 .temperature-grid-line-horizontal {
-  stroke: rgba(255, 255, 255, 0.35);
+  stroke: rgba(255, 255, 255, 1);
   stroke-dasharray: 2, 4;
 }
 
 .temperature-grid-line-vertical {
-  stroke: rgba(255, 255, 255, 0.3);
+  stroke: rgba(255, 255, 255, 1);
   stroke-dasharray: 1, 3;
 }
 
