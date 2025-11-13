@@ -53,7 +53,7 @@ function WeatherDrawer({
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 left-0 h-full w-full max-w-md bg-black/95 backdrop-blur-xl z-40 transform transition-transform duration-300 ease-in-out overflow-y-auto ${
+        className={`fixed top-0 left-0 h-full w-full max-w-md bg-black/60 backdrop-blur-xl z-40 transform transition-transform duration-300 ease-in-out overflow-y-auto ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
