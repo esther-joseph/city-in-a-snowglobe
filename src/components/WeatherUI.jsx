@@ -88,6 +88,7 @@ function TemperatureTrend({ data }) {
 function WeatherUI({
   weatherData,
   hourlyForecast,
+  weeklyForecast,
   loading,
   error,
   onSearch,
@@ -169,7 +170,10 @@ function WeatherUI({
       const timestamp = (entry.dt + timezoneOffset) * 1000
       const date = new Date(timestamp)
       const hourLabel = date.toLocaleTimeString([], { hour: 'numeric' })
-      const tempValue = typeof entry.temp === 'number' ? entry.temp : NaN
+      // Forecast API uses main.temp, onecall uses temp directly
+      const tempValue = typeof entry.temp === 'number' 
+        ? entry.temp 
+        : (typeof entry.main?.temp === 'number' ? entry.main.temp : NaN)
       return {
         id: entry.dt,
         temp: tempValue,

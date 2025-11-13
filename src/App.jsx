@@ -638,6 +638,7 @@ function resolveCityProfile(cityName) {
 function App() {
   const [weatherData, setWeatherData] = useState(null)
   const [hourlyForecast, setHourlyForecast] = useState(null)
+  const [weeklyForecast, setWeeklyForecast] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [city, setCity] = useState('New York')
@@ -692,38 +693,95 @@ function App() {
       const data = await response.json()
 
       let hourlyData = null
+      let weeklyData = null
       const lat = data?.coord?.lat
       const lon = data?.coord?.lon
 
       if (typeof lat === 'number' && typeof lon === 'number') {
         try {
-          const hourlyResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=current,minutely,daily,alerts&units=metric&appid=${envApiKey}`
+          // Free tier: 5 Day / 3 Hour Forecast API
+          // Returns 40 data points (5 days × 8 three-hour intervals)
+          const forecastResponse = await fetch(
+            `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${envApiKey}`
           )
-          if (!hourlyResponse.ok) {
-            throw new Error('Failed to fetch hourly forecast')
-          }
-          const hourlyJson = await hourlyResponse.json()
-          if (Array.isArray(hourlyJson?.hourly)) {
-            hourlyData = {
-              entries: hourlyJson.hourly,
-              timezoneOffset:
-                typeof hourlyJson.timezone_offset === 'number'
-                  ? hourlyJson.timezone_offset
-                  : data?.timezone ?? 0
+          if (forecastResponse.ok) {
+            const forecastJson = await forecastResponse.json()
+            
+            // Extract hourly data (3-hour intervals)
+            if (Array.isArray(forecastJson?.list)) {
+              hourlyData = {
+                entries: forecastJson.list,
+                timezoneOffset: data?.timezone ?? 0,
+                city: forecastJson.city
+              }
+              
+              // Group by day for weekly forecast
+              const dailyData = {}
+              forecastJson.list.forEach((item) => {
+                const date = new Date(item.dt * 1000)
+                const dateKey = date.toDateString()
+                if (!dailyData[dateKey]) {
+                  dailyData[dateKey] = {
+                    date: dateKey,
+                    timestamp: item.dt,
+                    temps: [],
+                    weather: [],
+                    min: Infinity,
+                    max: -Infinity
+                  }
+                }
+                const temp = item.main?.temp
+                if (typeof temp === 'number') {
+                  dailyData[dateKey].temps.push(temp)
+                  dailyData[dateKey].min = Math.min(dailyData[dateKey].min, temp)
+                  dailyData[dateKey].max = Math.max(dailyData[dateKey].max, temp)
+                }
+                if (item.weather?.[0]) {
+                  dailyData[dateKey].weather.push(item.weather[0])
+                }
+              })
+              
+              // Convert to array and get most common weather for each day
+              weeklyData = Object.values(dailyData).map((day) => {
+                // Get most common weather condition
+                const weatherCounts = {}
+                day.weather.forEach((w) => {
+                  const main = w.main
+                  weatherCounts[main] = (weatherCounts[main] || 0) + 1
+                })
+                const mostCommonWeather = Object.keys(weatherCounts).reduce((a, b) =>
+                  weatherCounts[a] > weatherCounts[b] ? a : b
+                )
+                const weather = day.weather.find((w) => w.main === mostCommonWeather) || day.weather[0]
+                
+                return {
+                  date: day.date,
+                  timestamp: day.timestamp,
+                  temp: {
+                    min: Math.round(day.min),
+                    max: Math.round(day.max),
+                    avg: Math.round(day.temps.reduce((a, b) => a + b, 0) / day.temps.length)
+                  },
+                  weather: weather
+                }
+              })
             }
           }
-        } catch {
-          // Ignore hourly fetch errors, keep primary weather data
+        } catch (err) {
+          console.warn('Failed to fetch forecast data:', err)
+          // Ignore forecast fetch errors, keep primary weather data
           hourlyData = null
+          weeklyData = null
         }
       }
 
       setWeatherData(data)
       setHourlyForecast(hourlyData)
+      setWeeklyForecast(weeklyData)
       setLoading(false)
     } catch (err) {
       setHourlyForecast(null)
+      setWeeklyForecast(null)
       setError(err.message)
       setLoading(false)
     }
@@ -984,6 +1042,7 @@ function App() {
       <WeatherUI 
         weatherData={weatherData}
           hourlyForecast={hourlyForecast}
+          weeklyForecast={weeklyForecast}
         loading={loading}
         error={error}
         onSearch={handleSearch}
