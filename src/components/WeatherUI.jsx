@@ -346,6 +346,8 @@ function WeatherUI({
   const feelsLike = weatherData?.main?.feels_like
   const humidity = weatherData?.main?.humidity
   const windSpeed = weatherData?.wind?.speed
+  const pressure = weatherData?.main?.pressure
+  const cloudCoverage = weatherData?.clouds?.all
   const description = weatherData?.weather?.[0]?.description
   const iconMain = weatherData?.weather?.[0]?.main
   const sunrise = formatLocalTime(weatherData?.sys?.sunrise)
@@ -561,6 +563,14 @@ function WeatherUI({
                 <div className="stat-item">
                   <span className="stat-label">Wind Speed</span>
                   <span className="stat-value">{windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Pressure</span>
+                  <span className="stat-value">{pressure !== undefined ? `${pressure} hPa` : '--'}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Clouds</span>
+                  <span className="stat-value">{cloudCoverage !== undefined ? `${cloudCoverage}%` : '--'}</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Sunrise</span>
