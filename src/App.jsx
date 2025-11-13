@@ -982,7 +982,7 @@ function App() {
         onRenderModeChange={setRenderMode}
       />
 
-      <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
         {renderMode === '3d' ? (
           <Canvas camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}>
             <Suspense fallback={null}>
@@ -994,18 +994,33 @@ function App() {
                 enableRotate
                 minDistance={18}
                 maxDistance={200}
-          maxPolarAngle={Math.PI / 2}
+           maxPolarAngle={Math.PI / 2}
                 target={[0, 7, 0]}
               />
             </Suspense>
           </Canvas>
         ) : (
           <Canvas
-            camera={{ position: [0, 1.4, 3.4], fov: 45 }}
-            onCreated={({ gl }) => {
+            camera={{ position: [0, 1.4, 3.4], fov: 50 }}
+            onCreated={({ gl, size }) => {
               gl.xr.enabled = true
+              // Ensure proper viewport setup for AR
+              gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
             }}
-            style={{ width: '100%', height: '100%' }}
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              touchAction: 'none'
+            }}
+            dpr={[1, 2]}
+            gl={{ 
+              antialias: true,
+              alpha: true,
+              powerPreference: 'high-performance'
+            }}
           >
             <Suspense fallback={null}>
               <XR referenceSpace="local-floor">
@@ -1025,11 +1040,54 @@ function App() {
 
 function ARGlobeBillboard({ backgroundColor, renderScene }) {
   const cameraRef = useRef(null)
+  const meshRef = useRef(null)
+  const [dimensions, setDimensions] = useState({ width: 3.8, height: 3, scale: 1.5 })
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      const aspectRatio = window.innerWidth / window.innerHeight
+      
+      // Adjust size based on screen aspect ratio
+      let width = 3.8
+      let height = 3
+      let scale = 1.5
+      
+      if (aspectRatio > 1) {
+        // Landscape orientation
+        width = 4.2
+        height = 3.2
+        scale = 1.6
+      } else {
+        // Portrait orientation
+        width = 3.2
+        height = 4.0
+        scale = 1.4
+      }
+      
+      // Adjust for smaller screens
+      if (window.innerWidth < 768) {
+        scale *= 0.9
+        width *= 0.9
+        height *= 0.9
+      }
+      
+      setDimensions({ width, height, scale })
+    }
+
+    updateDimensions()
+    window.addEventListener('resize', updateDimensions)
+    window.addEventListener('orientationchange', updateDimensions)
+    
+    return () => {
+      window.removeEventListener('resize', updateDimensions)
+      window.removeEventListener('orientationchange', updateDimensions)
+    }
+  }, [])
 
   return (
-    <group position={[0, 1.25, -2.15]} scale={[1.5, 1.5, 1.5]}>
-      <mesh rotation={[-Math.PI / 8, 0, 0]}>
-        <planeGeometry args={[3.8, 3]} />
+    <group position={[0, 1.25, -2.15]} scale={[dimensions.scale, dimensions.scale, dimensions.scale]}>
+      <mesh ref={meshRef} rotation={[-Math.PI / 8, 0, 0]}>
+        <planeGeometry args={[dimensions.width, dimensions.height]} />
         <meshBasicMaterial toneMapped={false}>
           <RenderTexture attach="map" width={1024} height={1024}>
             <color attach="background" args={[backgroundColor]} />
