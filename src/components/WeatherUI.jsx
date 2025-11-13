@@ -334,10 +334,57 @@ function WeatherUI({
   }
 
   const temperatureF = weatherData?.main?.temp
+  
+  // Get temperature for selected time from hourly forecast
+  const selectedTimeTemperature = useMemo(() => {
+    if (!hourlyForecast?.entries || !Array.isArray(hourlyForecast.entries) || hourlyForecast.entries.length === 0) {
+      return null
+    }
+
+    const timezoneOffset =
+      typeof hourlyForecast?.timezoneOffset === 'number'
+        ? hourlyForecast.timezoneOffset
+        : weatherData?.timezone ?? 0
+
+    // Get the selected hour (timeOverride or displayHour or current hour)
+    const selectedHour = timeOverride !== null && timeOverride !== undefined
+      ? timeOverride
+      : (displayHour !== null && displayHour !== undefined ? displayHour : new Date().getHours())
+
+    // Calculate the target timestamp for the selected hour
+    const now = new Date()
+    const selectedTime = new Date(now)
+    selectedTime.setHours(selectedHour, 0, 0, 0)
+    const selectedTimestamp = Math.floor(selectedTime.getTime() / 1000)
+
+    // Find the entry closest to the selected time
+    let closestEntry = null
+    let minDiff = Infinity
+    hourlyForecast.entries.forEach((entry) => {
+      const entryTimestamp = entry.dt + timezoneOffset
+      const diff = Math.abs(entryTimestamp - selectedTimestamp)
+      if (diff < minDiff) {
+        minDiff = diff
+        closestEntry = entry
+      }
+    })
+
+    if (!closestEntry) return null
+
+    // Get temperature from the closest entry
+    const tempValue = typeof closestEntry.temp === 'number' 
+      ? closestEntry.temp 
+      : (typeof closestEntry.main?.temp === 'number' ? closestEntry.main.temp : null)
+    
+    return Number.isFinite(tempValue) ? tempValue : null
+  }, [hourlyForecast, weatherData, timeOverride, displayHour])
+
   const temperatureLabel =
-    temperatureF !== undefined
-      ? `${Math.round(temperatureF)}°F`
-      : '--'
+    selectedTimeTemperature !== null
+      ? `${Math.round(selectedTimeTemperature)}°F`
+      : (temperatureF !== undefined
+          ? `${Math.round(temperatureF)}°F`
+          : '--')
   const feelsLikeF = weatherData?.main?.feels_like
   const humidity = weatherData?.main?.humidity
   const windSpeed = weatherData?.wind?.speed
@@ -595,7 +642,7 @@ function WeatherUI({
                   <MeteoconIcon
                     weatherMain={iconMain}
                     isNight={celestialData?.isNight || false}
-                    size={60}
+                    size={viewMode === 'informational' ? 150 : 60}
                     className="weather-meteocon-icon"
                   />
           </div>
