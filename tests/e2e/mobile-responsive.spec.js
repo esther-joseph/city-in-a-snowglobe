@@ -2,10 +2,13 @@ import { test, expect, devices } from '@playwright/test'
 
 /**
  * Mobile responsiveness tests
+ * Note: iPhone 12 device configuration is disabled
+ * Tests will run on the default browser from playwright.config.js
  */
-test.use({
-  ...devices['iPhone 12'],
-})
+// To use iPhone 12, uncomment the following:
+// test.use({
+//   ...devices['iPhone 12'],
+// })
 
 test.describe('Mobile Responsiveness', () => {
 

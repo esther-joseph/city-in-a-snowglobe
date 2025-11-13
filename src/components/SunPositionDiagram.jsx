@@ -51,8 +51,19 @@ function SunPositionDiagram({ weatherData, celestialData, timeOverride, displayH
       ? timeOverride 
       : (displayHour !== null && displayHour !== undefined ? displayHour : new Date().getHours())
     const date = new Date()
+    // Create a date object with the specified hour in user's timezone
+    const timeDate = new Date()
+    timeDate.setHours(Math.round(hour), 0, 0, 0)
+    // Format in 12-hour format using user's device timezone
+    const formattedTime = timeDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    })
     return {
       hour: Math.round(hour),
+      formattedTime,
       date: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     }
   }, [timeOverride, displayHour])
@@ -181,7 +192,7 @@ function SunPositionDiagram({ weatherData, celestialData, timeOverride, displayH
       <div className="sun-time-info">
         <div className="sun-time-item">
           <span className="sun-time-label">Time</span>
-          <span className="sun-time-value">{String(currentTime.hour).padStart(2, '0')}:00</span>
+          <span className="sun-time-value">{currentTime.formattedTime}</span>
         </div>
         <div className="sun-time-item">
           <span className="sun-time-label">Date</span>

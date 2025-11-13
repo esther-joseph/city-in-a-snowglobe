@@ -238,32 +238,39 @@ function WeatherUI({
   }, [currentCity])
 
   const formattedTimeLabel = useMemo(() => {
-    const formatHour = (hour) => {
+    const formatTime = (hour) => {
       if (hour === null || hour === undefined || Number.isNaN(hour)) return '--'
-      return String(Math.round(hour)).padStart(2, '0')
+      const date = new Date()
+      date.setHours(Math.round(hour), 0, 0, 0)
+      // Format in 12-hour format using user's device timezone
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      })
     }
     if (timeOverride !== null && timeOverride !== undefined) {
-      return `${formatHour(timeOverride)}:00`
+      return formatTime(timeOverride)
     }
     if (displayHour !== null && displayHour !== undefined) {
-      return `Auto (${formatHour(displayHour)}:00)`
+      return `Auto (${formatTime(displayHour)})`
     }
-    return 'Auto (--:00)'
+    return 'Auto (--:--)'
   }, [timeOverride, displayHour])
 
   const formatLocalTime = (seconds) => {
     if (!seconds || !weatherData) return '--'
-    // OpenWeatherMap returns UTC timestamps, timezone is offset in seconds from UTC
-    // We need to convert UTC to local time using the timezone offset
-    const timezoneOffset = weatherData.timezone ?? 0
-    // Create date from UTC timestamp and apply timezone offset
-    // The timezone offset is the difference in seconds from UTC
-    const localTimestamp = (seconds + timezoneOffset) * 1000
-    const localDate = new Date(localTimestamp)
-    // Use UTC methods to format, since we've already applied the timezone offset
-    const hours = String(localDate.getUTCHours()).padStart(2, '0')
-    const minutes = String(localDate.getUTCMinutes()).padStart(2, '0')
-    return `${hours}:${minutes}`
+    // OpenWeatherMap returns UTC timestamps
+    // Convert to user's device timezone and format in 12-hour format
+    const utcDate = new Date(seconds * 1000)
+    // Use user's device timezone and locale for formatting
+    return utcDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    })
   }
 
   const formatLocation = () => {
@@ -335,10 +342,19 @@ function WeatherUI({
     if (slice.length === 0) return null
 
     const points = slice.map((entry, index) => {
-      const timestamp = (entry.dt + timezoneOffset) * 1000
+      const timestamp = entry.dt * 1000
       const date = new Date(timestamp)
-      const hourLabel = date.toLocaleTimeString([], { hour: 'numeric' })
-      const entryHour = date.getHours()
+      // Format in 12-hour format using user's device timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const hourLabel = date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: userTimezone
+      })
+      // Get hour in user's timezone for comparison
+      const localDateString = date.toLocaleString('en-US', { timeZone: userTimezone })
+      const entryHour = new Date(localDateString).getHours()
       // Forecast API uses main.temp, onecall uses temp directly
       const tempValue = typeof entry.temp === 'number' 
         ? entry.temp 
@@ -380,18 +396,18 @@ function WeatherUI({
         <h1>3D Weather City</h1>
         <form onSubmit={handleSubmit} className="search-form">
           <div className="search-input-wrapper" ref={suggestionsRef}>
-            <input
-              type="text"
-              value={city}
+          <input
+            type="text"
+            value={city}
               onChange={handleCityChange}
               onFocus={() => {
                 if (suggestions.length > 0) {
                   setShowSuggestions(true)
                 }
               }}
-              placeholder="Enter city name..."
-              className="city-input"
-            />
+            placeholder="Enter city name..."
+            className="city-input"
+          />
             {city && (
               <button
                 type="button"
