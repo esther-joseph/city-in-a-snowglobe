@@ -5,7 +5,15 @@
   flex-direction: column;
   align-items: stretch;
   gap: 18px;
-  --panel-width: min(100%, 340px);
+  --panel-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Ensure all child components have equal width */
+.weather-ui > * {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .weather-header {
@@ -18,10 +26,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: var(--panel-width);
+  width: 100%;
+  min-width: 0;
   margin: 0;
   border-radius: 18px;
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
 }
 
 .controls-top .controls-hint {

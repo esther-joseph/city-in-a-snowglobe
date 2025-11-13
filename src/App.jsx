@@ -2,7 +2,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, RenderTexture } from '@react-three/drei'
-import { XR, Controllers, startSession, stopSession } from '@react-three/xr'
+import { XR, Controllers } from '@react-three/xr'
 import City from './components/City'
 import WeatherEffects from './components/WeatherEffects'
 import WeatherUI from './components/WeatherUI'
@@ -1018,67 +1018,64 @@ function App() {
     </>
   )
 
+  const ARGlobeBillboard = ({ backgroundColor, renderScene }) => {
+    const cameraRef = useRef(null)
+
+    return (
+      <group position={[0, 1.25, -2.15]} scale={[1.5, 1.5, 1.5]}>
+        <mesh rotation={[-Math.PI / 8, 0, 0]}>
+          <planeGeometry args={[3.8, 3]} />
+          <meshBasicMaterial toneMapped={false}>
+            <RenderTexture attach="map" width={1024} height={1024}>
+              <color attach="background" args={[backgroundColor]} />
+              <PerspectiveCamera
+                ref={cameraRef}
+                makeDefault
+                position={[120, 86, 120]}
+                fov={28}
+                near={0.1}
+                far={360}
+              />
+              {renderScene?.()}
+            </RenderTexture>
+          </meshBasicMaterial>
+        </mesh>
+      </group>
+    )
+  }
+
   return (
     <div
       style={{
         width: '100vw',
         height: '100vh',
         display: 'flex',
-        background: renderMode === '3d' ? celestialData.backgroundColor : '#060810'
+        flexDirection: 'column',
+        background: celestialData.backgroundColor,
+        overflow: 'hidden'
       }}
     >
+      {/* Top Half: 3D Scene */}
       <div
         style={{
-          width: 'min(400px, 34vw)',
-          padding: '24px 20px',
-          boxSizing: 'border-box',
-          overflowY: 'auto',
-          pointerEvents: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px'
+          width: '100%',
+          height: '50%',
+          position: 'relative',
+          flexShrink: 0
         }}
       >
-      <WeatherUI 
-        weatherData={weatherData}
-          hourlyForecast={hourlyForecast}
-          weeklyForecast={weeklyForecast}
-          celestialData={celestialData}
-        loading={loading}
-        error={error}
-        onSearch={handleSearch}
-        currentCity={city}
-          onTimeAdjust={(value) => {
-            if (value === null || Number.isNaN(value)) {
-              setManualHour(null)
-              setTimeTick(Date.now())
-            } else {
-              setManualHour(value)
-            }
-          }}
-          timeOverride={manualHour}
-          displayHour={displayHour}
-          onThunderToggle={setForceThunder}
-          forceThunder={forceThunder}
-          onSnowToggle={setForceSnow}
-          forceSnow={forceSnow}
-        />
-        <ModeToggle mode={renderMode} onChange={setRenderMode} />
-      </div>
-
-      <div style={{ flex: 1, position: 'relative' }}>
         {renderMode === '3d' ? (
           <Canvas camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}>
             <Suspense fallback={null}>
               <color attach="background" args={[celestialData.backgroundColor]} />
               <BaseScene includeSky />
-        <OrbitControls 
+              <OrbitControls 
                 enablePan
                 enableZoom
                 enableRotate
                 minDistance={18}
                 maxDistance={200}
-          maxPolarAngle={Math.PI / 2}
+                maxPolarAngle={Math.PI / 2}
                 target={[0, 7, 0]}
               />
             </Suspense>
@@ -1100,36 +1097,54 @@ function App() {
                 />
               </XR>
             </Suspense>
-      </Canvas>
+          </Canvas>
         )}
       </div>
+
+      {/* Bottom Half: UI Components */}
+      <div
+        style={{
+          width: '100%',
+          height: '50%',
+          padding: '16px 20px',
+          boxSizing: 'border-box',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          background: 'rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
+        }}
+      >
+        <WeatherUI 
+          weatherData={weatherData}
+          hourlyForecast={hourlyForecast}
+          weeklyForecast={weeklyForecast}
+          celestialData={celestialData}
+          loading={loading}
+          error={error}
+          onSearch={handleSearch}
+          currentCity={city}
+          onTimeAdjust={(value) => {
+            if (value === null || Number.isNaN(value)) {
+              setManualHour(null)
+              setTimeTick(Date.now())
+            } else {
+              setManualHour(value)
+            }
+          }}
+          timeOverride={manualHour}
+          displayHour={displayHour}
+          onThunderToggle={setForceThunder}
+          forceThunder={forceThunder}
+          onSnowToggle={setForceSnow}
+          forceSnow={forceSnow}
+        />
+        <ModeToggle mode={renderMode} onChange={setRenderMode} />
+      </div>
     </div>
-  )
-}
-
-function ARGlobeBillboard({ backgroundColor, renderScene }) {
-  const cameraRef = useRef(null)
-
-  return (
-    <group position={[0, 1.25, -2.15]} scale={[1.5, 1.5, 1.5]}>
-      <mesh rotation={[-Math.PI / 8, 0, 0]}>
-        <planeGeometry args={[3.8, 3]} />
-        <meshBasicMaterial toneMapped={false}>
-          <RenderTexture attach="map" width={1024} height={1024}>
-            <color attach="background" args={[backgroundColor]} />
-            <PerspectiveCamera
-              ref={cameraRef}
-              makeDefault
-              position={[120, 86, 120]}
-              fov={28}
-              near={0.1}
-              far={360}
-            />
-            {renderScene?.()}
-          </RenderTexture>
-        </meshBasicMaterial>
-      </mesh>
-    </group>
   )
 }
 
