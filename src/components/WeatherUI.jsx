@@ -1,22 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import './WeatherUI.css'
 import SunPositionDiagram from './SunPositionDiagram'
+import MeteoconIcon from './MeteoconIcon'
 
-const WEATHER_ICON_MAP = {
-  Clear: '☀️',
-  Clouds: '☁️',
-  Rain: '🌧️',
-  Drizzle: '🌦️',
-  Thunderstorm: '⛈️',
-  Snow: '❄️',
-  Mist: '🌫️',
-  Fog: '🌫️',
-  Haze: '🌫️'
-}
-
+// Legacy function for backward compatibility - now returns icon name for MeteoconIcon
 function getWeatherIcon(weatherMain) {
-  if (!weatherMain) return '🌤️'
-  return WEATHER_ICON_MAP[weatherMain] || '🌤️'
+  if (!weatherMain) return null
+  return weatherMain
 }
 
 function TemperatureTrend({ data }) {
@@ -138,15 +128,22 @@ function TemperatureTrend({ data }) {
                 r={point.isSelected ? "3.5" : "2.5"} 
                 className={`temperature-chart-node ${point.isSelected ? 'temperature-chart-node-selected' : ''}`}
               />
-              <text
-                x={point.x}
-                y={point.y - 8}
-                textAnchor="middle"
-                fontSize="10"
-                className="temperature-chart-icon"
-              >
-                {point.icon}
-              </text>
+              {point.icon && (
+                <foreignObject
+                  x={point.x - 8}
+                  y={point.y - 18}
+                  width="16"
+                  height="16"
+                  className="temperature-chart-icon-wrapper"
+                >
+                  <MeteoconIcon
+                    weatherMain={point.icon}
+                    isNight={point.isNight}
+                    size={16}
+                    className="temperature-chart-icon"
+                  />
+                </foreignObject>
+              )}
               <text
                 x={point.x}
                 y={point.y + 12}
@@ -417,12 +414,16 @@ function WeatherUI({
       const timeDiff = Math.abs(entryTimestamp - selectedTimestamp)
       const isSelected = timeDiff <= 5400 // 1.5 hours in seconds (closest match)
       
+      // Determine if it's night for this entry
+      const entryIsNight = entryHour >= 20 || entryHour < 6
+      
       return {
         id: entry.dt,
         temp: tempValue,
         roundedTemp: Number.isFinite(tempValue) ? Math.round(tempValue) : '--',
         hourLabel,
-        icon: getWeatherIcon(entry.weather?.[0]?.main),
+        icon: entry.weather?.[0]?.main || null,
+        isNight: entryIsNight,
         condition: entry.weather?.[0]?.main || '',
         description: entry.weather?.[0]?.description || '',
         hour: entryHour,
@@ -442,8 +443,8 @@ function WeatherUI({
 
   return (
     <div className="weather-ui">
-      <div className="weather-header controls-top">
-        <div className="controls-hint">
+      <div className="weather-header controls-top" style="z-index: 1;">
+       <div className="controls-hint">
           <p>🖱️ Left click + drag to rotate | Scroll to zoom | Right click + drag to pan</p>
         </div>
         <h1>3D Weather City</h1>
@@ -546,7 +547,14 @@ function WeatherUI({
           viewMode === 'minimal' ? (
             <div className="weather-summary">
               <div className="summary-main">
-                <span className="summary-icon">{getWeatherIcon(iconMain)}</span>
+                <span className="summary-icon">
+                  <MeteoconIcon
+                    weatherMain={iconMain}
+                    isNight={celestialData?.isNight || false}
+                    size={52}
+                    className="summary-meteocon-icon"
+                  />
+                </span>
                 <div className="summary-meta">
                   <h2>{formatLocation()}</h2>
                   <p className="summary-temp">
@@ -586,7 +594,12 @@ function WeatherUI({
             <>
               <div className={`weather-info weather-info--${viewMode}`}>
           <div className="weather-icon">
-                  {getWeatherIcon(iconMain)}
+                  <MeteoconIcon
+                    weatherMain={iconMain}
+                    isNight={celestialData?.isNight || false}
+                    size={60}
+                    className="weather-meteocon-icon"
+                  />
           </div>
           <div className="weather-details">
                   <h2>{formatLocation()}</h2>

@@ -540,7 +540,22 @@
 }
 
 .summary-icon {
-  font-size: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summary-meteocon-icon,
+.weather-meteocon-icon {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.temperature-chart-icon-wrapper {
+  overflow: visible;
+}
+
+.temperature-chart-icon {
+  pointer-events: none;
 }
 
 .summary-meta {
