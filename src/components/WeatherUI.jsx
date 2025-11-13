@@ -50,6 +50,32 @@ function TemperatureTrend({ data }) {
     return `${acc} L ${segment}`
   }, '')
 
+  // Generate grid lines
+  // Horizontal grid lines (temperature levels)
+  const horizontalGridLines = []
+  const numHorizontalLines = 5 // Number of horizontal grid lines
+  for (let i = 0; i <= numHorizontalLines; i++) {
+    const ratio = i / numHorizontalLines
+    const y = paddingY + (1 - ratio) * innerHeight
+    horizontalGridLines.push({
+      x1: paddingX,
+      y1: y,
+      x2: paddingX + innerWidth,
+      y2: y
+    })
+  }
+
+  // Vertical grid lines (time points)
+  const verticalGridLines = []
+  plottedPoints.forEach((point) => {
+    verticalGridLines.push({
+      x1: point.x,
+      y1: paddingY,
+      x2: point.x,
+      y2: paddingY + innerHeight
+    })
+  })
+
   // Scroll to selected time when it changes
   useEffect(() => {
     if (selectedIndex !== undefined && selectedIndex >= 0 && containerRef.current && hoursRef.current) {
@@ -78,6 +104,31 @@ function TemperatureTrend({ data }) {
           className="temperature-chart"
           preserveAspectRatio="xMinYMid meet"
         >
+          {/* Grid lines - rendered first so they appear behind the data */}
+          <g className="temperature-grid">
+            {/* Horizontal grid lines */}
+            {horizontalGridLines.map((line, index) => (
+              <line
+                key={`h-grid-${index}`}
+                x1={line.x1}
+                y1={line.y1}
+                x2={line.x2}
+                y2={line.y2}
+                className="temperature-grid-line temperature-grid-line-horizontal"
+              />
+            ))}
+            {/* Vertical grid lines */}
+            {verticalGridLines.map((line, index) => (
+              <line
+                key={`v-grid-${index}`}
+                x1={line.x1}
+                y1={line.y1}
+                x2={line.x2}
+                y2={line.y2}
+                className="temperature-grid-line temperature-grid-line-vertical"
+              />
+            ))}
+          </g>
           {path && <path d={path} className="temperature-chart-line" />}
           {plottedPoints.map((point, index) => (
             <g key={point.id ?? point.hourLabel}>
@@ -503,10 +554,22 @@ function WeatherUI({
                 </div>
               </div>
               <div className="summary-stats">
-                <span>💧 {humidity !== undefined ? `${humidity}%` : '--'}</span>
-                <span>💨 {windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
-                <span>🌅 {sunrise}</span>
-                <span>🌇 {sunset}</span>
+                <div className="stat-item">
+                  <span className="stat-label">Humidity</span>
+                  <span className="stat-value">{humidity !== undefined ? `${humidity}%` : '--'}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Wind Speed</span>
+                  <span className="stat-value">{windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Sunrise</span>
+                  <span className="stat-value">{sunrise}</span>
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Sunset</span>
+                  <span className="stat-value">{sunset}</span>
+                </div>
               </div>
             </div>
           ) : (
@@ -522,17 +585,29 @@ function WeatherUI({
                   </p>
                   <p className="condition">{description}</p>
                   <div className={`extra-info${viewMode === 'compact' ? ' extra-info--compact' : ''}`}>
-                    <span>💨 {windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
-                    <span>💧 {humidity !== undefined ? `${humidity}%` : '--'}</span>
+                    <div className="stat-item">
+                      <span className="stat-label">Wind Speed</span>
+                      <span className="stat-value">{windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Humidity</span>
+                      <span className="stat-value">{humidity !== undefined ? `${humidity}%` : '--'}</span>
+                    </div>
                     {viewMode === 'informational' && (
-                      <span>
-                        👁️ {weatherData?.visibility !== undefined
-                          ? `${(weatherData.visibility / 1000).toFixed(1)} km`
-                          : '--'}
-                      </span>
+                      <div className="stat-item">
+                        <span className="stat-label">Visibility</span>
+                        <span className="stat-value">
+                          {weatherData?.visibility !== undefined
+                            ? `${(weatherData.visibility / 1000).toFixed(1)} km`
+                            : '--'}
+                        </span>
+                      </div>
                     )}
                     {viewMode === 'informational' && feelsLike !== undefined && (
-                      <span>🌡️ Feels {Math.round(feelsLike)}°C</span>
+                      <div className="stat-item">
+                        <span className="stat-label">Feels Like</span>
+                        <span className="stat-value">{Math.round(feelsLike)}°C</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -575,8 +650,14 @@ function WeatherUI({
                     </button>
                   </div>
                   <div className="time-details">
-                    <span>🌅 Sunrise {sunrise}</span>
-                    <span>🌇 Sunset {sunset}</span>
+                    <div className="stat-item">
+                      <span className="stat-label">Sunrise</span>
+                      <span className="stat-value">{sunrise}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Sunset</span>
+                      <span className="stat-value">{sunset}</span>
+                    </div>
                   </div>
                 </div>
               )}
