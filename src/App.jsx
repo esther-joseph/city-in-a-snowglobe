@@ -727,59 +727,6 @@ function App() {
     }
   }, [])
 
-  // Check if star particles are properly spread out and reload if not
-  useEffect(() => {
-    // Only check if it's nighttime and stars should be visible
-    if (!celestialData.isNight || !celestialData.showStars) {
-      return
-    }
-
-    // Wait for scene to render before checking
-    const checkTimer = setTimeout(() => {
-      const starCheckKey = 'star-check-attempted'
-      const hasCheckedStars = sessionStorage.getItem(starCheckKey)
-      
-      // Only check once per session to avoid infinite reloads
-      if (hasCheckedStars) {
-        return
-      }
-
-      sessionStorage.setItem(starCheckKey, 'true')
-
-      // Check if stars are properly rendered by verifying:
-      // 1. Expected star count is reasonable
-      // 2. Star settings are valid
-      const expectedCount = celestialData.starSettings?.count
-      const hasValidSettings = 
-        expectedCount &&
-        expectedCount >= 1000 && // Minimum expected stars
-        expectedCount <= 10000 && // Maximum reasonable stars
-        celestialData.starSettings.radius > 0 &&
-        celestialData.starSettings.depth > 0
-
-      if (!hasValidSettings) {
-        console.warn('Star particles may not be properly configured, reloading...')
-        window.location.reload()
-        return
-      }
-
-      // Additional check: if stars should be visible but settings seem off
-      // This catches cases where stars might be clustered or not distributed
-      const starVisibility = Math.max(0.1, 1 - (weatherData?.clouds?.all ?? 50) / 100)
-      const expectedCountFromVisibility = Math.round(1800 + starVisibility * 4000)
-      const countDifference = Math.abs(expectedCount - expectedCountFromVisibility)
-      
-      // If the count is way off from expected, reload
-      if (countDifference > 2000) {
-        console.warn('Star particle count seems incorrect, reloading...')
-        window.location.reload()
-        return
-      }
-    }, 2000) // Wait 2 seconds for scene to render
-
-    return () => clearTimeout(checkTimer)
-  }, [celestialData.isNight, celestialData.showStars, celestialData.starSettings, weatherData])
-
   useEffect(() => {
     if (weatherService) {
       fetchWeather(city)
