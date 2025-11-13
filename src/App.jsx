@@ -12,6 +12,7 @@ import Sun from './components/environment/Sun'
 import Moon from './components/environment/Moon'
 import StarField from './components/environment/StarField'
 import AuraSky from './components/environment/AuraSky'
+import WeatherRepository from './services/WeatherRepository'
 import './App.css'
 
 function hexToRgb(hex) {
@@ -649,6 +650,20 @@ function App() {
   const [renderMode, setRenderMode] = useState('3d')
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
+  // Initialize weather repository (Dependency Inversion Principle)
+  const weatherRepository = useMemo(() => {
+    const apiKey = import.meta.env.OPENWEATHER_API_KEY
+    if (!apiKey) {
+      return null
+    }
+    try {
+      return new WeatherRepository(apiKey)
+    } catch (error) {
+      console.error('Failed to initialize weather repository:', error)
+      return null
+    }
+  }, [])
+
   const projectToGlobe = (sourcePosition, desiredActualRadius) => {
     if (
       !sourcePosition ||
@@ -668,11 +683,14 @@ function App() {
     return [vector.x, vector.y, vector.z]
   }
 
+  /**
+   * Fetch weather data using repository pattern (CRUD: Read operation)
+   * Follows SOLID principles:
+   * - Single Responsibility: Only handles state updates
+   * - Dependency Inversion: Depends on WeatherRepository abstraction
+   */
   const fetchWeather = async (cityName) => {
-    // Get API key from Vercel environment variable
-    const envApiKey = import.meta.env.OPENWEATHER_API_KEY
-    
-    if (!envApiKey) {
+    if (!weatherRepository) {
       setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
       setLoading(false)
       return
@@ -682,102 +700,14 @@ function App() {
       setLoading(true)
       setError(null)
       setHourlyForecast(null)
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${envApiKey}&units=metric`
-      )
+      setWeeklyForecast(null)
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch weather data. Check your API key and city name.')
-      }
+      // Use repository to get weather data (Read operation)
+      const weatherData = await weatherRepository.getWeatherByCity(cityName)
       
-      const data = await response.json()
-
-      let hourlyData = null
-      let weeklyData = null
-      const lat = data?.coord?.lat
-      const lon = data?.coord?.lon
-
-      if (typeof lat === 'number' && typeof lon === 'number') {
-        try {
-          // Free tier: 5 Day / 3 Hour Forecast API
-          // Returns 40 data points (5 days × 8 three-hour intervals)
-          const forecastResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${envApiKey}`
-          )
-          if (forecastResponse.ok) {
-            const forecastJson = await forecastResponse.json()
-            
-            // Extract hourly data (3-hour intervals)
-            if (Array.isArray(forecastJson?.list)) {
-              hourlyData = {
-                entries: forecastJson.list,
-                timezoneOffset: data?.timezone ?? 0,
-                city: forecastJson.city
-              }
-              
-              // Group by day for weekly forecast
-              const dailyData = {}
-              forecastJson.list.forEach((item) => {
-                const date = new Date(item.dt * 1000)
-                const dateKey = date.toDateString()
-                if (!dailyData[dateKey]) {
-                  dailyData[dateKey] = {
-                    date: dateKey,
-                    timestamp: item.dt,
-                    temps: [],
-                    weather: [],
-                    min: Infinity,
-                    max: -Infinity
-                  }
-                }
-                const temp = item.main?.temp
-                if (typeof temp === 'number') {
-                  dailyData[dateKey].temps.push(temp)
-                  dailyData[dateKey].min = Math.min(dailyData[dateKey].min, temp)
-                  dailyData[dateKey].max = Math.max(dailyData[dateKey].max, temp)
-                }
-                if (item.weather?.[0]) {
-                  dailyData[dateKey].weather.push(item.weather[0])
-                }
-              })
-              
-              // Convert to array and get most common weather for each day
-              weeklyData = Object.values(dailyData).map((day) => {
-                // Get most common weather condition
-                const weatherCounts = {}
-                day.weather.forEach((w) => {
-                  const main = w.main
-                  weatherCounts[main] = (weatherCounts[main] || 0) + 1
-                })
-                const mostCommonWeather = Object.keys(weatherCounts).reduce((a, b) =>
-                  weatherCounts[a] > weatherCounts[b] ? a : b
-                )
-                const weather = day.weather.find((w) => w.main === mostCommonWeather) || day.weather[0]
-                
-                return {
-                  date: day.date,
-                  timestamp: day.timestamp,
-                  temp: {
-                    min: Math.round(day.min),
-                    max: Math.round(day.max),
-                    avg: Math.round(day.temps.reduce((a, b) => a + b, 0) / day.temps.length)
-                  },
-                  weather: weather
-                }
-              })
-            }
-          }
-        } catch (err) {
-          console.warn('Failed to fetch forecast data:', err)
-          // Ignore forecast fetch errors, keep primary weather data
-          hourlyData = null
-          weeklyData = null
-        }
-      }
-
-      setWeatherData(data)
-      setHourlyForecast(hourlyData)
-      setWeeklyForecast(weeklyData)
+      setWeatherData(weatherData.current)
+      setHourlyForecast(weatherData.hourly)
+      setWeeklyForecast(weatherData.weekly)
       setLoading(false)
     } catch (err) {
       setHourlyForecast(null)
@@ -788,16 +718,14 @@ function App() {
   }
 
   useEffect(() => {
-    // Get API key from Vercel environment variable
-    const envApiKey = import.meta.env.OPENWEATHER_API_KEY
-    
-    if (envApiKey) {
+    if (weatherRepository) {
       fetchWeather(city)
     } else {
       setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
       setLoading(false)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherRepository])
 
   const handleSearch = (newCity) => {
     setCity(newCity)
@@ -1050,20 +978,51 @@ function App() {
         width: '100vw',
         height: '100vh',
         display: 'flex',
-        flexDirection: 'column',
-        background: celestialData.backgroundColor,
-        overflow: 'hidden'
+        background: renderMode === '3d' ? celestialData.backgroundColor : '#060810'
       }}
     >
-      {/* Top Half: 3D Scene */}
+      {/* Left Side: UI Components */}
       <div
         style={{
-          width: '100%',
-          height: '50%',
-          position: 'relative',
-          flexShrink: 0
+          width: 'min(400px, 34vw)',
+          padding: '24px 20px',
+          boxSizing: 'border-box',
+          overflowY: 'auto',
+          pointerEvents: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px'
         }}
       >
+        <WeatherUI 
+          weatherData={weatherData}
+          hourlyForecast={hourlyForecast}
+          weeklyForecast={weeklyForecast}
+          celestialData={celestialData}
+          loading={loading}
+          error={error}
+          onSearch={handleSearch}
+          currentCity={city}
+          onTimeAdjust={(value) => {
+            if (value === null || Number.isNaN(value)) {
+              setManualHour(null)
+              setTimeTick(Date.now())
+            } else {
+              setManualHour(value)
+            }
+          }}
+          timeOverride={manualHour}
+          displayHour={displayHour}
+          onThunderToggle={setForceThunder}
+          forceThunder={forceThunder}
+          onSnowToggle={setForceSnow}
+          forceSnow={forceSnow}
+        />
+        <ModeToggle mode={renderMode} onChange={setRenderMode} />
+      </div>
+
+      {/* Right Side: 3D Scene */}
+      <div style={{ flex: 1, position: 'relative' }}>
         {renderMode === '3d' ? (
           <Canvas camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}>
             <Suspense fallback={null}>
@@ -1099,50 +1058,6 @@ function App() {
             </Suspense>
           </Canvas>
         )}
-      </div>
-
-      {/* Bottom Half: UI Components */}
-      <div
-        style={{
-          width: '100%',
-          height: '50%',
-          padding: '16px 20px',
-          boxSizing: 'border-box',
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          background: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)'
-        }}
-      >
-        <WeatherUI 
-          weatherData={weatherData}
-          hourlyForecast={hourlyForecast}
-          weeklyForecast={weeklyForecast}
-          celestialData={celestialData}
-          loading={loading}
-          error={error}
-          onSearch={handleSearch}
-          currentCity={city}
-          onTimeAdjust={(value) => {
-            if (value === null || Number.isNaN(value)) {
-              setManualHour(null)
-              setTimeTick(Date.now())
-            } else {
-              setManualHour(value)
-            }
-          }}
-          timeOverride={manualHour}
-          displayHour={displayHour}
-          onThunderToggle={setForceThunder}
-          forceThunder={forceThunder}
-          onSnowToggle={setForceSnow}
-          forceSnow={forceSnow}
-        />
-        <ModeToggle mode={renderMode} onChange={setRenderMode} />
       </div>
     </div>
   )

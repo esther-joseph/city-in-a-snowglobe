@@ -10,18 +10,4 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
-}
-
-#root {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
-
-@media (max-width: 768px) {
-  /* On mobile, stack vertically with 60/40 split for better UI visibility */
-  body {
-    overflow-y: auto;
-  }
 }

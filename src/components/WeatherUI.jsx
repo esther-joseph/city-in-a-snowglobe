@@ -227,7 +227,8 @@ function WeatherUI({
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* Thunder and Snow test toggles - commented out for production */}
+        {/* <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {onThunderToggle && (
             <button
               type="button"
@@ -248,7 +249,7 @@ function WeatherUI({
               ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
             </button>
           )}
-        </div>
+        </div> */}
       </div>
 
       {error && (
