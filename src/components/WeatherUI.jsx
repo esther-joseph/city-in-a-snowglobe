@@ -151,7 +151,7 @@ function TemperatureTrend({ data }) {
                 fontSize="9"
                 className="temperature-chart-temp"
               >
-                {`${point.roundedTemp}°`}
+                {`${point.roundedTemp}°F`}
               </text>
             </g>
           ))}
@@ -333,14 +333,12 @@ function WeatherUI({
     return cityName
   }
 
-  const temperatureC = weatherData?.main?.temp
-  const temperatureF =
-    typeof temperatureC === 'number' ? (temperatureC * 9) / 5 + 32 : undefined
+  const temperatureF = weatherData?.main?.temp
   const temperatureLabel =
-    temperatureC !== undefined && temperatureF !== undefined
-      ? `${Math.round(temperatureC)}°C / ${Math.round(temperatureF)}°F`
+    temperatureF !== undefined
+      ? `${Math.round(temperatureF)}°F`
       : '--'
-  const feelsLike = weatherData?.main?.feels_like
+  const feelsLikeF = weatherData?.main?.feels_like
   const humidity = weatherData?.main?.humidity
   const windSpeed = weatherData?.wind?.speed
   const pressure = weatherData?.main?.pressure
@@ -496,7 +494,7 @@ function WeatherUI({
             )}
           </div>
           <button type="submit" className="search-button" disabled={loading}>
-            {loading ? '⏳' : '🔍'}
+            {loading ? '⏳' : 'Search'}
           </button>
         </form>
         <div className="view-toggle">
@@ -626,10 +624,10 @@ function WeatherUI({
                         </span>
                       </div>
                     )}
-                    {viewMode === 'informational' && feelsLike !== undefined && (
+                    {viewMode === 'informational' && feelsLikeF !== undefined && (
                       <div className="stat-item">
                         <span className="stat-label">Feels Like</span>
-                        <span className="stat-value">{Math.round(feelsLike)}°C</span>
+                        <span className="stat-value">{Math.round(feelsLikeF)}°F</span>
                       </div>
                     )}
                   </div>
@@ -690,7 +688,7 @@ function WeatherUI({
                   <div className="temperature-card-header">
                     <h3>12-Hour Temperature</h3>
                     <span>
-                      {`${Math.round(hourlyTrend.min)}° / ${Math.round(hourlyTrend.max)}°`}
+                      {`${Math.round(hourlyTrend.min)}°F / ${Math.round(hourlyTrend.max)}°F`}
                     </span>
                   </div>
                   <TemperatureTrend data={hourlyTrend} />
@@ -710,7 +708,7 @@ function WeatherUI({
                     </div>
                     <div>
                       <span>Feels</span>
-                      <strong>{feelsLike !== undefined ? `${Math.round(feelsLike)}°C` : '--'}</strong>
+                      <strong>{feelsLikeF !== undefined ? `${Math.round(feelsLikeF)}°F` : '--'}</strong>
             </div>
           </div>
         </div>

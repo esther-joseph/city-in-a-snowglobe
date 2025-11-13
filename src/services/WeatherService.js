@@ -29,7 +29,7 @@ class WeatherService {
       throw new Error('City name must be a non-empty string')
     }
 
-    const url = `${this.baseUrl}/weather?q=${encodeURIComponent(cityName)}&appid=${this.apiKey}&units=metric`
+    const url = `${this.baseUrl}/weather?q=${encodeURIComponent(cityName)}&appid=${this.apiKey}&units=imperial`
     
     try {
       const response = await fetch(url)
@@ -65,7 +65,7 @@ class WeatherService {
       throw new Error('Latitude and longitude must be numbers')
     }
 
-    const url = `${this.baseUrl}/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${this.apiKey}`
+    const url = `${this.baseUrl}/forecast?lat=${lat}&lon=${lon}&units=imperial&appid=${this.apiKey}`
     
     try {
       const response = await fetch(url)

@@ -34,7 +34,7 @@ function RainParticles() {
       positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
       velocities[i] = Math.random() * 0.35 + 0.25
     }
-
+    
     return { positions, velocities, horizontalSpan, verticalSpan, baseHeight }
   }, [])
 
@@ -482,7 +482,7 @@ function CloudLayer({ weatherType, windDirection, windSpeed, weatherData }) {
                   opacity={cloud.opacity * 0.85}
                   roughness={0.25}
                   metalness={0.015}
-                />
+          />
               </Icosahedron>
             </group>
           ))}
