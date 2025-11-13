@@ -14,7 +14,7 @@
 }
 
 .weather-header {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   padding: 20px;
@@ -61,6 +61,7 @@
   font-size: 16px;
   outline: none;
   background: rgba(255, 255, 255, 0.9);
+  color: #000000;
 }
 
 .search-button {
@@ -189,7 +190,7 @@
 }
 
 .api-input-container {
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   padding: 15px 20px;
@@ -229,7 +230,7 @@
 }
 
 .error-message {
-  background: rgba(220, 53, 69, 0.9);
+  background: rgba(220, 53, 69, 0.7);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   color: white;
@@ -259,7 +260,7 @@
 }
 
 .temperature-card {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   padding: 20px 22px;
@@ -394,7 +395,7 @@
 }
 
 .weather-summary {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   padding: 22px;
@@ -456,7 +457,7 @@
 }
 
 .weather-stack .empty-panel {
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.4);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-radius: 18px;
@@ -471,7 +472,7 @@
 
 .weather-info,
 .time-card {
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   padding: 20px 22px;

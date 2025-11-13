@@ -394,7 +394,7 @@ function WeatherUI({
         )}
       </div>
 
-      {weatherData && celestialData && (
+      {weatherData && celestialData && viewMode === 'informational' && (
         <SunPositionDiagram
           weatherData={weatherData}
           celestialData={celestialData}
