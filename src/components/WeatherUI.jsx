@@ -101,8 +101,6 @@ function WeatherUI({
   forceSnow = false
 }) {
   const [city, setCity] = useState(currentCity)
-  const [apiKey, setApiKey] = useState('')
-  const [showApiInput, setShowApiInput] = useState(false)
   const [viewMode, setViewMode] = useState('informational')
   const VIEW_MODES = [
     { id: 'minimal', label: 'Minimal' },
@@ -113,8 +111,7 @@ function WeatherUI({
   const handleSubmit = (e) => {
     e.preventDefault()
     if (city.trim()) {
-      onSearch(city, apiKey)
-      setShowApiInput(false)
+      onSearch(city)
     }
   }
 
@@ -211,14 +208,6 @@ function WeatherUI({
           <button type="submit" className="search-button" disabled={loading}>
             {loading ? '⏳' : '🔍'}
           </button>
-          <button 
-            type="button" 
-            className="api-button"
-            onClick={() => setShowApiInput(!showApiInput)}
-            title="Set API Key"
-          >
-            🔑
-          </button>
         </form>
         <div className="view-toggle">
           {VIEW_MODES.map((mode) => (
@@ -256,34 +245,9 @@ function WeatherUI({
         </div>
       </div>
 
-      {showApiInput && (
-        <div className="api-input-container">
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Enter OpenWeatherMap API key..."
-            className="api-input"
-          />
-          <p className="api-hint">
-            Get your free API key at{' '}
-            <a 
-              href="https://openweathermap.org/api" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              openweathermap.org
-            </a>
-          </p>
-        </div>
-      )}
-
       {error && (
         <div className="error-message">
           <p>⚠️ {error}</p>
-          {!apiKey && (
-            <p className="hint">Click the 🔑 button to add your API key</p>
-          )}
         </div>
       )}
 

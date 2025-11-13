@@ -641,7 +641,6 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [city, setCity] = useState('New York')
-  const [apiKey, setApiKey] = useState('')
   const [timeTick, setTimeTick] = useState(Date.now())
   const [manualHour, setManualHour] = useState(null)
   const [forceThunder, setForceThunder] = useState(false)
@@ -668,13 +667,12 @@ function App() {
     return [vector.x, vector.y, vector.z]
   }
 
-  const fetchWeather = async (cityName, key) => {
-    // Try to use env variable if no key provided
+  const fetchWeather = async (cityName) => {
+    // Get API key from Vercel environment variable
     const envApiKey = import.meta.env.VITE_OPENWEATHER_API_KEY || import.meta.env.OPENWEATHER_API_KEY
-    const keyToUse = key || envApiKey
     
-    if (!keyToUse) {
-      setError('Please enter your OpenWeatherMap API key or set OPENWEATHER_API_KEY environment variable')
+    if (!envApiKey) {
+      setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
       setLoading(false)
       return
     }
@@ -684,7 +682,7 @@ function App() {
       setError(null)
       setHourlyForecast(null)
       const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${keyToUse}&units=metric`
+        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${envApiKey}&units=metric`
       )
       
       if (!response.ok) {
@@ -700,7 +698,7 @@ function App() {
       if (typeof lat === 'number' && typeof lon === 'number') {
         try {
           const hourlyResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=current,minutely,daily,alerts&units=metric&appid=${keyToUse}`
+            `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=current,minutely,daily,alerts&units=metric&appid=${envApiKey}`
           )
           if (!hourlyResponse.ok) {
             throw new Error('Failed to fetch hourly forecast')
@@ -732,38 +730,20 @@ function App() {
   }
 
   useEffect(() => {
-    // Priority: Vercel env variable > localStorage
+    // Get API key from Vercel environment variable
     const envApiKey = import.meta.env.VITE_OPENWEATHER_API_KEY || import.meta.env.OPENWEATHER_API_KEY
-    const savedApiKey = localStorage.getItem('openweathermap_api_key')
-    const keyToUse = envApiKey || savedApiKey
     
-    if (keyToUse) {
-      setApiKey(keyToUse)
-      if (envApiKey) {
-        // Don't save env variable to localStorage
-        fetchWeather(city, envApiKey)
-      } else {
-        fetchWeather(city, savedApiKey)
-      }
+    if (envApiKey) {
+      fetchWeather(city)
     } else {
+      setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
       setLoading(false)
     }
   }, [])
 
-  const handleSearch = (newCity, newApiKey) => {
-    // Priority: Vercel env variable > newApiKey > existing apiKey
-    const envApiKey = import.meta.env.VITE_OPENWEATHER_API_KEY || import.meta.env.OPENWEATHER_API_KEY
-    const keyToUse = envApiKey || newApiKey || apiKey
-    
-    if (keyToUse) {
-      // Only save to localStorage if it's not the env variable
-      if (!envApiKey && (newApiKey || apiKey)) {
-        localStorage.setItem('openweathermap_api_key', keyToUse)
-      }
-      setApiKey(keyToUse)
-    }
+  const handleSearch = (newCity) => {
     setCity(newCity)
-    fetchWeather(newCity, keyToUse)
+    fetchWeather(newCity)
   }
 
   useEffect(() => {
