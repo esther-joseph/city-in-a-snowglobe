@@ -60,10 +60,9 @@ function WeatherDrawer({
           boxShadow: isOpen ? '4px 0 24px rgba(0, 0, 0, 0.5)' : 'none'
         }}
       >
-        <div className="p-6 flex flex-col gap-5">
+        <div className="pt-20 px-6 pb-6 flex flex-col gap-5">
           {/* Weather UI Components */}
-          <div className="mt-4">
-            <WeatherUI
+          <WeatherUI
             weatherData={weatherData}
             hourlyForecast={hourlyForecast}
             weeklyForecast={weeklyForecast}
@@ -79,8 +78,7 @@ function WeatherDrawer({
             forceThunder={forceThunder}
             onSnowToggle={onSnowToggle}
             forceSnow={forceSnow}
-            />
-          </div>
+          />
           <ModeToggle mode={renderMode} onChange={onRenderModeChange} />
         </div>
       </div>
