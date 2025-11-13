@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import './WeatherUI.css'
+import SunPositionDiagram from './SunPositionDiagram'
 
 const WEATHER_ICON_MAP = {
   Clear: '☀️',
@@ -89,6 +90,7 @@ function WeatherUI({
   weatherData,
   hourlyForecast,
   weeklyForecast,
+  celestialData,
   loading,
   error,
   onSearch,
@@ -387,6 +389,14 @@ function WeatherUI({
         )}
       </div>
 
+      {weatherData && celestialData && (
+        <SunPositionDiagram
+          weatherData={weatherData}
+          celestialData={celestialData}
+          timeOverride={timeOverride}
+          displayHour={displayHour}
+        />
+      )}
     </div>
   )
 }

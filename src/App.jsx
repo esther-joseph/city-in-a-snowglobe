@@ -1043,6 +1043,7 @@ function App() {
         weatherData={weatherData}
           hourlyForecast={hourlyForecast}
           weeklyForecast={weeklyForecast}
+          celestialData={celestialData}
         loading={loading}
         error={error}
         onSearch={handleSearch}
