@@ -443,7 +443,7 @@ function WeatherUI({
 
   return (
     <div className="weather-ui">
-      <div className="weather-header controls-top" style="z-index: 1;">
+      <div className="weather-header controls-top" style={{ zIndex: 1 }}>
        <div className="controls-hint">
           <p>🖱️ Left click + drag to rotate | Scroll to zoom | Right click + drag to pan</p>
         </div>
