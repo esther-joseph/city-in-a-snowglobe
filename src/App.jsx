@@ -12,6 +12,7 @@ import Sun from './components/environment/Sun'
 import Moon from './components/environment/Moon'
 import StarField from './components/environment/StarField'
 import AuraSky from './components/environment/AuraSky'
+import WeatherService from './services/WeatherService'
 import './App.css'
 
 function hexToRgb(hex) {
@@ -649,6 +650,21 @@ function App() {
   const [renderMode, setRenderMode] = useState('3d')
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
+  // Initialize weather service (Dependency Inversion Principle)
+  // Single Responsibility: WeatherService handles all API operations
+  const weatherService = useMemo(() => {
+    const apiKey = import.meta.env.OPENWEATHER_API_KEY
+    if (!apiKey) {
+      return null
+    }
+    try {
+      return new WeatherService(apiKey)
+    } catch (error) {
+      console.error('Failed to initialize weather service:', error)
+      return null
+    }
+  }, [])
+
   const projectToGlobe = (sourcePosition, desiredActualRadius) => {
     if (
       !sourcePosition ||
@@ -668,11 +684,14 @@ function App() {
     return [vector.x, vector.y, vector.z]
   }
 
+  /**
+   * Fetch weather data using service pattern (CRUD: Read operation)
+   * Follows SOLID principles:
+   * - Single Responsibility: Only handles state updates
+   * - Dependency Inversion: Depends on WeatherService abstraction
+   */
   const fetchWeather = async (cityName) => {
-    // Get API key from Vercel environment variable
-    const envApiKey = import.meta.env.OPENWEATHER_API_KEY
-    
-    if (!envApiKey) {
+    if (!weatherService) {
       setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
       setLoading(false)
       return
@@ -682,102 +701,14 @@ function App() {
       setLoading(true)
       setError(null)
       setHourlyForecast(null)
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${envApiKey}&units=metric`
-      )
+      setWeeklyForecast(null)
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch weather data. Check your API key and city name.')
-      }
+      // Use service to get complete weather data (CRUD: Read)
+      const weatherData = await weatherService.getCompleteWeatherData(cityName)
       
-      const data = await response.json()
-
-      let hourlyData = null
-      let weeklyData = null
-      const lat = data?.coord?.lat
-      const lon = data?.coord?.lon
-
-      if (typeof lat === 'number' && typeof lon === 'number') {
-        try {
-          // Free tier: 5 Day / 3 Hour Forecast API
-          // Returns 40 data points (5 days × 8 three-hour intervals)
-          const forecastResponse = await fetch(
-            `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${envApiKey}`
-          )
-          if (forecastResponse.ok) {
-            const forecastJson = await forecastResponse.json()
-            
-            // Extract hourly data (3-hour intervals)
-            if (Array.isArray(forecastJson?.list)) {
-              hourlyData = {
-                entries: forecastJson.list,
-                timezoneOffset: data?.timezone ?? 0,
-                city: forecastJson.city
-              }
-              
-              // Group by day for weekly forecast
-              const dailyData = {}
-              forecastJson.list.forEach((item) => {
-                const date = new Date(item.dt * 1000)
-                const dateKey = date.toDateString()
-                if (!dailyData[dateKey]) {
-                  dailyData[dateKey] = {
-                    date: dateKey,
-                    timestamp: item.dt,
-                    temps: [],
-                    weather: [],
-                    min: Infinity,
-                    max: -Infinity
-                  }
-                }
-                const temp = item.main?.temp
-                if (typeof temp === 'number') {
-                  dailyData[dateKey].temps.push(temp)
-                  dailyData[dateKey].min = Math.min(dailyData[dateKey].min, temp)
-                  dailyData[dateKey].max = Math.max(dailyData[dateKey].max, temp)
-                }
-                if (item.weather?.[0]) {
-                  dailyData[dateKey].weather.push(item.weather[0])
-                }
-              })
-              
-              // Convert to array and get most common weather for each day
-              weeklyData = Object.values(dailyData).map((day) => {
-                // Get most common weather condition
-                const weatherCounts = {}
-                day.weather.forEach((w) => {
-                  const main = w.main
-                  weatherCounts[main] = (weatherCounts[main] || 0) + 1
-                })
-                const mostCommonWeather = Object.keys(weatherCounts).reduce((a, b) =>
-                  weatherCounts[a] > weatherCounts[b] ? a : b
-                )
-                const weather = day.weather.find((w) => w.main === mostCommonWeather) || day.weather[0]
-                
-                return {
-                  date: day.date,
-                  timestamp: day.timestamp,
-                  temp: {
-                    min: Math.round(day.min),
-                    max: Math.round(day.max),
-                    avg: Math.round(day.temps.reduce((a, b) => a + b, 0) / day.temps.length)
-                  },
-                  weather: weather
-                }
-              })
-            }
-          }
-        } catch (err) {
-          console.warn('Failed to fetch forecast data:', err)
-          // Ignore forecast fetch errors, keep primary weather data
-          hourlyData = null
-          weeklyData = null
-        }
-      }
-
-      setWeatherData(data)
-      setHourlyForecast(hourlyData)
-      setWeeklyForecast(weeklyData)
+      setWeatherData(weatherData.current)
+      setHourlyForecast(weatherData.hourly)
+      setWeeklyForecast(weatherData.weekly)
       setLoading(false)
     } catch (err) {
       setHourlyForecast(null)
@@ -788,16 +719,14 @@ function App() {
   }
 
   useEffect(() => {
-    // Get API key from Vercel environment variable
-    const envApiKey = import.meta.env.OPENWEATHER_API_KEY
-    
-    if (envApiKey) {
+    if (weatherService) {
       fetchWeather(city)
     } else {
       setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
       setLoading(false)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherService])
 
   const handleSearch = (newCity) => {
     setCity(newCity)

@@ -227,28 +227,29 @@ function WeatherUI({
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {onThunderToggle && (
-            <button
-              type="button"
-              className={`thunder-toggle${forceThunder ? ' active' : ''}`}
-              onClick={() => onThunderToggle(!forceThunder)}
-              title="Toggle Thunder Test Mode"
-            >
-              ⚡ {forceThunder ? 'Thunder ON' : 'Thunder OFF'}
-            </button>
-          )}
-          {onSnowToggle && (
-            <button
-              type="button"
-              className={`snow-toggle${forceSnow ? ' active' : ''}`}
-              onClick={() => onSnowToggle(!forceSnow)}
-              title="Toggle Snow Test Mode"
-            >
-              ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
-            </button>
-          )}
-        </div>
+         {/* Thunder and Snow test toggles - commented out for production */}
+         {/* <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {onThunderToggle && (
+              <button
+                type="button"
+                className={`thunder-toggle${forceThunder ? ' active' : ''}`}
+                onClick={() => onThunderToggle(!forceThunder)}
+                title="Toggle Thunder Test Mode"
+              >
+                ⚡ {forceThunder ? 'Thunder ON' : 'Thunder OFF'}
+              </button>
+            )}
+            {onSnowToggle && (
+              <button
+                type="button"
+                className={`snow-toggle${forceSnow ? ' active' : ''}`}
+                onClick={() => onSnowToggle(!forceSnow)}
+                title="Toggle Snow Test Mode"
+              >
+                ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
+              </button>
+            )}
+         </div> */}
       </div>
 
       {error && (
@@ -281,10 +282,10 @@ function WeatherUI({
           ) : (
             <>
               <div className={`weather-info weather-info--${viewMode}`}>
-                <div className="weather-icon">
+          <div className="weather-icon">
                   {getWeatherIcon(iconMain)}
-                </div>
-                <div className="weather-details">
+          </div>
+          <div className="weather-details">
                   <h2>{weatherData?.name}, {weatherData?.sys?.country}</h2>
                   <p className="temperature">
                     {temperatureLabel}
@@ -376,10 +377,10 @@ function WeatherUI({
                     <div>
                       <span>Feels</span>
                       <strong>{feelsLike !== undefined ? `${Math.round(feelsLike)}°C` : '--'}</strong>
-                    </div>
-                  </div>
-                </div>
-              )}
+            </div>
+          </div>
+        </div>
+      )}
             </>
           )
         ) : (
