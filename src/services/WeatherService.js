@@ -156,6 +156,37 @@ class WeatherService {
   }
 
   /**
+   * CRUD: Read - Search for cities (autocomplete/geocoding)
+   * @param {string} query - Search query (city name)
+   * @param {number} limit - Maximum number of results (default: 5)
+   * @returns {Promise<Array>} Array of city suggestions
+   */
+  async searchCities(query, limit = 5) {
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      return []
+    }
+
+    const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=${limit}&appid=${this.apiKey}`
+    
+    try {
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Invalid API key. Please check your OPENWEATHER_API_KEY.')
+        }
+        return []
+      }
+      
+      const data = await response.json()
+      return Array.isArray(data) ? data : []
+    } catch (error) {
+      console.warn('Failed to search cities:', error)
+      return []
+    }
+  }
+
+  /**
    * CRUD: Read - Get complete weather data (current + forecast)
    * Convenience method that combines getCurrentWeather and getForecast
    * @param {string} cityName - Name of the city

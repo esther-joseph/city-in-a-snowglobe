@@ -138,10 +138,16 @@ function WeatherUI({
   onThunderToggle,
   forceThunder = false,
   onSnowToggle,
-  forceSnow = false
+  forceSnow = false,
+  weatherService = null
 }) {
   const [city, setCity] = useState(currentCity)
   const [viewMode, setViewMode] = useState('informational')
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const searchTimeoutRef = useRef(null)
+  const suggestionsRef = useRef(null)
   const VIEW_MODES = [
     { id: 'minimal', label: 'Minimal' },
     { id: 'compact', label: 'Compact' },
@@ -151,9 +157,85 @@ function WeatherUI({
   const handleSubmit = (e) => {
     e.preventDefault()
     if (city.trim()) {
+      setShowSuggestions(false)
       onSearch(city)
     }
   }
+
+  const handleCityChange = (e) => {
+    const value = e.target.value
+    setCity(value)
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // If input is empty, clear suggestions
+    if (!value.trim()) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    // Debounce autocomplete search
+    searchTimeoutRef.current = setTimeout(async () => {
+      if (weatherService && value.trim().length >= 2) {
+        setIsSearching(true)
+        try {
+          const results = await weatherService.searchCities(value.trim(), 5)
+          setSuggestions(results)
+          setShowSuggestions(true)
+        } catch (error) {
+          console.warn('Autocomplete search failed:', error)
+          setSuggestions([])
+        } finally {
+          setIsSearching(false)
+        }
+      } else {
+        setSuggestions([])
+        setShowSuggestions(false)
+      }
+    }, 300)
+  }
+
+  const handleSuggestionClick = (suggestion) => {
+    const cityName = suggestion.name
+    const state = suggestion.state
+    const country = suggestion.country
+    // Format: "City, State, Country" or "City, Country" if no state
+    const fullName = state ? `${cityName}, ${state}, ${country}` : `${cityName}, ${country}`
+    setCity(fullName)
+    setShowSuggestions(false)
+    onSearch(fullName)
+  }
+
+  const handleClear = () => {
+    setCity('')
+    setSuggestions([])
+    setShowSuggestions(false)
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+  }
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  // Update city when currentCity prop changes
+  useEffect(() => {
+    setCity(currentCity)
+  }, [currentCity])
 
   const formattedTimeLabel = useMemo(() => {
     const formatHour = (hour) => {
@@ -171,9 +253,29 @@ function WeatherUI({
 
   const formatLocalTime = (seconds) => {
     if (!seconds || !weatherData) return '--'
-    const timezone = weatherData.timezone ?? 0
-    const date = new Date((seconds + timezone) * 1000)
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    // OpenWeatherMap returns UTC timestamps, timezone is offset in seconds from UTC
+    // We need to convert UTC to local time using the timezone offset
+    const timezoneOffset = weatherData.timezone ?? 0
+    // Create date from UTC timestamp and apply timezone offset
+    // The timezone offset is the difference in seconds from UTC
+    const localTimestamp = (seconds + timezoneOffset) * 1000
+    const localDate = new Date(localTimestamp)
+    // Use UTC methods to format, since we've already applied the timezone offset
+    const hours = String(localDate.getUTCHours()).padStart(2, '0')
+    const minutes = String(localDate.getUTCMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+
+  const formatLocation = () => {
+    if (!weatherData) return '--'
+    const cityName = weatherData.name || ''
+    const countryCode = weatherData.sys?.country || ''
+    // Try to get state from the full location string if available
+    // OpenWeatherMap doesn't provide state directly, but we can format it nicely
+    if (countryCode) {
+      return `${cityName}, ${countryCode}`
+    }
+    return cityName
   }
 
   const temperatureC = weatherData?.main?.temp
@@ -277,13 +379,52 @@ function WeatherUI({
         </div>
         <h1>3D Weather City</h1>
         <form onSubmit={handleSubmit} className="search-form">
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="Enter city name..."
-            className="city-input"
-          />
+          <div className="search-input-wrapper" ref={suggestionsRef}>
+            <input
+              type="text"
+              value={city}
+              onChange={handleCityChange}
+              onFocus={() => {
+                if (suggestions.length > 0) {
+                  setShowSuggestions(true)
+                }
+              }}
+              placeholder="Enter city name..."
+              className="city-input"
+            />
+            {city && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="clear-button"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="suggestions-dropdown">
+                {suggestions.map((suggestion, index) => {
+                  const displayName = suggestion.state
+                    ? `${suggestion.name}, ${suggestion.state}, ${suggestion.country}`
+                    : `${suggestion.name}, ${suggestion.country}`
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      className="suggestion-item"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      <span className="suggestion-name">{suggestion.name}</span>
+                      <span className="suggestion-location">
+                        {suggestion.state ? `${suggestion.state}, ` : ''}{suggestion.country}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
           <button type="submit" className="search-button" disabled={loading}>
             {loading ? '⏳' : '🔍'}
           </button>
@@ -338,7 +479,7 @@ function WeatherUI({
               <div className="summary-main">
                 <span className="summary-icon">{getWeatherIcon(iconMain)}</span>
                 <div className="summary-meta">
-                  <h2>{weatherData?.name}, {weatherData?.sys?.country}</h2>
+                  <h2>{formatLocation()}</h2>
                   <p className="summary-temp">
                     {temperatureLabel}
                   </p>
@@ -359,7 +500,7 @@ function WeatherUI({
                   {getWeatherIcon(iconMain)}
           </div>
           <div className="weather-details">
-                  <h2>{weatherData?.name}, {weatherData?.sys?.country}</h2>
+                  <h2>{formatLocation()}</h2>
                   <p className="temperature">
                     {temperatureLabel}
                   </p>

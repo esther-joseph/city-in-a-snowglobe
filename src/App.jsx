@@ -990,11 +990,26 @@ function App() {
         forceSnow={forceSnow}
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
+        weatherService={weatherService}
       />
 
       <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
         {renderMode === '3d' ? (
-          <Canvas camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}>
+          <Canvas 
+            camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}
+            onCreated={({ gl }) => {
+              // Optimize for mobile performance
+              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+              if (isMobile) {
+                gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
+              }
+            }}
+            dpr={typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? [1, 1.5] : [1, 2]}
+            gl={{ 
+              antialias: true,
+              powerPreference: typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 'default' : 'high-performance'
+            }}
+          >
             <Suspense fallback={null}>
               <color attach="background" args={[celestialData.backgroundColor]} />
               <BaseScene includeSky />
@@ -1006,6 +1021,8 @@ function App() {
                 maxDistance={200}
            maxPolarAngle={Math.PI / 2}
                 target={[0, 7, 0]}
+                dampingFactor={0.05}
+                enableDamping
               />
             </Suspense>
           </Canvas>
