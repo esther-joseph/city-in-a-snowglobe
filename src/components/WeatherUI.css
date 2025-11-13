@@ -28,6 +28,7 @@
   border-radius: 18px;
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
   box-sizing: border-box;
+  overflow: visible;
 }
 
 .controls-top .controls-hint {
@@ -52,6 +53,8 @@
   justify-content: center;
   flex-wrap: wrap;
   position: relative;
+  overflow: visible;
+  z-index: 1;
 }
 
 .search-input-wrapper {
@@ -59,6 +62,7 @@
   position: relative;
   min-width: 200px;
   z-index: 9998;
+  isolation: isolate;
 }
 
 .city-input {
@@ -112,6 +116,7 @@
   overflow-y: auto;
   z-index: 9999;
   border: 1px solid rgba(0, 0, 0, 0.1);
+  isolation: isolate;
 }
 
 .suggestion-item {
@@ -826,7 +831,7 @@
   .time-card {
     width: 100%;
   }
-
+  
   .controls-hint {
     font-size: 12px;
     padding: 8px 15px;
