@@ -159,9 +159,16 @@
   color: rgba(255, 255, 255, 0.95);
 }
 
+/* Responsive Design */
 @media (max-width: 768px) {
   .sun-position-diagram {
     padding: 16px;
+  }
+
+  .sun-diagram-header {
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .sun-diagram-header h3 {
@@ -173,16 +180,73 @@
     padding: 3px 10px;
   }
 
+  .sun-diagram-container {
+    margin-bottom: 12px;
+    padding: 8px;
+  }
+
+  .sun-compass {
+    width: 100%;
+    height: auto;
+    max-width: 180px;
+  }
+
   .sun-data-grid {
     gap: 8px;
+    margin-bottom: 12px;
   }
 
   .sun-data-item {
     padding: 8px;
   }
 
+  .sun-data-label {
+    font-size: 10px;
+  }
+
   .sun-data-value {
     font-size: 14px;
+  }
+
+  .sun-time-info {
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .sun-time-label {
+    font-size: 10px;
+  }
+
+  .sun-time-value {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sun-position-diagram {
+    padding: 14px;
+  }
+
+  .sun-diagram-header h3 {
+    font-size: 13px;
+  }
+
+  .sun-compass {
+    max-width: 160px;
+  }
+
+  .sun-data-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .sun-data-item {
+    padding: 6px;
+  }
+
+  .sun-time-info {
+    flex-direction: column;
+    gap: 8px;
   }
 }
 
