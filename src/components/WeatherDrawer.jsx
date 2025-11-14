@@ -19,6 +19,8 @@ function WeatherDrawer({
   forceThunder,
   onSnowToggle,
   forceSnow,
+  onRainToggle,
+  forceRain,
   renderMode,
   onRenderModeChange,
   weatherService
@@ -77,6 +79,8 @@ function WeatherDrawer({
             forceThunder={forceThunder}
             onSnowToggle={onSnowToggle}
             forceSnow={forceSnow}
+          onRainToggle={onRainToggle}
+          forceRain={forceRain}
             weatherService={weatherService}
           />
           <ModeToggle 

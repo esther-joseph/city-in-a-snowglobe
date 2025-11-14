@@ -1,15 +1,19 @@
 # 3D Weather City Visualization
 
-A stunning 3D city landscape that visualizes real-time weather data from OpenWeatherMap API using React-Three-Fiber.
+An interactive snow-globe city that visualizes real-time weather data from OpenWeatherMap using React, React-Three-Fiber, and @react-three/xr.
 
 ## Features
 
-- 🏙️ **3D City Landscape** - Procedurally generated buildings with realistic lighting
-- 🌦️ **Real-Time Weather** - Live data from OpenWeatherMap API
-- ⛈️ **Dynamic Weather Effects** - Rain, snow, and cloud particles based on actual weather
-- 🌈 **Adaptive Sky** - Sky color changes based on weather conditions
-- 🖱️ **Interactive Controls** - Orbit, zoom, and pan around the 3D scene
-- 📱 **Responsive Design** - Works on desktop and mobile devices
+- 🏙️ **Procedural Snow-Globe City** – Landmark-aware buildings, vegetation ring, bridges, benches, fountain, and plaques inside a glass globe
+- 🌦️ **Live Weather Sync** – Current, hourly, and weekly data sourced via a SOLID-compliant WeatherService using `OPENWEATHER_API_KEY`
+- 🌩️ **Rich Weather Effects** – Rain, snow, cloud layers, stellated starfield, moon phases, and emoji-style ⚡ thunderbolts that can be manually toggled for testing
+- 🔆 **Sun & Moon Timeline** – 12-hour slider that updates temperatures, icons, and star/sun positions in real time
+- ✨ **Shakeable Globe** – Dedicated “Shake Snow Globe” button (and device motion on mobile) to spin particles and rotation with responsive positioning
+- 🗂️ **Weather Drawer UI** – Tailwind-inspired drawer containing view toggles (Minimal / Compact / Informational), sun-position diagram, metrics grid, pollen/UV indices, thunder/snow debug toggles, and city search with autocomplete
+- 📱 **3D & AR Modes** – Switch between the default 3D canvas and an AR view powered by `@react-three/xr` (transparent background, re-instantiating sessions for stability)
+- 🌁 **Dynamic Glass Tinting** – Snow-globe glass tint, fogging, and aura colors adapt to time of day and weather conditions
+- 🖱️ **Interactive Controls** – OrbitControls for rotate/pan/zoom plus mobile-friendly layout adjustments
+- ✅ **Vercel Ready** – Uses `OPENWEATHER_API_KEY` env variable only (no inline entry) and includes `vercel.json`
 
 ## Setup Instructions
 
@@ -31,7 +35,7 @@ npm install
 npm run dev
 ```
 
-The app will open in your browser at `http://localhost:3000`
+The app runs at `http://localhost:5173` by default (Vite).
 
 ### 4. Set Up API Key
 
@@ -40,24 +44,28 @@ The app will open in your browser at `http://localhost:3000`
 2. Add: `OPENWEATHER_API_KEY=your_api_key_here`
 3. For Vercel: Set `OPENWEATHER_API_KEY` in your Vercel project settings under Environment Variables
 
-**Note:** The API key must be set as an environment variable. Manual entry is no longer available.
+**Note:** The API key must be set as an environment variable. The UI no longer exposes direct entry.
 
 ## Usage
 
-1. **Search for Cities**: Type any city name in the search bar and press Enter or click the search icon
-2. **Navigate the Scene**: 
-   - Left click + drag to rotate the camera
-   - Scroll to zoom in/out
-   - Right click + drag to pan
-3. **Watch Weather Effects**: The scene will display rain, snow, or clouds based on the actual weather
+1. **Open the Weather Drawer** – Tap “Open Weather Info” to reveal the stacked UI (search, metrics, timeline, view modes, thunder/snow toggles, sun-position diagram).
+2. **Search for Cities** – Type in the drawer search bar. Suggestions float above other UI with city/state/country metadata. Clearing text uses the “×” button.
+3. **Change View Modes** – Minimal, Compact, or Informational layouts change icon size, metric grids, and extra cards (e.g., sun position diagram only in Informational).
+4. **Time Slider** – Drag the 12-hour slider to update the main temperature readout, graph, weather icons, and sun/moon positions. Sunrise/sunset labels update per-city/time zone.
+5. **Thunder/Snow Testing** – In the drawer header, tap the highlighted toggles to override weather data and preview thunder or snow particle systems.
+6. **Shake the Globe** – Press the floating “✨ Shake Snow Globe” button (always within viewport thanks to responsive clamps) or shake a physical device with motion permissions granted.
+7. **3D vs AR** – Use the Mode toggle at the bottom of the drawer to swap between 3D canvas (with aura sky / starfield) and AR (transparent background, reloaded session for performance).
+8. **Scene Controls** – Outside the drawer, left-drag to rotate, right-drag to pan, scroll/pinch to zoom.
 
 ## Weather Effects
 
-- ☀️ **Clear** - Bright sky with strong sunlight
-- ☁️ **Cloudy** - 3D cloud particles floating above the city
-- 🌧️ **Rain** - Particle system simulating falling rain
-- ❄️ **Snow** - Gentle snowfall with wind drift
-- 🌫️ **Fog/Mist** - Atmospheric conditions
+- ☀️ **Clear** – Sunny lighting, reflective windows, raised sun arc, translucent glass tint
+- ☁️ **Clouds** – Procedural cloud layer inside the globe (day & night) with density tied to API coverage and weather type
+- 🌧️ **Rain** – Teardrop instanced particles scaled to dome size with cloud umbrellas overhead
+- ❄️ **Snow** – Expanded snow particle volume matching cloud scale plus manual override toggle
+- ⚡ **Thunder** – Emoji-style thunderbolts spawning with random flashing, density matching snow, override toggle available
+- 🌫️ **Fog / Mist** – Increased glass roughness/tint, aura adjustments, subdued lighting
+- ✨ **Stars & Moon** – Stellation-based starfield and moon phase indicators when night mode or manual override applies
 
 ## Technologies Used
 
@@ -65,6 +73,7 @@ The app will open in your browser at `http://localhost:3000`
 - **Three.js** - 3D rendering engine
 - **React-Three-Fiber** - React renderer for Three.js
 - **@react-three/drei** - Useful helpers for R3F
+- **@react-three/xr** - AR session support
 - **OpenWeatherMap API** - Weather data
 - **Vite** - Fast build tool
 
@@ -99,13 +108,16 @@ npm run preview
 weather-city-3d/
 ├── src/
 │   ├── components/
-│   │   ├── City.jsx           # 3D city buildings
-│   │   ├── WeatherEffects.jsx # Rain, snow, clouds
-│   │   ├── WeatherUI.jsx      # UI overlay
-│   │   └── WeatherUI.css      # UI styling
-│   ├── App.jsx                # Main application
-│   ├── App.css                # Global styles
-│   └── main.jsx               # Entry point
+│   │   ├── City.jsx                # 3D snow-globe, bridges, landmarks
+│   │   ├── WeatherEffects.jsx      # Rain, snow, thunder, clouds, stars
+│   │   ├── WeatherDrawer.jsx       # Drawer shell with toggle button
+│   │   ├── WeatherUI.jsx / .css    # Drawer content, graphs, metrics, toggles
+│   │   ├── ModeToggle.jsx          # 3D / AR switcher
+│   │   └── city/*, environment/*   # Fountain, vegetation ring, sun/moon, etc.
+│   ├── services/WeatherService.js  # CRUD wrapper for OpenWeatherMap APIs
+│   ├── App.jsx                     # Main scene + Canvas/XR + shake button
+│   ├── App.css                     # Global styles / layout helpers
+│   └── main.jsx                    # Entry point
 ├── index.html                 # HTML template
 ├── vite.config.js            # Vite configuration
 └── package.json              # Dependencies

@@ -287,6 +287,32 @@
   box-shadow: 0 0 12px rgba(200, 230, 255, 0.4);
 }
 
+.rain-toggle {
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rain-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.02);
+}
+
+.rain-toggle.active {
+  background: rgba(135, 211, 248, 0.3);
+  color: #87d3f8;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(135, 211, 248, 0.45);
+}
+
 .api-input-container {
   background: rgba(0, 0, 0, 0.5);
   -webkit-backdrop-filter: blur(10px);

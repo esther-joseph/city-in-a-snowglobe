@@ -647,6 +647,7 @@ function App() {
   const [manualHour, setManualHour] = useState(null)
   const [forceThunder, setForceThunder] = useState(false)
   const [forceSnow, setForceSnow] = useState(false)
+  const [forceRain, setForceRain] = useState(false)
   const [renderMode, setRenderMode] = useState('3d')
   const [arSessionKey, setArSessionKey] = useState(0)
   const [shakeTrigger, setShakeTrigger] = useState(0)
@@ -964,7 +965,13 @@ function App() {
   }, [manualHour, celestialData, weatherData])
 
   const baseWeatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
-  const weatherType = forceSnow ? 'snow' : forceThunder ? 'thunderstorm' : baseWeatherType
+  const weatherType = forceSnow
+    ? 'snow'
+    : forceThunder
+      ? 'thunderstorm'
+      : forceRain
+        ? 'rain'
+        : baseWeatherType
 
   const glassTint = useMemo(() => {
     const hour = displayHour ?? new Date().getHours()
@@ -1106,6 +1113,8 @@ function App() {
         forceThunder={forceThunder}
         onSnowToggle={setForceSnow}
         forceSnow={forceSnow}
+            onRainToggle={setForceRain}
+            forceRain={forceRain}
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
         weatherService={weatherService}

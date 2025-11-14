@@ -156,32 +156,46 @@ function ThunderboltParticles() {
   const instancedMeshRef = useRef()
   const count = 1600 // Match snow density
 
-  const boltGeometry = useMemo(() => new THREE.PlaneGeometry(1, 1.8), [])
-
-  const emojiTexture = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 256
-    canvas.height = 256
-    const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.font = 'bold 220px "Apple Color Emoji", "Segoe UI Emoji", system-ui'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('⚡', canvas.width / 2, canvas.height / 2 + 15)
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.anisotropy = 4
-    return texture
+  const boltGeometry = useMemo(() => {
+    const shape = new THREE.Shape()
+    const height = 2.5
+    const width = 0.55
+    shape.moveTo(-width * 0.6, 0)
+    shape.quadraticCurveTo(width * 0.35, height * 0.18, -width * 0.15, height * 0.38)
+    shape.quadraticCurveTo(-width * 0.75, height * 0.55, width * 0.15, height * 0.78)
+    shape.quadraticCurveTo(width * 0.55, height * 0.95, width * 0.15, height * 1.05)
+    shape.lineTo(width * 0.95, height * 1.25)
+    shape.quadraticCurveTo(width * 0.05, height * 1.18, -width * 0.05, height * 0.96)
+    shape.quadraticCurveTo(-width * 0.7, height * 0.75, width * 0.1, height * 0.48)
+    shape.quadraticCurveTo(width * 0.45, height * 0.28, -width * 0.25, height * 0.08)
+    shape.quadraticCurveTo(-width * 0.4, height * 0.02, -width * 0.6, 0)
+    const extrudeSettings = {
+      depth: 0.3,
+      bevelEnabled: true,
+      bevelSize: 0.06,
+      bevelThickness: 0.08,
+      bevelSegments: 2,
+      steps: 2
+    }
+    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
+    geometry.center()
+    return geometry
   }, [])
 
   const boltMaterial = useMemo(
     () =>
-      new THREE.MeshBasicMaterial({
-        map: emojiTexture,
+      new THREE.MeshStandardMaterial({
+        color: '#ffd400',
+        emissive: '#fff063',
+        emissiveIntensity: 2.4,
+        roughness: 0.18,
+        metalness: 0.25,
         transparent: true,
+        vertexColors: true,
         depthWrite: false,
-        side: THREE.DoubleSide
+        toneMapped: false
       }),
-    [emojiTexture]
+    []
   )
 
   const particles = useMemo(() => {
@@ -213,55 +227,53 @@ function ThunderboltParticles() {
         particles.positions[i * 3 + 1],
         particles.positions[i * 3 + 2]
       )
+      matrix.scale(new THREE.Vector3(1.7, 1.7, 1.7))
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
   }, [particles, count])
 
-  useFrame(() => {
+  useFrame((state) => {
     if (!instancedMeshRef.current) return
     
     const positions = particles.positions
     const visibilities = particles.visibilities
+    const time = state.clock.elapsedTime
+    const color = new THREE.Color()
     
     for (let i = 0; i < count; i++) {
-      // Update visibility (flashing effect - fade out quickly)
       if (visibilities[i] > 0) {
-        visibilities[i] -= 0.08 // Fade out faster
+        visibilities[i] -= 0.08
       }
       
-      // Move bolt downward
       positions[i * 3 + 1] -= particles.velocities[i]
       
-      // Respawn at top when it reaches bottom or becomes invisible
       if (positions[i * 3 + 1] < -6 || visibilities[i] <= 0) {
-        // Random chance to spawn a new bolt
-        if (Math.random() < 0.015) { // 1.5% chance per frame
+        if (Math.random() < 0.015) {
           positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
           positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
           positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
-          visibilities[i] = 1.0 // Make visible
+          visibilities[i] = 1.0
           particles.velocities[i] = Math.random() * 0.8 + 0.6
         } else {
-          // Keep it hidden at bottom
           positions[i * 3 + 1] = -10
           visibilities[i] = 0
         }
       }
-    }
-    
-    // Update instanced mesh positions and scales
-    for (let i = 0; i < count; i++) {
+
       const matrix = new THREE.Matrix4()
       matrix.identity()
       matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+      matrix.scale(new THREE.Vector3(1.7, 1.7, 1.7))
       instancedMeshRef.current.setMatrixAt(i, matrix)
+
+      const flashIntensity = 0.65 + Math.abs(Math.sin(time * 2.2 + i * 0.3)) * 0.35
+      color.setHSL(0.15, 1, flashIntensity * 0.55 + 0.25)
+      instancedMeshRef.current.setColorAt(i, color)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
-
-    const avgVisibility = visibilities.reduce((a, b) => a + b, 0) / count
-    if (instancedMeshRef.current.material) {
-      instancedMeshRef.current.material.opacity = Math.max(0, Math.min(1, avgVisibility * 0.95))
+    if (instancedMeshRef.current.instanceColor) {
+      instancedMeshRef.current.instanceColor.needsUpdate = true
     }
   })
 
@@ -638,6 +650,7 @@ function WeatherEffects({
   enableNightStars = false,
   forceThunder = false,
   forceSnow = false,
+  forceRain = false,
   shakeTrigger = 0
 }) {
   const baseWeatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
@@ -655,7 +668,7 @@ function WeatherEffects({
   const windSpeed = weatherData?.wind?.speed || 0
   const windDirection = weatherData?.wind?.deg
 
-  const hasRain = weatherType.includes('rain') || weatherType.includes('drizzle')
+  const hasRain = weatherType.includes('rain') || weatherType.includes('drizzle') || forceRain
   const hasSnow = weatherType.includes('snow') || forceSnow
   const hasCuteClouds =
     !suppressClouds &&
@@ -704,7 +717,7 @@ function WeatherEffects({
 
   return (
     <group ref={shakeGroupRef}>
-      {hasRain && <RainParticles />}
+      {(hasRain || forceRain) && <RainParticles />}
       {(hasSnow || forceSnow) && <SnowParticles />}
       {hasCuteClouds && (
         <CloudLayer

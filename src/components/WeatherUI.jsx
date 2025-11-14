@@ -236,6 +236,8 @@ function WeatherUI({
   forceThunder = false,
   onSnowToggle,
   forceSnow = false,
+  onRainToggle,
+  forceRain = false,
   weatherService = null
 }) {
   const [city, setCity] = useState(currentCity)
@@ -679,6 +681,16 @@ function WeatherUI({
               title="Toggle Thunder Test Mode"
             >
               ⚡ {forceThunder ? 'Thunder ON' : 'Thunder OFF'}
+            </button>
+          )}
+          {onRainToggle && (
+            <button
+              type="button"
+              className={`rain-toggle${forceRain ? ' active' : ''}`}
+              onClick={() => onRainToggle(!forceRain)}
+              title="Toggle Rain Test Mode"
+            >
+              💧 {forceRain ? 'Rain ON' : 'Rain OFF'}
             </button>
           )}
           {onSnowToggle && (
