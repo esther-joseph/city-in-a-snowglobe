@@ -648,7 +648,6 @@ function App() {
   const [forceThunder, setForceThunder] = useState(false)
   const [forceSnow, setForceSnow] = useState(false)
   const [renderMode, setRenderMode] = useState('3d')
-  const [cameraFacing, setCameraFacing] = useState('environment') // 'environment' (back) or 'user' (front)
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
   // Initialize weather service (Dependency Inversion Principle)
@@ -798,7 +797,7 @@ function App() {
       cancelled = true
       stopSession().catch(() => {})
     }
-  }, [renderMode, setRenderMode, cameraFacing])
+  }, [renderMode, setRenderMode])
 
   const cityProfile = useMemo(
     () => resolveCityProfile(weatherData?.name || city),
@@ -1071,75 +1070,6 @@ function App() {
       </Canvas>
         )}
         
-        {/* Camera Toggle Button for AR Mode */}
-        {renderMode === 'ar' && (
-          <button
-            onClick={async () => {
-              const newFacing = cameraFacing === 'environment' ? 'user' : 'environment'
-              setCameraFacing(newFacing)
-              
-              // Stop current session and restart with new camera preference
-              try {
-                await stopSession()
-                // Small delay to ensure session is fully closed
-                await new Promise(resolve => setTimeout(resolve, 200))
-                
-                if (renderMode === 'ar' && navigator.xr) {
-                  const supported = await navigator.xr.isSessionSupported('immersive-ar')
-                  if (supported) {
-                    const optionalFeatures = ['local-floor', 'hit-test']
-                    if (typeof document !== 'undefined') optionalFeatures.push('dom-overlay')
-                    
-                    const sessionInit = {
-                      optionalFeatures,
-                      ...(typeof document !== 'undefined' && { domOverlay: { root: document.body } })
-                    }
-                    
-                    // Try to request user-facing camera if needed
-                    if (newFacing === 'user') {
-                      // Note: Not all browsers support this, but we try
-                      try {
-                        await startSession('immersive-ar', { ...sessionInit, requiredFeatures: ['user-facing'] })
-                      } catch (e) {
-                        // Fallback to default if user-facing not supported
-                        console.warn('User-facing camera not supported, using default:', e)
-                        await startSession('immersive-ar', sessionInit)
-                      }
-                    } else {
-                      await startSession('immersive-ar', sessionInit)
-                    }
-                  }
-                }
-              } catch (error) {
-                console.warn('Failed to switch camera:', error)
-              }
-            }}
-            style={{
-              position: 'fixed',
-              bottom: '20px',
-              right: '20px',
-              zIndex: 1000,
-              padding: '12px 20px',
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              color: 'white',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: '25px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              backdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-              pointerEvents: 'auto'
-            }}
-            aria-label={`Switch to ${cameraFacing === 'environment' ? 'front' : 'back'} camera`}
-          >
-            <span>📷</span>
-            <span>{cameraFacing === 'environment' ? 'Front' : 'Back'}</span>
-          </button>
-        )}
       </div>
     </div>
   )
