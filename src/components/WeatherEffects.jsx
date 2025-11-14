@@ -160,26 +160,25 @@ function ThunderboltParticles() {
   // Create zigzag lightning bolt geometry
   const boltGeometry = useMemo(() => {
     const shape = new THREE.Shape()
-    const width = 0.15
-    const height = 2.5
-    
-    // Create zigzag path
-    shape.moveTo(0, 0)
-    shape.lineTo(width * 0.3, height * 0.2)
-    shape.lineTo(-width * 0.2, height * 0.4)
-    shape.lineTo(width * 0.4, height * 0.6)
-    shape.lineTo(-width * 0.3, height * 0.8)
-    shape.lineTo(width * 0.2, height)
-    shape.lineTo(0, height)
-    shape.lineTo(-width * 0.2, height * 0.8)
-    shape.lineTo(width * 0.3, height * 0.6)
-    shape.lineTo(-width * 0.4, height * 0.4)
-    shape.lineTo(width * 0.2, height * 0.2)
-    shape.lineTo(0, 0)
-    
+    const height = 2.6
+    const halfWidth = 0.32
+
+    shape.moveTo(-halfWidth * 0.8, 0)
+    shape.quadraticCurveTo(halfWidth * 0.5, height * 0.18, -halfWidth * 0.2, height * 0.35)
+    shape.quadraticCurveTo(-halfWidth, height * 0.55, halfWidth * 0.35, height * 0.75)
+    shape.quadraticCurveTo(halfWidth * 0.75, height * 0.95, halfWidth * 0.25, height * 1.15)
+    shape.lineTo(halfWidth * 0.95, height * 1.25)
+    shape.quadraticCurveTo(halfWidth * 0.15, height * 1.2, -halfWidth * 0.05, height * 1.0)
+    shape.quadraticCurveTo(-halfWidth * 0.85, height * 0.8, halfWidth * 0.1, height * 0.55)
+    shape.quadraticCurveTo(halfWidth * 0.6, height * 0.35, -halfWidth * 0.25, height * 0.15)
+    shape.quadraticCurveTo(-halfWidth * 0.45, height * 0.05, -halfWidth * 0.8, 0)
+
     const extrudeSettings = {
-      depth: 0.1,
-      bevelEnabled: false
+      depth: 0.18,
+      bevelEnabled: true,
+      bevelSize: 0.04,
+      bevelThickness: 0.04,
+      bevelSegments: 2
     }
     return new THREE.ExtrudeGeometry(shape, extrudeSettings)
   }, [])
