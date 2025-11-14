@@ -21,7 +21,7 @@ function TemperatureTrend({ data }) {
   const paddingLeft = 44
   const paddingRight = 20
   const paddingY = 30
-  const paddingBottom = 100 // Extra space for precipitation bars, weather text, and wind speed
+  const paddingBottom = 80 // Reduced space under the chart
   const width = points.length * pointSpacing + paddingLeft + paddingRight
   const height = 240 // Increased height to accommodate all elements
   const innerWidth = width - paddingLeft - paddingRight
@@ -294,7 +294,7 @@ function TemperatureTrend({ data }) {
           
           {/* Temperature scale labels on left */}
           {horizontalGridLines.map((line, index) => {
-            const tempValue = min + (max - min) * (1 - index / (horizontalGridLines.length - 1))
+            const tempValue = min + (max - min) * (index / (horizontalGridLines.length - 1))
             return (
               <text
                 key={`temp-label-${index}`}
