@@ -230,42 +230,23 @@ function SnowParticles() {
 
 function ThunderboltParticles() {
   const instancedMeshRef = useRef()
-  const count = 600
+  const count = 400
 
   const boltGeometry = useMemo(() => {
-    const shape = new THREE.Shape()
-    const height = 2.5
-    const width = 0.55
-    shape.moveTo(-width * 0.6, 0)
-    shape.quadraticCurveTo(width * 0.35, height * 0.18, -width * 0.15, height * 0.38)
-    shape.quadraticCurveTo(-width * 0.75, height * 0.55, width * 0.15, height * 0.78)
-    shape.quadraticCurveTo(width * 0.55, height * 0.95, width * 0.15, height * 1.05)
-    shape.lineTo(width * 0.95, height * 1.25)
-    shape.quadraticCurveTo(width * 0.05, height * 1.18, -width * 0.05, height * 0.96)
-    shape.quadraticCurveTo(-width * 0.7, height * 0.75, width * 0.1, height * 0.48)
-    shape.quadraticCurveTo(width * 0.45, height * 0.28, -width * 0.25, height * 0.08)
-    shape.quadraticCurveTo(-width * 0.4, height * 0.02, -width * 0.6, 0)
-    const extrudeSettings = {
-      depth: 0.3,
-      bevelEnabled: true,
-      bevelSize: 0.06,
-      bevelThickness: 0.08,
-      bevelSegments: 2,
-      steps: 2
-    }
-    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-    geometry.center()
-    return geometry
+    const geom = starGeometry.clone()
+    geom.scale(2.4, 2.4, 2.4)
+    geom.computeVertexNormals()
+    return geom
   }, [])
 
   const boltMaterial = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#ffd400',
-        emissive: '#fff063',
-        emissiveIntensity: 2.4,
-        roughness: 0.18,
-        metalness: 0.25,
+        color: '#ffe86f',
+        emissive: '#fffcc5',
+        emissiveIntensity: 2.7,
+        roughness: 0.3,
+        metalness: 0.18,
         transparent: true,
         vertexColors: true,
         depthWrite: false,
@@ -277,20 +258,22 @@ function ThunderboltParticles() {
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count)
-    const visibilities = new Float32Array(count) // Track if bolt is visible/flashing
+    const intensities = new Float32Array(count)
+    const flashPhase = new Float32Array(count)
     const horizontalSpan = 80
-    const verticalSpan = 45
-    const baseHeight = 35 // Start at cloud height
+    const verticalSpan = 55
+    const baseHeight = 34
     
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
       positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
       positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
-      velocities[i] = Math.random() * 0.8 + 0.6 // Faster than rain
-      visibilities[i] = 0 // Start invisible
+      velocities[i] = Math.random() * 0.12 + 0.06
+      intensities[i] = 0
+      flashPhase[i] = Math.random() * Math.PI * 2
     }
 
-    return { positions, velocities, visibilities, horizontalSpan, verticalSpan, baseHeight }
+    return { positions, velocities, intensities, flashPhase, horizontalSpan, verticalSpan, baseHeight }
   }, [])
 
   useEffect(() => {
@@ -303,48 +286,43 @@ function ThunderboltParticles() {
         particles.positions[i * 3 + 1],
         particles.positions[i * 3 + 2]
       )
-      matrix.scale(new THREE.Vector3(1.7, 1.7, 1.7))
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
   }, [particles, count])
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!instancedMeshRef.current) return
     
-    const positions = particles.positions
-    const visibilities = particles.visibilities
+    const { positions, velocities, intensities, flashPhase, horizontalSpan, verticalSpan, baseHeight } = particles
     const time = state.clock.elapsedTime
     const color = new THREE.Color()
     
     for (let i = 0; i < count; i++) {
-      if (visibilities[i] > 0) {
-        visibilities[i] -= 0.08
-      }
+      intensities[i] = Math.max(0, intensities[i] - delta * 0.23)
       
-      positions[i * 3 + 1] -= particles.velocities[i]
+      positions[i * 3 + 1] -= velocities[i]
       
-      if (positions[i * 3 + 1] < -6 || visibilities[i] <= 0) {
-        if (Math.random() < 0.015) {
-          positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
-          positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
-          positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
-          visibilities[i] = 1.0
-          particles.velocities[i] = Math.random() * 0.8 + 0.6
-        } else {
-          positions[i * 3 + 1] = -10
-          visibilities[i] = 0
-        }
+      if (positions[i * 3 + 1] < -6) {
+        positions[i * 3 + 1] = verticalSpan + baseHeight
+        positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
+        positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
+        velocities[i] = Math.random() * 0.12 + 0.06
+        intensities[i] = 1
+      } else if (Math.random() < 0.012) {
+        intensities[i] = 1
       }
+
+      const burst = intensities[i] + Math.abs(Math.sin(time * 1.5 + flashPhase[i])) * 0.45
 
       const matrix = new THREE.Matrix4()
       matrix.identity()
       matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-      matrix.scale(new THREE.Vector3(1.7, 1.7, 1.7))
+      const burstScale = 1.2 + burst * 0.9
+      matrix.scale(new THREE.Vector3(burstScale, burstScale, burstScale))
       instancedMeshRef.current.setMatrixAt(i, matrix)
 
-      const flashIntensity = 0.65 + Math.abs(Math.sin(time * 2.2 + i * 0.3)) * 0.35
-      color.setHSL(0.15, 1, flashIntensity * 0.55 + 0.25)
+      color.setHSL(0.14, 1, 0.42 + burst * 0.3)
       instancedMeshRef.current.setColorAt(i, color)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
