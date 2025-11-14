@@ -183,43 +183,6 @@ function TemperatureTrend({ data }) {
             </g>
           ))}
           
-          {/* Weather condition text - formatted */}
-          {plottedPoints.map((point) => {
-            const textY = height - paddingBottom + 65
-            // Split long text into multiple lines if needed
-            const words = point.formattedDescription.split(' ')
-            const maxCharsPerLine = 8
-            let lines = []
-            let currentLine = ''
-            
-            words.forEach(word => {
-              if ((currentLine + word).length <= maxCharsPerLine) {
-                currentLine = currentLine ? `${currentLine} ${word}` : word
-              } else {
-                if (currentLine) lines.push(currentLine)
-                currentLine = word
-              }
-            })
-            if (currentLine) lines.push(currentLine)
-            
-            return (
-              <g key={`condition-${point.id}`}>
-                {lines.map((line, lineIndex) => (
-                  <text
-                    key={`${point.id}-line-${lineIndex}`}
-                    x={point.x}
-                    y={textY + (lineIndex * 12)}
-                    textAnchor="middle"
-                    fontSize="9"
-                    className="temperature-weather-condition"
-                  >
-                    {line}
-                  </text>
-                ))}
-              </g>
-            )
-          })}
-          
           {/* Hour labels */}
           {plottedPoints.map((point) => (
             <text
