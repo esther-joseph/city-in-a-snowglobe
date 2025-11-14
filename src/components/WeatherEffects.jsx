@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useCallback } from 'react'
+import React, { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
@@ -279,14 +279,14 @@ function ThunderboltParticles() {
     const velocities = new Float32Array(count)
     const visibilities = new Float32Array(count) // Track if bolt is visible/flashing
     const horizontalSpan = 80
-    const verticalSpan = 8
-    const baseHeight = 36 // Align near cloud band
+    const verticalSpan = 45
+    const baseHeight = 35 // Start at cloud height
     
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
       positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
       positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
-      velocities[i] = Math.random() * 0.14 + 0.05
+      velocities[i] = Math.random() * 0.8 + 0.6 // Faster than rain
       visibilities[i] = 0 // Start invisible
     }
 
@@ -324,15 +324,15 @@ function ThunderboltParticles() {
       
       positions[i * 3 + 1] -= particles.velocities[i]
       
-      if (positions[i * 3 + 1] < particles.baseHeight - 2 || visibilities[i] <= 0) {
+      if (positions[i * 3 + 1] < -6 || visibilities[i] <= 0) {
         if (Math.random() < 0.015) {
           positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
           positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
           positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
           visibilities[i] = 1.0
-          particles.velocities[i] = Math.random() * 0.14 + 0.05
+          particles.velocities[i] = Math.random() * 0.8 + 0.6
         } else {
-          positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
+          positions[i * 3 + 1] = -10
           visibilities[i] = 0
         }
       }

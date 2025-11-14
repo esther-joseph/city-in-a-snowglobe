@@ -1,6 +1,5 @@
 import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Icosahedron } from '@react-three/drei'
 import PropTypes from 'prop-types'
 
 function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpeed = 0 }) {
@@ -70,66 +69,23 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
 
   return (
     <group position={position} rotation={[0, randomRotation, 0]}>
-      {/* Root flare */}
-      <mesh castShadow receiveShadow position={[0, trunkHeight * 0.08, 0]}>
-        <cylinderGeometry args={[trunkWidth * 1.8, trunkWidth * 1.1, trunkHeight * 0.16, 16]} />
-        <meshStandardMaterial color="#c79257" roughness={0.7} metalness={0.1} />
+      {/* Blocky trunk */}
+      <mesh castShadow receiveShadow position={[0, trunkHeight / 2, 0]} scale={[1, 1.1, 1]}>
+        <boxGeometry args={[trunkWidth * 1.2, trunkHeight, trunkWidth * 1.2]} />
+        <meshStandardMaterial color="#9b6a3a" roughness={0.65} metalness={0.08} />
       </mesh>
-
-      {/* Main trunk */}
-      <mesh castShadow receiveShadow position={[0, trunkHeight / 2, 0]}>
-        <cylinderGeometry args={[trunkWidth * 0.55, trunkWidth * 0.8, trunkHeight, 18]} />
-        <meshStandardMaterial color="#d4a574" roughness={0.6} metalness={0.1} />
+      <mesh castShadow receiveShadow position={[0, trunkHeight + leafSize * 0.45, 0]}>
+        <boxGeometry args={[leafSize * 2.1, leafSize * 1.25, leafSize * 2.1]} />
+        <meshStandardMaterial color="#417a36" roughness={0.4} metalness={0.05} />
       </mesh>
-      
-      {/* Left branch */}
-      <mesh 
-        castShadow 
-        receiveShadow 
-        position={[
-          -Math.sin(branchAngle) * branchLength / 2,
-          branchHeight,
-          -Math.cos(branchAngle) * branchLength / 2
-        ]}
-        rotation={[0, branchAngle, -Math.PI / 6]}
-      >
-        <cylinderGeometry args={[trunkWidth * 0.35, trunkWidth * 0.45, branchLength, 12]} />
-        <meshStandardMaterial color="#d4a574" roughness={0.6} metalness={0.1} />
+      <mesh castShadow receiveShadow position={[0, trunkHeight + leafSize * 1.05, 0]}>
+        <boxGeometry args={[leafSize * 1.65, leafSize * 1.1, leafSize * 1.65]} />
+        <meshStandardMaterial color="#3a8f3c" roughness={0.35} metalness={0.05} />
       </mesh>
-      
-      {/* Right branch */}
-      <mesh 
-        castShadow 
-        receiveShadow 
-        position={[
-          Math.sin(branchAngle) * branchLength / 2,
-          branchHeight,
-          -Math.cos(branchAngle) * branchLength / 2
-        ]}
-        rotation={[0, -branchAngle, Math.PI / 6]}
-      >
-        <cylinderGeometry args={[trunkWidth * 0.35, trunkWidth * 0.45, branchLength, 12]} />
-        <meshStandardMaterial color="#d4a574" roughness={0.6} metalness={0.1} />
+      <mesh castShadow receiveShadow position={[0, trunkHeight + leafSize * 1.55, 0]}>
+        <boxGeometry args={[leafSize * 1.25, leafSize * 1.05, leafSize * 1.25]} />
+        <meshStandardMaterial color="#48a24a" roughness={0.32} metalness={0.05} />
       </mesh>
-      
-      {/* Foliage clusters */}
-      <group ref={canopyRef}>
-        {leafClusters.map((cluster, idx) => {
-          const colors = ['#4a9e4a', '#5db85d', '#3d8f3d']
-          return (
-            <Icosahedron
-              key={`leaf-cluster-${idx}`}
-              args={[leafSize * 0.85, 1]}
-              position={cluster.position}
-              scale={[cluster.scale, cluster.scale * 1.1, cluster.scale]}
-              castShadow
-              receiveShadow
-            >
-              <meshStandardMaterial color={colors[cluster.colorIdx]} roughness={0.25} metalness={0.04} />
-            </Icosahedron>
-          )
-        })}
-      </group>
     </group>
   )
 }
@@ -143,39 +99,40 @@ Tree.propTypes = {
 }
 
 function Bush({ position, scale }) {
-  const blobCount = Math.max(6, Math.round(scale * 3))
-  const blobIndices = new Array(blobCount).fill(0)
+  const blockCount = Math.max(4, Math.round(scale * 2.2))
+  const blockIndices = new Array(blockCount).fill(0)
 
   return (
     <group position={position}>
-      {blobIndices.map((_, index) => {
-        const angle = (index / blobCount) * Math.PI * 2
-        const radius = scale * 0.3 + Math.random() * scale * 0.22
-        const x = Math.cos(angle) * radius + (Math.random() - 0.5) * scale * 0.18
-        const z = Math.sin(angle) * radius + (Math.random() - 0.5) * scale * 0.18
-        const y = Math.random() * scale * 0.25
-        const blobScale = 0.55 + Math.random() * 0.45
+      {blockIndices.map((_, index) => {
+        const angle = (index / blockCount) * Math.PI * 2
+        const radius = scale * 0.35 + Math.random() * scale * 0.18
+        const x = Math.cos(angle) * radius + (Math.random() - 0.5) * scale * 0.2
+        const z = Math.sin(angle) * radius + (Math.random() - 0.5) * scale * 0.2
+        const y = Math.random() * scale * 0.2
+        const blockScale = 0.45 + Math.random() * 0.25
+        const colors = ['#3f8f3d', '#357b34', '#4aa347']
 
         return (
           <mesh
-            key={`bush-blob-${index}`}
+            key={`bush-block-${index}`}
             position={[x, y, z]}
             castShadow
             receiveShadow
-            scale={[blobScale, blobScale * 1.15, blobScale]}
+            scale={[blockScale, blockScale, blockScale]}
           >
-            <sphereGeometry args={[scale * 0.45, 20, 20]} />
+            <boxGeometry args={[scale * 0.7, scale * 0.7, scale * 0.7]} />
             <meshStandardMaterial
-              color={index % 2 === 0 ? '#3f8f3d' : '#357b34'}
-              roughness={0.6}
+              color={colors[index % colors.length]}
+              roughness={0.55}
               metalness={0.05}
             />
           </mesh>
         )
       })}
-      <mesh position={[0, scale * 0.25, 0]} castShadow receiveShadow>
-        <sphereGeometry args={[scale * 0.55, 24, 24]} />
-        <meshStandardMaterial color="#46a043" roughness={0.55} metalness={0.08} />
+      <mesh position={[0, scale * 0.15, 0]} castShadow receiveShadow>
+        <boxGeometry args={[scale * 0.9, scale * 0.4, scale * 0.9]} />
+        <meshStandardMaterial color="#4aa347" roughness={0.5} metalness={0.05} />
       </mesh>
     </group>
   )
