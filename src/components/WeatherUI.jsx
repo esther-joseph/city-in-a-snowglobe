@@ -843,7 +843,7 @@ function WeatherUI({
                   <MeteoconIcon
                     weatherMain={iconMain}
                     isNight={celestialData?.isNight || false}
-                    size={52}
+                    size={130}
                     className="summary-meteocon-icon"
                   />
                 </span>
@@ -857,28 +857,16 @@ function WeatherUI({
               </div>
               <div className="summary-stats">
                 <div className="stat-item">
-                  <span className="stat-label">Humidity</span>
-                  <span className="stat-value">{humidity !== undefined ? `${humidity}%` : '--'}</span>
-                </div>
-                <div className="stat-item">
                   <span className="stat-label">Wind Speed</span>
                   <span className="stat-value">{windSpeed !== undefined ? `${windSpeed} m/s` : '--'}</span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label">Pressure</span>
-                  <span className="stat-value">{pressure !== undefined ? `${pressure} hPa` : '--'}</span>
+                  <span className="stat-label">Humidity</span>
+                  <span className="stat-value">{humidity !== undefined ? `${humidity}%` : '--'}</span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label">Clouds</span>
-                  <span className="stat-value">{cloudCoverage !== undefined ? `${cloudCoverage}%` : '--'}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Sunrise</span>
-                  <span className="stat-value">{sunrise}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Sunset</span>
-                  <span className="stat-value">{sunset}</span>
+                  <span className="stat-label">Feels Like</span>
+                  <span className="stat-value">{feelsLikeF !== undefined ? `${Math.round(feelsLikeF)}°F` : '--'}</span>
                 </div>
               </div>
             </div>
@@ -889,7 +877,7 @@ function WeatherUI({
                   <MeteoconIcon
                     weatherMain={iconMain}
                     isNight={celestialData?.isNight || false}
-                    size={viewMode === 'informational' ? 150 : 60}
+                    size={viewMode === 'informational' ? 150 : (viewMode === 'minimal' || viewMode === 'compact' ? 150 : 60)}
                     className="weather-meteocon-icon"
                   />
           </div>
@@ -908,6 +896,24 @@ function WeatherUI({
                       <span className="stat-label">Humidity</span>
                       <span className="stat-value">{humidity !== undefined ? `${humidity}%` : '--'}</span>
                     </div>
+                    {(viewMode === 'compact' || viewMode === 'informational') && feelsLikeF !== undefined && (
+                      <div className="stat-item">
+                        <span className="stat-label">Feels Like</span>
+                        <span className="stat-value">{Math.round(feelsLikeF)}°F</span>
+                      </div>
+                    )}
+                    {viewMode === 'compact' && pressure !== undefined && (
+                      <div className="stat-item">
+                        <span className="stat-label">Pressure</span>
+                        <span className="stat-value">{pressure} hPa</span>
+                      </div>
+                    )}
+                    {viewMode === 'compact' && cloudCoverage !== undefined && (
+                      <div className="stat-item">
+                        <span className="stat-label">Clouds</span>
+                        <span className="stat-value">{cloudCoverage}%</span>
+                      </div>
+                    )}
                     {viewMode === 'informational' && (
                       <div className="stat-item">
                         <span className="stat-label">Visibility</span>
@@ -916,12 +922,6 @@ function WeatherUI({
                             ? `${(weatherData.visibility / 1000).toFixed(1)} km`
                             : '--'}
                         </span>
-                      </div>
-                    )}
-                    {viewMode === 'informational' && feelsLikeF !== undefined && (
-                      <div className="stat-item">
-                        <span className="stat-label">Feels Like</span>
-                        <span className="stat-value">{Math.round(feelsLikeF)}°F</span>
                       </div>
                     )}
                     {viewMode === 'informational' && uvIndex !== null && uvIndex !== undefined && (
