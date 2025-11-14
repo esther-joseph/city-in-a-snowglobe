@@ -21,6 +21,7 @@ function WeatherDrawer({
   forceSnow,
   onRainToggle,
   forceRain,
+  particleValidation,
   renderMode,
   onRenderModeChange,
   weatherService
@@ -81,6 +82,7 @@ function WeatherDrawer({
             forceSnow={forceSnow}
           onRainToggle={onRainToggle}
           forceRain={forceRain}
+          particleValidation={particleValidation}
             weatherService={weatherService}
           />
           <ModeToggle 
