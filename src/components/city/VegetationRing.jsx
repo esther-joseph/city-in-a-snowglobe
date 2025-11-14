@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import PropTypes from 'prop-types'
 
 function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpeed = 0 }) {
-  const groupRef = useRef()
+  const canopyRef = useRef()
   
   // Random Y-axis rotation (0 to 2π) for each tree
   const randomRotation = useMemo(() => Math.random() * Math.PI * 2, [])
@@ -18,8 +18,7 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
   const windStrength = Math.min(windSpeed / 15, 1) // Normalize to 0-1, max at 15 m/s
   
   useFrame((state) => {
-    if (!groupRef.current) return
-    
+    if (!canopyRef.current) return
     const time = state.clock.elapsedTime
     // S-curve swaying: use sine wave with phase offset for smooth s-curve motion
     const swayAmount = windStrength * 0.15 // Maximum sway angle in radians
@@ -36,8 +35,8 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
     const totalSway = baseSway + sCurvePhase
     
     // Apply rotation in wind direction
-    groupRef.current.rotation.z = totalSway * windX
-    groupRef.current.rotation.x = -totalSway * windZ // Negative for correct direction
+    canopyRef.current.rotation.z = totalSway * windX
+    canopyRef.current.rotation.x = -totalSway * windZ // Negative for correct direction
   })
   const trunkWidth = 0.16 * foliageScale
   const branchHeight = trunkHeight * 0.72
@@ -69,7 +68,7 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
   }, [trunkHeight, leafSize])
 
   return (
-    <group ref={groupRef} position={position} rotation={[0, randomRotation, 0]}>
+    <group position={position} rotation={[0, randomRotation, 0]}>
       {/* Root flare */}
       <mesh castShadow receiveShadow position={[0, trunkHeight * 0.08, 0]}>
         <cylinderGeometry args={[trunkWidth * 1.8, trunkWidth * 1.1, trunkHeight * 0.16, 16]} />
@@ -113,21 +112,23 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
       </mesh>
       
       {/* Foliage clusters */}
-      {leafClusters.map((cluster, idx) => {
-        const colors = ['#4a9e4a', '#5db85d', '#3d8f3d']
-        return (
-          <mesh
-            key={`leaf-cluster-${idx}`}
-            castShadow
-            receiveShadow
-            position={cluster.position}
-            scale={[cluster.scale, cluster.scale * 1.1, cluster.scale]}
-          >
-            <icosahedronGeometry args={[leafSize, 2]} />
-            <meshStandardMaterial color={colors[cluster.colorIdx]} roughness={0.25} metalness={0.04} />
-          </mesh>
-        )
-      })}
+      <group ref={canopyRef}>
+        {leafClusters.map((cluster, idx) => {
+          const colors = ['#4a9e4a', '#5db85d', '#3d8f3d']
+          return (
+            <mesh
+              key={`leaf-cluster-${idx}`}
+              castShadow
+              receiveShadow
+              position={cluster.position}
+              scale={[cluster.scale, cluster.scale * 1.1, cluster.scale]}
+            >
+              <icosahedronGeometry args={[leafSize, 2]} />
+              <meshStandardMaterial color={colors[cluster.colorIdx]} roughness={0.25} metalness={0.04} />
+            </mesh>
+          )
+        })}
+      </group>
     </group>
   )
 }
