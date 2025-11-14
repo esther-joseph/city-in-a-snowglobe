@@ -93,19 +93,19 @@ function RainParticles() {
 
 function SnowParticles() {
   const points = useRef()
-  const count = 800
+  const count = 1600
 
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count)
-    const horizontalSpan = 24
-    const verticalSpan = 26
+    const horizontalSpan = 80
+    const verticalSpan = 45
     
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
-      positions[i * 3 + 1] = Math.random() * verticalSpan + 3
+      positions[i * 3 + 1] = Math.random() * verticalSpan + 5
       positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
-      velocities[i] = Math.random() * 0.1 + 0.05
+      velocities[i] = Math.random() * 0.18 + 0.06
     }
     
     return { positions, velocities, horizontalSpan, verticalSpan }
@@ -121,8 +121,8 @@ function SnowParticles() {
       positions[i * 3 + 1] -= particles.velocities[i]
       positions[i * 3] += Math.sin(time + i) * 0.01
       
-      if (positions[i * 3 + 1] < 0) {
-        positions[i * 3 + 1] = particles.verticalSpan + 3
+      if (positions[i * 3 + 1] < -5) {
+        positions[i * 3 + 1] = particles.verticalSpan + 5
         positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
         positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
       }
@@ -142,7 +142,7 @@ function SnowParticles() {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.3}
+        size={0.35}
         color="#FFFFFF"
         transparent
         opacity={0.8}
@@ -265,7 +265,7 @@ function ThunderboltParticles() {
       const glowMatrix = new THREE.Matrix4()
       glowMatrix.makeRotationX(Math.PI / 2)
       glowMatrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-      glowMatrix.scale(new THREE.Vector3(1.3, 1.3, 1.3))
+      glowMatrix.scale(new THREE.Vector3(1.6, 1.6, 1.6))
       glowMeshRef.current.setMatrixAt(i, glowMatrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
@@ -287,9 +287,9 @@ function ThunderboltParticles() {
       {/* Main bolts */}
       <instancedMesh ref={instancedMeshRef} args={[boltGeometry, null, count]}>
         <meshStandardMaterial
-          color="#FFFFAA"
-          emissive="#FFFF88"
-          emissiveIntensity={2}
+          color="#ffed4f"
+          emissive="#ffd500"
+          emissiveIntensity={2.5}
           transparent
           opacity={0.95}
         />
@@ -297,11 +297,11 @@ function ThunderboltParticles() {
       {/* Glow effect */}
       <instancedMesh ref={glowMeshRef} args={[boltGeometry, null, count]}>
         <meshStandardMaterial
-          color="#AAAAFF"
-          emissive="#8888FF"
-          emissiveIntensity={1.5}
+          color="#fff48c"
+          emissive="#ffdd55"
+          emissiveIntensity={1.8}
           transparent
-          opacity={0.4}
+          opacity={0.5}
         />
       </instancedMesh>
     </>
