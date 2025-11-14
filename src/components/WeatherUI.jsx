@@ -29,6 +29,8 @@ function TemperatureTrend({ data }) {
   
   // Calculate max precipitation for scaling bars
   const maxPrecipitation = Math.max(...points.map(p => p.precipitation || 0), 0.1)
+  // Max probability is 100% (1.0)
+  const maxProbability = 1.0
 
   const plottedPoints = points.map((point, index) => {
     const ratio = points.length > 1 ? index / (points.length - 1) : 0.5
@@ -36,18 +38,27 @@ function TemperatureTrend({ data }) {
     const normalized = (point.temp - min) / range
     const y = paddingY + (1 - normalized) * innerHeight
     
-    // Calculate precipitation bar height (scaled to fit in bottom section)
-    const precipitationBarHeight = point.precipitation > 0 
-      ? (point.precipitation / maxPrecipitation) * 30 // Max 30px height for bars
-      : 0
-    const precipitationBarY = height - paddingBottom + 20 // Start position for bars
+    // Calculate precipitation probability bar height (0-100% scale)
+    // Bar height represents probability, not amount
+    const probabilityBarHeight = (point.pop || 0) * 40 // Max 40px height for 100% probability
+    const probabilityBarY = height - paddingBottom + 20 // Start position for bars (from bottom)
+    
+    // Format weather description text (capitalize and handle long words)
+    const formatWeatherText = (text) => {
+      if (!text) return ''
+      // Capitalize first letter of each word
+      return text.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ')
+    }
     
     return { 
       ...point, 
       x, 
       y,
-      precipitationBarHeight,
-      precipitationBarY
+      precipitationBarHeight: probabilityBarHeight,
+      precipitationBarY: probabilityBarY,
+      formattedDescription: formatWeatherText(point.description || point.condition)
     }
   })
 
@@ -159,69 +170,113 @@ function TemperatureTrend({ data }) {
             </g>
           ))}
           
-          {/* Precipitation bars */}
+          {/* Precipitation probability bars - show for all hours */}
           {plottedPoints.map((point) => {
-            if (point.precipitation <= 0) return null
-            const barWidth = 8
+            const barWidth = 12
+            const probability = point.pop || 0
+            const barHeight = probability * 40 // Max 40px for 100%
+            const barY = point.precipitationBarY - barHeight // Bars grow upward from base
+            
             return (
               <g key={`precip-${point.id}`}>
+                {/* Probability bar */}
                 <rect
                   x={point.x - barWidth / 2}
-                  y={point.precipitationBarY}
+                  y={barY}
                   width={barWidth}
-                  height={point.precipitationBarHeight}
+                  height={barHeight}
                   className="temperature-precipitation-bar"
                   rx="2"
+                  opacity={probability > 0 ? 0.7 : 0.2}
                 />
-                <text
-                  x={point.x}
-                  y={point.precipitationBarY - 8}
-                  textAnchor="middle"
-                  fontSize="8"
-                  className="temperature-precipitation-text"
-                >
-                  {point.precipitation.toFixed(2)}mm/h
-                </text>
-                {point.pop > 0 && (
+                {/* Precipitation amount text (if there's precipitation) */}
+                {point.precipitation > 0 && (
                   <text
                     x={point.x}
-                    y={point.precipitationBarY - 18}
+                    y={barY - 6}
                     textAnchor="middle"
-                    fontSize="7"
+                    fontSize="8"
+                    className="temperature-precipitation-text"
+                  >
+                    {point.precipitation.toFixed(2)}mm/h
+                  </text>
+                )}
+                {/* Probability percentage */}
+                {probability > 0 && (
+                  <text
+                    x={point.x}
+                    y={barY - (point.precipitation > 0 ? 16 : 6)}
+                    textAnchor="middle"
+                    fontSize="8"
                     className="temperature-precipitation-prob"
                   >
-                    {Math.round(point.pop * 100)}%
+                    {Math.round(probability * 100)}%
                   </text>
                 )}
               </g>
             )
           })}
           
-          {/* Weather condition text */}
+          {/* Weather condition text - formatted */}
           {plottedPoints.map((point) => {
-            const textY = height - paddingBottom + 60
+            const textY = height - paddingBottom + 65
+            // Split long text into multiple lines if needed
+            const words = point.formattedDescription.split(' ')
+            const maxCharsPerLine = 8
+            let lines = []
+            let currentLine = ''
+            
+            words.forEach(word => {
+              if ((currentLine + word).length <= maxCharsPerLine) {
+                currentLine = currentLine ? `${currentLine} ${word}` : word
+              } else {
+                if (currentLine) lines.push(currentLine)
+                currentLine = word
+              }
+            })
+            if (currentLine) lines.push(currentLine)
+            
             return (
-              <text
-                key={`condition-${point.id}`}
-                x={point.x}
-                y={textY}
-                textAnchor="middle"
-                fontSize="9"
-                className="temperature-weather-condition"
-              >
-                {point.description || point.condition}
-              </text>
+              <g key={`condition-${point.id}`}>
+                {lines.map((line, lineIndex) => (
+                  <text
+                    key={`${point.id}-line-${lineIndex}`}
+                    x={point.x}
+                    y={textY + (lineIndex * 12)}
+                    textAnchor="middle"
+                    fontSize="9"
+                    className="temperature-weather-condition"
+                  >
+                    {line}
+                  </text>
+                ))}
+              </g>
             )
           })}
           
           {/* Cloud coverage text */}
           {plottedPoints.map((point) => {
             if (point.clouds > 0 && point.precipitation <= 0) {
+              // Calculate number of lines in weather condition text
+              const words = point.formattedDescription.split(' ')
+              const maxCharsPerLine = 8
+              let numLines = 1
+              let currentLine = ''
+              words.forEach(word => {
+                if ((currentLine + word).length <= maxCharsPerLine) {
+                  currentLine = currentLine ? `${currentLine} ${word}` : word
+                } else {
+                  if (currentLine) numLines++
+                  currentLine = word
+                }
+              })
+              
+              const cloudY = height - paddingBottom + 65 + (numLines * 12) + 5
               return (
                 <text
                   key={`clouds-${point.id}`}
                   x={point.x}
-                  y={height - paddingBottom + 75}
+                  y={cloudY}
                   textAnchor="middle"
                   fontSize="8"
                   className="temperature-cloud-coverage"
@@ -235,11 +290,27 @@ function TemperatureTrend({ data }) {
           
           {/* Wind speed */}
           {plottedPoints.map((point) => {
+            // Calculate number of lines in weather condition text
+            const words = point.formattedDescription.split(' ')
+            const maxCharsPerLine = 8
+            let numLines = 1
+            let currentLine = ''
+            words.forEach(word => {
+              if ((currentLine + word).length <= maxCharsPerLine) {
+                currentLine = currentLine ? `${currentLine} ${word}` : word
+              } else {
+                if (currentLine) numLines++
+                currentLine = word
+              }
+            })
+            
+            const hasClouds = point.clouds > 0 && point.precipitation <= 0
+            const windY = height - paddingBottom + 65 + (numLines * 12) + (hasClouds ? 18 : 5)
             return (
               <text
                 key={`wind-${point.id}`}
                 x={point.x}
-                y={height - paddingBottom + 90}
+                y={windY}
                 textAnchor="middle"
                 fontSize="8"
                 className="temperature-wind-speed"
