@@ -485,21 +485,6 @@
   justify-content: center;
 }
 
-.temperature-precipitation-bar {
-  fill: #87CEEB;
-  opacity: 0.8;
-}
-
-.temperature-precipitation-text {
-  fill: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-}
-
-.temperature-precipitation-prob {
-  fill: rgba(255, 255, 255, 0.7);
-  font-weight: 400;
-}
-
 .temperature-weather-condition {
   fill: rgba(255, 255, 255, 0.85);
   font-weight: 400;

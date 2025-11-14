@@ -18,7 +18,7 @@ function TemperatureTrend({ data }) {
   const { points, min, max, selectedIndex } = data
   // Calculate width based on number of points - give each point 60px of space
   const pointSpacing = 60
-  const paddingLeft = 38
+  const paddingLeft = 44
   const paddingRight = 20
   const paddingY = 18
   const paddingBottom = 100 // Extra space for precipitation bars, weather text, and wind speed
@@ -188,53 +188,6 @@ function TemperatureTrend({ data }) {
               </text>
             </g>
           ))}
-          
-          {/* Precipitation probability bars - show for all hours */}
-          {plottedPoints.map((point) => {
-            const barWidth = 12
-            const probability = point.pop || 0
-            const barHeight = probability * 40 // Max 40px for 100%
-            const barY = point.precipitationBarY - barHeight // Bars grow upward from base
-            
-            return (
-              <g key={`precip-${point.id}`}>
-                {/* Probability bar */}
-                <rect
-                  x={point.x - barWidth / 2}
-                  y={barY}
-                  width={barWidth}
-                  height={barHeight}
-                  className="temperature-precipitation-bar"
-                  rx="2"
-                  opacity={probability > 0 ? 0.7 : 0.2}
-                />
-                {/* Precipitation amount text (if there's precipitation) */}
-                {point.precipitation > 0 && (
-                  <text
-                    x={point.x}
-                    y={barY - 6}
-                    textAnchor="middle"
-                    fontSize="8"
-                    className="temperature-precipitation-text"
-                  >
-                    {point.precipitation.toFixed(2)}mm/h
-                  </text>
-                )}
-                {/* Probability percentage */}
-                {probability > 0 && (
-                  <text
-                    x={point.x}
-                    y={barY - (point.precipitation > 0 ? 16 : 6)}
-                    textAnchor="middle"
-                    fontSize="8"
-                    className="temperature-precipitation-prob"
-                  >
-                    {Math.round(probability * 100)}%
-                  </text>
-                )}
-              </g>
-            )
-          })}
           
           {/* Weather condition text - formatted */}
           {plottedPoints.map((point) => {
