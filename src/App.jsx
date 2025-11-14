@@ -914,31 +914,6 @@ function App() {
           />
         )}
 
-        {renderMode === '3d' && (
-          <button
-            onClick={triggerShakeEffect}
-            style={{
-              position: 'fixed',
-              bottom: '20px',
-              right: '20px',
-              zIndex: 1000,
-              padding: '12px 20px',
-              backgroundColor: 'rgba(0, 0, 0, 0.75)',
-              color: '#fff',
-              border: '2px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '999px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              backdropFilter: 'blur(12px)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
-              pointerEvents: 'auto'
-            }}
-            aria-label="Shake the snow globe"
-          >
-            ✨ Shake Snow Globe
-          </button>
-        )}
         {celestialData.isNight && (
           <Moon
             position={moonOuterPosition}
@@ -1137,7 +1112,31 @@ function App() {
             </Suspense>
       </Canvas>
         )}
-        
+        {renderMode === '3d' && (
+          <button
+            onClick={triggerShakeEffect}
+            style={{
+              position: 'absolute',
+              bottom: '20px',
+              right: '20px',
+              zIndex: 50,
+              padding: '12px 20px',
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              color: '#fff',
+              border: '2px solid rgba(255, 255, 255, 0.25)',
+              borderRadius: '999px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+              pointerEvents: 'auto'
+            }}
+            aria-label="Shake the snow globe"
+          >
+            ✨ Shake Snow Globe
+          </button>
+        )}
       </div>
     </div>
   )
