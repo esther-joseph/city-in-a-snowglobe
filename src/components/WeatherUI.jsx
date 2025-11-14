@@ -936,10 +936,10 @@ function WeatherUI({
                         <span className="stat-value">{pollenIndex.toFixed(1)}</span>
                       </div>
                     )}
-                    {viewMode === 'compact' && sunrise && sunset && (
+                    {viewMode === 'compact' && pollenIndex !== null && pollenIndex !== undefined && (
                       <div className="stat-item">
-                        <span className="stat-label">Sunrise/Sunset</span>
-                        <span className="stat-value">{sunrise}/{sunset}</span>
+                        <span className="stat-label">Allergy Index</span>
+                        <span className="stat-value">{pollenIndex.toFixed(1)}</span>
                       </div>
                     )}
                   </div>
@@ -990,10 +990,10 @@ function WeatherUI({
                     <div className="stat-item">
                       <span className="stat-label">Sunset</span>
                       <span className="stat-value">{sunset}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+            </div>
+          </div>
+        </div>
+      )}
 
               {viewMode === 'informational' && hourlyTrend && (
                 <div className="temperature-card">
