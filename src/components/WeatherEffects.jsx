@@ -7,13 +7,18 @@ function RainParticles() {
   const instancedMeshRef = useRef()
   const count = 1000
 
-  const dropGeometry = useMemo(() => {
-    const geometry = new THREE.OctahedronGeometry(0.22, 0)
-    const stretch = new THREE.Matrix4().makeScale(0.75, 1.8, 0.75)
-    geometry.applyMatrix4(stretch)
-    geometry.translate(0, -0.15, 0)
-    geometry.computeVertexNormals()
-    return geometry
+  const teardropGeometry = useMemo(() => {
+    // Create a teardrop shape using lathe geometry
+    const points = []
+    const segments = 16
+    const scale = 3.5 // Increased size multiplier
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments
+      // Teardrop curve: wider at top, narrows to point at bottom
+      const radius = t < 0.7 ? 0.08 * scale * (1 - t * 0.5) : 0.08 * scale * (1 - t) * 3
+      points.push(new THREE.Vector2(radius, -t * 0.3 * scale))
+    }
+    return new THREE.LatheGeometry(points, 8)
   }, [])
 
   const particles = useMemo(() => {
@@ -37,7 +42,7 @@ function RainParticles() {
     if (!instancedMeshRef.current) return
     const matrix = new THREE.Matrix4()
     for (let i = 0; i < count; i++) {
-      matrix.identity()
+      matrix.makeRotationX(Math.PI) // Rotate 180 degrees to point downward
       matrix.setPosition(
         particles.positions[i * 3],
         particles.positions[i * 3 + 1],
@@ -66,7 +71,7 @@ function RainParticles() {
     // Update instanced mesh positions and rotations (teardrops point downward)
     const matrix = new THREE.Matrix4()
     for (let i = 0; i < count; i++) {
-      matrix.identity()
+      matrix.makeRotationX(Math.PI) // Rotate 180 degrees to point downward
       matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
@@ -74,16 +79,13 @@ function RainParticles() {
   })
 
   return (
-    <instancedMesh ref={instancedMeshRef} args={[dropGeometry, null, count]}>
+    <instancedMesh ref={instancedMeshRef} args={[teardropGeometry, null, count]}>
       <meshStandardMaterial
-        color="#ffd400"
+        color="#87CEEB"
         transparent
-        opacity={0.85}
-        emissive="#ffea7a"
-        emissiveIntensity={1.2}
-        roughness={0.15}
-        metalness={0.2}
-        toneMapped={false}
+        opacity={0.7}
+        roughness={0.1}
+        metalness={0.1}
       />
     </instancedMesh>
   )
@@ -649,8 +651,7 @@ function WeatherEffects({
   forceThunder = false,
   forceSnow = false,
   forceRain = false,
-  shakeTrigger = 0,
-  onValidationChange = null
+  shakeTrigger = 0
 }) {
   const baseWeatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
   const baseWeatherDescription = weatherData?.weather?.[0]?.description?.toLowerCase?.() || ''
@@ -658,16 +659,12 @@ function WeatherEffects({
     ? 'snow'
     : forceThunder
       ? 'thunderstorm'
-      : forceRain
-        ? 'rain'
-        : baseWeatherType
+      : baseWeatherType
   const weatherDescription = forceSnow
     ? 'snow'
     : forceThunder
       ? 'thunderstorm'
-      : forceRain
-        ? 'rain'
-        : baseWeatherDescription
+      : baseWeatherDescription
   const windSpeed = weatherData?.wind?.speed || 0
   const windDirection = weatherData?.wind?.deg
 
@@ -686,29 +683,7 @@ function WeatherEffects({
     weatherDescription.includes('overcast'))
   const hasWind = false
 
-  const hasThunderstorm =
-    weatherType.includes('thunder') || weatherDescription.includes('thunder') || forceThunder
-
-  useEffect(() => {
-    if (!onValidationChange) return
-    const validation = {
-      rainActive: hasRain,
-      rainFromApi: baseWeatherType.includes('rain') || baseWeatherType.includes('drizzle'),
-      snowActive: hasSnow,
-      snowFromApi: baseWeatherType.includes('snow'),
-      thunderActive: hasThunderstorm,
-      thunderFromApi:
-        baseWeatherType.includes('thunder') || baseWeatherDescription.includes('thunder')
-    }
-    onValidationChange(validation)
-  }, [
-    hasRain,
-    hasSnow,
-    hasThunderstorm,
-    baseWeatherType,
-    baseWeatherDescription,
-    onValidationChange
-  ])
+  const hasThunderstorm = weatherType.includes('thunder') || weatherDescription.includes('thunder') || forceThunder
 
   const shakeGroupRef = useRef()
   const shakeStateRef = useRef({ active: false, start: 0, duration: 0 })

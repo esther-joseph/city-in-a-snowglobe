@@ -648,7 +648,6 @@ function App() {
   const [forceThunder, setForceThunder] = useState(false)
   const [forceSnow, setForceSnow] = useState(false)
   const [forceRain, setForceRain] = useState(false)
-  const [particleValidation, setParticleValidation] = useState(null)
   const [renderMode, setRenderMode] = useState('3d')
   const [arSessionKey, setArSessionKey] = useState(0)
   const [shakeTrigger, setShakeTrigger] = useState(0)
@@ -945,7 +944,6 @@ function App() {
             forceSnow={forceSnow}
             forceRain={forceRain}
             shakeTrigger={shakeTrigger}
-            onValidationChange={setParticleValidation}
           />
         </group>
       )
@@ -1118,7 +1116,6 @@ function App() {
         forceSnow={forceSnow}
             onRainToggle={setForceRain}
             forceRain={forceRain}
-        particleValidation={particleValidation}
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
         weatherService={weatherService}

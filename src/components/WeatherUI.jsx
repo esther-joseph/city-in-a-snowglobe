@@ -238,7 +238,6 @@ function WeatherUI({
   forceSnow = false,
   onRainToggle,
   forceRain = false,
-  particleValidation = null,
   weatherService = null
 }) {
   const [city, setCity] = useState(currentCity)
@@ -703,23 +702,6 @@ function WeatherUI({
             >
               ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
             </button>
-          )}
-          {particleValidation && (
-            <div className="particle-validation">
-              {[
-                { key: 'rain', label: 'Rain', active: particleValidation.rainActive, api: particleValidation.rainFromApi },
-                { key: 'snow', label: 'Snow', active: particleValidation.snowActive, api: particleValidation.snowFromApi },
-                { key: 'thunder', label: 'Thunder', active: particleValidation.thunderActive, api: particleValidation.thunderFromApi }
-              ].map((item) => (
-                <span
-                  key={item.key}
-                  className={`particle-validation__item ${item.active ? 'active' : ''}`}
-                  title={`API indicates ${item.api ? 'ON' : 'OFF'}`}
-                >
-                  {item.label}: {item.active ? 'Active' : 'Off'}
-                </span>
-              ))}
-            </div>
           )}
         </div>
       </div>
