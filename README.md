@@ -15,6 +15,19 @@ An interactive snow-globe city that visualizes real-time weather data from OpenW
 - 🖱️ **Interactive Controls** – OrbitControls for rotate/pan/zoom plus mobile-friendly layout adjustments
 - ✅ **Vercel Ready** – Uses `OPENWEATHER_API_KEY` env variable only (no inline entry) and includes `vercel.json`
 
+## Documentation Highlights
+
+This README intentionally covers the most common needs when onboarding to the project:
+
+1. **Run the project locally & mirror the dev environment**  
+   - See _Setup Instructions_ (API key creation, dependency install, `npm run dev`, and `.env` usage) plus the _Deploy to Vercel_ and _Preview Production Build_ sections for parity with hosted environments.
+
+2. **Navigate the core prototype interactions**  
+   - The _Usage_ and _Weather Effects_ sections walk through the drawer UI, search/autocomplete, view toggles, time slider, shake mode, and weather overrides so testers know how to explore the experience.
+
+3. **Understand third-party APIs & libraries**  
+   - _Technologies Used_ lists every major dependency (React, R3F, drei, XR, OpenWeatherMap, Vite) along with why they’re included (3D rendering, AR mode, weather data, build tooling).
+
 ## Setup Instructions
 
 ### 1. Get Your OpenWeatherMap API Key
