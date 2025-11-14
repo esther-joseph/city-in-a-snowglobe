@@ -1,5 +1,6 @@
 import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { Icosahedron } from '@react-three/drei'
 import PropTypes from 'prop-types'
 
 function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpeed = 0 }) {
@@ -116,16 +117,16 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
         {leafClusters.map((cluster, idx) => {
           const colors = ['#4a9e4a', '#5db85d', '#3d8f3d']
           return (
-            <mesh
+            <Icosahedron
               key={`leaf-cluster-${idx}`}
-              castShadow
-              receiveShadow
+              args={[leafSize * 0.85, 1]}
               position={cluster.position}
               scale={[cluster.scale, cluster.scale * 1.1, cluster.scale]}
+              castShadow
+              receiveShadow
             >
-              <icosahedronGeometry args={[leafSize, 2]} />
               <meshStandardMaterial color={colors[cluster.colorIdx]} roughness={0.25} metalness={0.04} />
-            </mesh>
+            </Icosahedron>
           )
         })}
       </group>

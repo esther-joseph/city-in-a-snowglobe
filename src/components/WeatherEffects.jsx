@@ -5,20 +5,22 @@ import * as THREE from 'three'
 
 function RainParticles() {
   const instancedMeshRef = useRef()
+  const rippleRefs = useRef([])
   const count = 1000
+  const rippleCount = 10
 
   const dropGeometry = useMemo(() => {
     const shape = new THREE.Shape()
-    const height = 1.6
-    const width = 0.5
+    const height = 1.1
+    const width = 0.38
     shape.moveTo(0, height)
-    shape.quadraticCurveTo(width * 0.55, height * 0.6, 0, 0)
-    shape.quadraticCurveTo(-width * 0.55, height * 0.6, 0, height)
+    shape.quadraticCurveTo(width * 0.55, height * 0.55, 0, 0)
+    shape.quadraticCurveTo(-width * 0.55, height * 0.55, 0, height)
     const extrudeSettings = {
-      depth: 0.3,
+      depth: 0.25,
       bevelEnabled: true,
-      bevelSize: 0.05,
-      bevelThickness: 0.06,
+      bevelSize: 0.04,
+      bevelThickness: 0.05,
       bevelSegments: 2
     }
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
@@ -29,19 +31,33 @@ function RainParticles() {
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count)
-    const horizontalSpan = 58
-    const verticalSpan = 25
-    const baseHeight = 25 // Raised starting height
+    const horizontalSpan = 80
+    const verticalSpan = 45
+    const baseHeight = 30
     
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
       positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
       positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
-      velocities[i] = Math.random() * 0.35 + 0.25
+      velocities[i] = Math.random() * 0.22 + 0.18
     }
     
     return { positions, velocities, horizontalSpan, verticalSpan, baseHeight }
   }, [])
+
+  const ripplePool = useMemo(() => {
+    const pool = []
+    for (let i = 0; i < rippleCount; i++) {
+      pool.push({
+        active: false,
+        start: 0,
+        duration: 1200,
+        radius: 0.5,
+        mesh: null
+      })
+    }
+    return pool
+  }, [rippleCount])
 
   useEffect(() => {
     if (!instancedMeshRef.current) return
@@ -53,11 +69,21 @@ function RainParticles() {
         particles.positions[i * 3 + 1],
         particles.positions[i * 3 + 2]
       )
-      matrix.scale(new THREE.Vector3(1.15, 1.15, 1.15))
+      matrix.scale(new THREE.Vector3(0.8, 0.8, 0.8))
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
   }, [particles, count])
+
+  const triggerRipple = useCallback((x, z) => {
+    const now = performance.now()
+    const ripple = ripplePool.find((r) => !r.active)
+    if (!ripple) return
+    ripple.active = true
+    ripple.start = now
+    ripple.radius = 0.65 + Math.random() * 0.35
+    ripple.position = [x, 0.05, z]
+  }, [ripplePool])
 
   useFrame(() => {
     if (!instancedMeshRef.current) return
@@ -67,7 +93,8 @@ function RainParticles() {
     for (let i = 0; i < count; i++) {
       positions[i * 3 + 1] -= particles.velocities[i]
       
-      if (positions[i * 3 + 1] < -6) {
+      if (positions[i * 3 + 1] < 0) {
+        triggerRipple(positions[i * 3], positions[i * 3 + 2])
         positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
         positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
         positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
@@ -78,25 +105,65 @@ function RainParticles() {
     for (let i = 0; i < count; i++) {
       matrix.identity()
       matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-      matrix.scale(new THREE.Vector3(1.15, 1.15, 1.15))
+      matrix.scale(new THREE.Vector3(0.8, 0.8, 0.8))
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
   })
 
+  useFrame(() => {
+    ripplePool.forEach((ripple, index) => {
+      if (!rippleRefs.current[index]) return
+      const mesh = rippleRefs.current[index]
+      if (!mesh) return
+      if (!ripple.active) {
+        mesh.visible = false
+        return
+      }
+      const now = performance.now()
+      const elapsed = now - ripple.start
+      if (elapsed > ripple.duration) {
+        ripple.active = false
+        mesh.visible = false
+        return
+      }
+      const progress = elapsed / ripple.duration
+      const scale = ripple.radius + progress * 1.35
+      mesh.visible = true
+      mesh.position.set(ripple.position[0], ripple.position[1], ripple.position[2])
+      mesh.scale.set(scale, scale, scale)
+      mesh.material.opacity = 0.35 * (1 - progress)
+    })
+  })
+
   return (
-    <instancedMesh ref={instancedMeshRef} args={[dropGeometry, null, count]}>
-      <meshStandardMaterial
-        color="#4dc9ff"
-        emissive="#a6eaff"
-        emissiveIntensity={0.8}
-        transparent
-        opacity={0.9}
-        roughness={0.08}
-        metalness={0.05}
-        toneMapped={false}
-      />
-    </instancedMesh>
+    <>
+      <instancedMesh ref={instancedMeshRef} args={[dropGeometry, null, count]}>
+        <meshStandardMaterial
+          color="#35b6ff"
+          emissive="#c5f2ff"
+          emissiveIntensity={0.75}
+          transparent
+          opacity={0.85}
+          roughness={0.12}
+          metalness={0.06}
+          toneMapped={false}
+        />
+      </instancedMesh>
+      {ripplePool.map((_, index) => (
+        <mesh
+          key={`rain-ripple-${index}`}
+          ref={(ref) => {
+            rippleRefs.current[index] = ref
+          }}
+          rotation={[-Math.PI / 2, 0, 0]}
+          visible={false}
+        >
+          <ringGeometry args={[0.35, 0.5, 32]} />
+          <meshBasicMaterial color="#9adfff" transparent opacity={0.35} />
+        </mesh>
+      ))}
+    </>
   )
 }
 
@@ -163,7 +230,7 @@ function SnowParticles() {
 
 function ThunderboltParticles() {
   const instancedMeshRef = useRef()
-  const count = 1600 // Match snow density
+  const count = 600
 
   const boltGeometry = useMemo(() => {
     const shape = new THREE.Shape()
@@ -212,14 +279,14 @@ function ThunderboltParticles() {
     const velocities = new Float32Array(count)
     const visibilities = new Float32Array(count) // Track if bolt is visible/flashing
     const horizontalSpan = 80
-    const verticalSpan = 45
-    const baseHeight = 35 // Start at cloud height
+    const verticalSpan = 8
+    const baseHeight = 36 // Align near cloud band
     
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
       positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
       positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
-      velocities[i] = Math.random() * 0.8 + 0.6 // Faster than rain
+      velocities[i] = Math.random() * 0.14 + 0.05
       visibilities[i] = 0 // Start invisible
     }
 
@@ -257,15 +324,15 @@ function ThunderboltParticles() {
       
       positions[i * 3 + 1] -= particles.velocities[i]
       
-      if (positions[i * 3 + 1] < -6 || visibilities[i] <= 0) {
+      if (positions[i * 3 + 1] < baseHeight - 2 || visibilities[i] <= 0) {
         if (Math.random() < 0.015) {
           positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
           positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
           positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
           visibilities[i] = 1.0
-          particles.velocities[i] = Math.random() * 0.8 + 0.6
+          particles.velocities[i] = Math.random() * 0.14 + 0.05
         } else {
-          positions[i * 3 + 1] = -10
+          positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
           visibilities[i] = 0
         }
       }
