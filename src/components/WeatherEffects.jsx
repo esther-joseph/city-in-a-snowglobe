@@ -6,7 +6,7 @@ import * as THREE from 'three'
 function RainParticles() {
   const instancedMeshRef = useRef()
   const rippleRefs = useRef([])
-  const count = 1000
+  const count = 1600
   const rippleCount = 10
 
   const dropGeometry = useMemo(() => {
@@ -33,7 +33,7 @@ function RainParticles() {
     const velocities = new Float32Array(count)
     const horizontalSpan = 80
     const verticalSpan = 45
-    const baseHeight = 30
+    const baseHeight = 35
     
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
