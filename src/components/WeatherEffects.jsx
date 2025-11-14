@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect } from 'react'
+import React, { useRef, useMemo, useEffect, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
@@ -324,7 +324,7 @@ function ThunderboltParticles() {
       
       positions[i * 3 + 1] -= particles.velocities[i]
       
-      if (positions[i * 3 + 1] < baseHeight - 2 || visibilities[i] <= 0) {
+      if (positions[i * 3 + 1] < particles.baseHeight - 2 || visibilities[i] <= 0) {
         if (Math.random() < 0.015) {
           positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
           positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
