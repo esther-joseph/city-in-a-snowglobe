@@ -53,6 +53,8 @@ function RectangularWindows({
       columns > 1 ? (usableSpan - windowWidth) / (columns - 1) : 0
 
     const windows = []
+    const safeHalfSpan = Math.max(span / 2 - inset, windowWidth / 2 + 0.02)
+
     for (let row = 0; row < rows; row++) {
       const y =
         baseY +
@@ -66,18 +68,22 @@ function RectangularWindows({
           horizontalPadding +
           windowWidth / 2 +
           col * (windowWidth + horizontalStep)
+        const clampedOffset = Math.min(
+          safeHalfSpan - windowWidth / 2,
+          Math.max(-safeHalfSpan + windowWidth / 2, offset)
+        )
         let position = [0, y, 0]
         let rotation = [0, 0, 0]
         if (side === 'front') {
-          position = [offset, y, depth / 2 + 0.02]
+          position = [clampedOffset, y, depth / 2 + 0.02]
         } else if (side === 'back') {
-          position = [offset, y, -depth / 2 - 0.02]
+          position = [clampedOffset, y, -depth / 2 - 0.02]
           rotation = [0, Math.PI, 0]
         } else if (side === 'left') {
-          position = [-width / 2 - 0.02, y, offset]
+          position = [-width / 2 - 0.02, y, clampedOffset]
           rotation = [0, -Math.PI / 2, 0]
         } else if (side === 'right') {
-          position = [width / 2 + 0.02, y, offset]
+          position = [width / 2 + 0.02, y, clampedOffset]
           rotation = [0, Math.PI / 2, 0]
         }
         windows.push(
