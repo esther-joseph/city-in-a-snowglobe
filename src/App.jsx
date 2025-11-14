@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
@@ -649,6 +649,9 @@ function App() {
   const [forceSnow, setForceSnow] = useState(false)
   const [renderMode, setRenderMode] = useState('3d')
   const [arSessionKey, setArSessionKey] = useState(0)
+  const [shakeTrigger, setShakeTrigger] = useState(0)
+  const [shakeActive, setShakeActive] = useState(false)
+  const [motionPermission, setMotionPermission] = useState('unknown')
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
   // Initialize weather service (Dependency Inversion Principle)
@@ -730,6 +733,47 @@ function App() {
     prevRenderModeRef.current = renderMode
   }, [renderMode])
 
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission !== 'function'
+    ) {
+      setMotionPermission('granted')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (shakeTrigger === 0) return
+    setShakeActive(true)
+    const timeout = setTimeout(() => setShakeActive(false), 3500)
+    return () => clearTimeout(timeout)
+  }, [shakeTrigger])
+
+  useEffect(() => {
+    if (renderMode !== '3d') return undefined
+    if (motionPermission === 'denied') return undefined
+
+    let lastShakeTime = 0
+    const threshold = 20 // m/s^2
+
+    const handleMotion = (event) => {
+      const acc = event.accelerationIncludingGravity || event.acceleration
+      if (!acc) return
+      const total = Math.sqrt(
+        (acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2
+      )
+      const now = Date.now()
+      if (total > threshold && now - lastShakeTime > 1500) {
+        lastShakeTime = now
+        setShakeTrigger((prev) => prev + 1)
+      }
+    }
+
+    window.addEventListener('devicemotion', handleMotion)
+    return () => window.removeEventListener('devicemotion', handleMotion)
+  }, [renderMode, motionPermission])
+
   // Reload page on first launch
   useEffect(() => {
     const hasReloaded = sessionStorage.getItem('app-has-reloaded')
@@ -808,6 +852,31 @@ function App() {
       stopSession().catch(() => {})
     }
   }, [renderMode, setRenderMode])
+
+  const triggerShake = useCallback(() => {
+    setShakeTrigger((prev) => prev + 1)
+  }, [])
+
+  const requestMotionPermission = useCallback(async () => {
+    if (typeof window === 'undefined' || typeof DeviceMotionEvent === 'undefined') {
+      setMotionPermission('unsupported')
+      return false
+    }
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        const response = await DeviceMotionEvent.requestPermission()
+        setMotionPermission(response)
+        return response === 'granted'
+      } catch (error) {
+        console.warn('Motion permission denied', error)
+        setMotionPermission('denied')
+        return false
+      }
+    } else {
+      setMotionPermission('granted')
+      return true
+    }
+  }, [])
 
   const cityProfile = useMemo(
     () => resolveCityProfile(weatherData?.name || city),
@@ -927,7 +996,7 @@ function App() {
 
   const displayCityName = weatherData?.name || city
 
-  const BaseScene = ({ includeSky = true }) => (
+  const BaseScene = ({ includeSky = true, shakeActive = false }) => (
     <>
       <ambientLight
         color={celestialData.ambientSkyColor}
@@ -965,6 +1034,7 @@ function App() {
         isNight={celestialData.isNight}
         windDirection={weatherData?.wind?.deg || 0}
         windSpeed={weatherData?.wind?.speed || 0}
+        shakeActive={shakeActive}
       />
     </>
   )
@@ -1005,6 +1075,9 @@ function App() {
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
         weatherService={weatherService}
+        onShake={triggerShake}
+        onRequestMotionPermission={requestMotionPermission}
+        motionPermission={motionPermission}
       />
 
       <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
@@ -1026,7 +1099,7 @@ function App() {
           >
             <Suspense fallback={null}>
               <color attach="background" args={[celestialData.backgroundColor]} />
-              <BaseScene includeSky />
+              <BaseScene includeSky shakeActive={shakeActive} />
         <OrbitControls 
                 enablePan
                 enableZoom
@@ -1074,7 +1147,7 @@ function App() {
               <XR referenceSpace="local-floor">
                 <Controllers />
                 <group position={[0, 0, 0]}>
-                  <BaseScene includeSky={false} />
+                  <BaseScene includeSky={false} shakeActive={shakeActive} />
                 </group>
               </XR>
             </Suspense>

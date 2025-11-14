@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { useFrame } from '@react-three/fiber'
 import SnowGlobe from './SnowGlobe'
 import Fountain from './city/Fountain'
 import VegetationRing from './city/VegetationRing'
@@ -731,7 +732,15 @@ function LightPost({ position = [0, 0, 0], isNight }) {
   )
 }
 
-function City({ profile = {}, cityName = 'City', extraElements = null, isNight = false, windDirection = 0, windSpeed = 0 }) {
+function City({
+  profile = {},
+  cityName = 'City',
+  extraElements = null,
+  isNight = false,
+  windDirection = 0,
+  windSpeed = 0,
+  shakeActive = false
+}) {
   // Generate random buildings
   const cityLayout = useMemo(() => {
     const {
@@ -993,8 +1002,26 @@ function City({ profile = {}, cityName = 'City', extraElements = null, isNight =
     return bushArray
   }, [generatedBuildings])
 
+  const globeRef = useRef(null)
+  const spinVelocityRef = useRef(0)
+
+  useEffect(() => {
+    if (shakeActive) {
+      spinVelocityRef.current = 8
+    }
+  }, [shakeActive])
+
+  useFrame((_, delta) => {
+    if (!globeRef.current) return
+    if (spinVelocityRef.current > 0.001) {
+      globeRef.current.rotation.y += spinVelocityRef.current * delta
+      spinVelocityRef.current = Math.max(0, spinVelocityRef.current - delta * 3)
+    }
+  })
+
   return (
-    <SnowGlobe cityName={cityName}>
+    <group ref={globeRef}>
+      <SnowGlobe cityName={cityName}>
       <group position={[0, 0.02, 0]}>
         {generatedBuildings.map((building) =>
           building.isLandmark ? (
@@ -1046,8 +1073,9 @@ function City({ profile = {}, cityName = 'City', extraElements = null, isNight =
           <BridgeModel key={bridge.key} data={bridge} />
         ))}
         {extraElements}
+      </group>
+      </SnowGlobe>
     </group>
-    </SnowGlobe>
   )
 }
 

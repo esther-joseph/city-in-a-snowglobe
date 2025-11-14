@@ -21,7 +21,10 @@ function WeatherDrawer({
   forceSnow,
   renderMode,
   onRenderModeChange,
-  weatherService
+  weatherService,
+  onShake,
+  onRequestMotionPermission,
+  motionPermission
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -87,6 +90,26 @@ function WeatherDrawer({
             }} 
           />
         </div>
+        {renderMode === '3d' && (
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={async () => {
+                await onRequestMotionPermission?.()
+                onShake?.()
+              }}
+              className="bg-white/10 text-white border border-white/20 rounded-xl px-4 py-3 mt-2 hover:bg-white/15 transition flex items-center justify-center gap-2"
+              style={{ pointerEvents: 'auto' }}
+            >
+              <span role="img" aria-hidden="true">🔄</span>
+              <span>Shake Snow Globe</span>
+            </button>
+            {motionPermission === 'denied' && (
+              <p className="text-xs text-red-300">
+                Enable motion access in your device settings to shake by moving your phone.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </>
   )
