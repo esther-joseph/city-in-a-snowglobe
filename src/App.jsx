@@ -648,6 +648,7 @@ function App() {
   const [forceThunder, setForceThunder] = useState(false)
   const [forceSnow, setForceSnow] = useState(false)
   const [renderMode, setRenderMode] = useState('3d')
+  const [arSessionKey, setArSessionKey] = useState(0)
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
   // Initialize weather service (Dependency Inversion Principle)
@@ -719,6 +720,15 @@ function App() {
       setLoading(false)
     }
   }
+
+  const prevRenderModeRef = useRef(renderMode)
+
+  useEffect(() => {
+    if (renderMode === 'ar' && prevRenderModeRef.current !== 'ar') {
+      setArSessionKey((key) => key + 1)
+    }
+    prevRenderModeRef.current = renderMode
+  }, [renderMode])
 
   // Reload page on first launch
   useEffect(() => {
@@ -1032,6 +1042,7 @@ function App() {
           </Canvas>
         ) : (
           <Canvas
+            key={`ar-session-${arSessionKey}`}
             camera={{ position: [0, 1.6, 0], fov: 50 }}
             onCreated={({ gl, scene, camera }) => {
               gl.xr.enabled = true
