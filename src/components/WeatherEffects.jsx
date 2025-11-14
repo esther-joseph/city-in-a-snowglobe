@@ -1,7 +1,8 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useLoader } from '@react-three/fiber'
 import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 
 function RainParticles() {
   const instancedMeshRef = useRef()
@@ -231,13 +232,32 @@ function SnowParticles() {
 function ThunderboltParticles() {
   const instancedMeshRef = useRef()
   const count = 25
+  const lightningModel = useLoader(
+    FBXLoader,
+    new URL('../models/lightning-bolt/Lightning Bolt.fbx', import.meta.url).href
+  )
 
   const boltGeometry = useMemo(() => {
-    const geom = starGeometry.clone()
-    geom.scale(2.4, 2.4, 2.4)
-    geom.computeVertexNormals()
-    return geom
-  }, [])
+    let extractedGeometry = null
+    lightningModel?.traverse((child) => {
+      if (!extractedGeometry && child.isMesh && child.geometry) {
+        extractedGeometry = child.geometry.clone()
+      }
+    })
+
+    if (!extractedGeometry) {
+      const fallback = starGeometry.clone()
+      fallback.scale(2.4, 2.4, 2.4)
+      fallback.computeVertexNormals()
+      return fallback
+    }
+
+    extractedGeometry.center()
+    const scaleMatrix = new THREE.Matrix4().makeScale(0.04, 0.04, 0.04)
+    extractedGeometry.applyMatrix4(scaleMatrix)
+    extractedGeometry.computeVertexNormals()
+    return extractedGeometry
+  }, [lightningModel])
 
   const boltMaterial = useMemo(
     () =>
@@ -248,7 +268,7 @@ function ThunderboltParticles() {
         roughness: 0.25,
         metalness: 0.12,
         transparent: true,
-        vertexColors: true,
+        vertexColors: false,
         depthWrite: false,
         depthTest: false,
         toneMapped: false
