@@ -169,7 +169,7 @@ function RainParticles() {
 
 function SnowParticles() {
   const points = useRef()
-  const count = 1600
+  const count = 2600
 
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
@@ -218,7 +218,7 @@ function SnowParticles() {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.35}
+        size={0.18}
         color="#FFFFFF"
         transparent
         opacity={0.8}
@@ -250,6 +250,7 @@ function ThunderboltParticles() {
         transparent: true,
         vertexColors: true,
         depthWrite: false,
+        depthTest: false,
         toneMapped: false
       }),
     []
@@ -263,6 +264,7 @@ function ThunderboltParticles() {
     const horizontalSpan = 80
     const verticalSpan = 55
     const baseHeight = 34
+    const vanishThreshold = -5 // halfway past globe equator
     
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
@@ -273,7 +275,16 @@ function ThunderboltParticles() {
       flashPhase[i] = Math.random() * Math.PI * 2
     }
 
-    return { positions, velocities, intensities, flashPhase, horizontalSpan, verticalSpan, baseHeight }
+    return {
+      positions,
+      velocities,
+      intensities,
+      flashPhase,
+      horizontalSpan,
+      verticalSpan,
+      baseHeight,
+      vanishThreshold
+    }
   }, [])
 
   useEffect(() => {
@@ -294,7 +305,16 @@ function ThunderboltParticles() {
   useFrame((state, delta) => {
     if (!instancedMeshRef.current) return
     
-    const { positions, velocities, intensities, flashPhase, horizontalSpan, verticalSpan, baseHeight } = particles
+    const {
+      positions,
+      velocities,
+      intensities,
+      flashPhase,
+      horizontalSpan,
+      verticalSpan,
+      baseHeight,
+      vanishThreshold
+    } = particles
     const time = state.clock.elapsedTime
     const color = new THREE.Color()
     
@@ -303,7 +323,7 @@ function ThunderboltParticles() {
       
       positions[i * 3 + 1] -= velocities[i]
       
-      if (positions[i * 3 + 1] < -6) {
+      if (positions[i * 3 + 1] < vanishThreshold) {
         positions[i * 3 + 1] = verticalSpan + baseHeight
         positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
         positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
