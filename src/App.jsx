@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, RenderTexture } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import { XR, Controllers, startSession, stopSession } from '@react-three/xr'
 import City from './components/City'
 import WeatherEffects from './components/WeatherEffects'
@@ -1033,11 +1033,15 @@ function App() {
           </Canvas>
         ) : (
           <Canvas
-            camera={{ position: [0, 1.4, 3.4], fov: 50 }}
-            onCreated={({ gl, size }) => {
+            camera={{ position: [0, 1.6, 0], fov: 50 }}
+            onCreated={({ gl, scene, camera }) => {
               gl.xr.enabled = true
               // Ensure proper viewport setup for AR
               gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+              // Make sure background is transparent for AR
+              gl.setClearColor(0x000000, 0)
+              // Ensure scene background is transparent
+              scene.background = null
             }}
             style={{ 
               width: '100%', 
@@ -1045,22 +1049,23 @@ function App() {
               position: 'absolute',
               top: 0,
               left: 0,
-              touchAction: 'none'
+              touchAction: 'none',
+              background: 'transparent'
             }}
             dpr={[1, 2]}
             gl={{ 
               antialias: true,
               alpha: true,
-              powerPreference: 'high-performance'
+              powerPreference: 'high-performance',
+              preserveDrawingBuffer: false
             }}
           >
             <Suspense fallback={null}>
               <XR referenceSpace="local-floor">
                 <Controllers />
-                <ARGlobeBillboard
-                  backgroundColor={celestialData.backgroundColor}
-                  renderScene={() => <BaseScene includeSky={false} />}
-                />
+                <group position={[0, 0, 0]}>
+                  <BaseScene includeSky={false} />
+                </group>
               </XR>
             </Suspense>
       </Canvas>
@@ -1140,74 +1145,6 @@ function App() {
   )
 }
 
-function ARGlobeBillboard({ backgroundColor, renderScene }) {
-  const cameraRef = useRef(null)
-  const meshRef = useRef(null)
-  const [dimensions, setDimensions] = useState({ width: 3.8, height: 3, scale: 1.5 })
-
-  useEffect(() => {
-    const updateDimensions = () => {
-      const aspectRatio = window.innerWidth / window.innerHeight
-      
-      // Adjust size based on screen aspect ratio
-      let width = 3.8
-      let height = 3
-      let scale = 1.5
-      
-      if (aspectRatio > 1) {
-        // Landscape orientation
-        width = 4.2
-        height = 3.2
-        scale = 1.6
-      } else {
-        // Portrait orientation
-        width = 3.2
-        height = 4.0
-        scale = 1.4
-      }
-      
-      // Adjust for smaller screens
-      if (window.innerWidth < 768) {
-        scale *= 0.9
-        width *= 0.9
-        height *= 0.9
-      }
-      
-      setDimensions({ width, height, scale })
-    }
-
-    updateDimensions()
-    window.addEventListener('resize', updateDimensions)
-    window.addEventListener('orientationchange', updateDimensions)
-    
-    return () => {
-      window.removeEventListener('resize', updateDimensions)
-      window.removeEventListener('orientationchange', updateDimensions)
-    }
-  }, [])
-
-  return (
-    <group position={[0, 1.25, -2.15]} scale={[dimensions.scale, dimensions.scale, dimensions.scale]}>
-      <mesh ref={meshRef} rotation={[-Math.PI / 8, 0, 0]}>
-        <planeGeometry args={[dimensions.width, dimensions.height]} />
-        <meshBasicMaterial toneMapped={false}>
-          <RenderTexture attach="map" width={1024} height={1024}>
-            <color attach="background" args={['transparent']} />
-            <PerspectiveCamera
-              ref={cameraRef}
-              makeDefault
-              position={[120, 86, 120]}
-              fov={28}
-              near={0.1}
-              far={360}
-            />
-            {renderScene?.()}
-          </RenderTexture>
-        </meshBasicMaterial>
-      </mesh>
-    </group>
-  )
-}
 
 export default App
 

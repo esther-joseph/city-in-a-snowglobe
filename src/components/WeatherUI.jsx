@@ -425,7 +425,7 @@ function WeatherUI({
       } else {
         setSuggestions([])
         setShowSuggestions(false)
-      }
+    }
     }, 300)
   }
 
