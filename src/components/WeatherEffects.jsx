@@ -7,18 +7,23 @@ function RainParticles() {
   const instancedMeshRef = useRef()
   const count = 1000
 
-  const teardropGeometry = useMemo(() => {
-    // Create a teardrop shape using lathe geometry
-    const points = []
-    const segments = 16
-    const scale = 3.5 // Increased size multiplier
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments
-      // Teardrop curve: wider at top, narrows to point at bottom
-      const radius = t < 0.7 ? 0.08 * scale * (1 - t * 0.5) : 0.08 * scale * (1 - t) * 3
-      points.push(new THREE.Vector2(radius, -t * 0.3 * scale))
+  const dropGeometry = useMemo(() => {
+    const shape = new THREE.Shape()
+    const height = 1.6
+    const width = 0.5
+    shape.moveTo(0, height)
+    shape.quadraticCurveTo(width * 0.55, height * 0.6, 0, 0)
+    shape.quadraticCurveTo(-width * 0.55, height * 0.6, 0, height)
+    const extrudeSettings = {
+      depth: 0.3,
+      bevelEnabled: true,
+      bevelSize: 0.05,
+      bevelThickness: 0.06,
+      bevelSegments: 2
     }
-    return new THREE.LatheGeometry(points, 8)
+    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
+    geometry.center()
+    return geometry
   }, [])
 
   const particles = useMemo(() => {
@@ -42,12 +47,13 @@ function RainParticles() {
     if (!instancedMeshRef.current) return
     const matrix = new THREE.Matrix4()
     for (let i = 0; i < count; i++) {
-      matrix.makeRotationX(Math.PI) // Rotate 180 degrees to point downward
+      matrix.identity()
       matrix.setPosition(
         particles.positions[i * 3],
         particles.positions[i * 3 + 1],
         particles.positions[i * 3 + 2]
       )
+      matrix.scale(new THREE.Vector3(1.15, 1.15, 1.15))
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
@@ -68,24 +74,27 @@ function RainParticles() {
       }
     }
     
-    // Update instanced mesh positions and rotations (teardrops point downward)
     const matrix = new THREE.Matrix4()
     for (let i = 0; i < count; i++) {
-      matrix.makeRotationX(Math.PI) // Rotate 180 degrees to point downward
+      matrix.identity()
       matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+      matrix.scale(new THREE.Vector3(1.15, 1.15, 1.15))
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
   })
 
   return (
-    <instancedMesh ref={instancedMeshRef} args={[teardropGeometry, null, count]}>
+    <instancedMesh ref={instancedMeshRef} args={[dropGeometry, null, count]}>
       <meshStandardMaterial
-        color="#87CEEB"
+        color="#4dc9ff"
+        emissive="#a6eaff"
+        emissiveIntensity={0.8}
         transparent
-        opacity={0.7}
-        roughness={0.1}
-        metalness={0.1}
+        opacity={0.9}
+        roughness={0.08}
+        metalness={0.05}
+        toneMapped={false}
       />
     </instancedMesh>
   )
