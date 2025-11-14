@@ -53,14 +53,16 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
       const heightVariation = 0.15 + (i % 2) * 0.1 // Alternate heights
       const branchY = branchHeight + (trunkHeight * 0.15 * heightVariation)
       const branchAngle = Math.PI / 5 + (i % 3) * Math.PI / 12 // Vary branch angles
+      // Use a seeded random based on index for consistent results
+      const seed = (i * 7 + 13) % 100 / 100
       return {
         angle,
         branchY,
         branchAngle,
-        length: branchLength * (0.8 + Math.random() * 0.4)
+        length: branchLength * (0.8 + seed * 0.4)
       }
     })
-  }, [])
+  }, [branchHeight, branchLength, trunkHeight])
 
   return (
     <group ref={groupRef} position={position} rotation={[0, randomRotation, 0]}>
@@ -201,21 +203,33 @@ Tree.propTypes = {
 
 function Bush({ position, scale }) {
   const blobCount = Math.max(5, Math.round(scale * 3.5))
-  const blobIndices = useMemo(() => new Array(blobCount).fill(0).map((_, i) => ({
-    angle: (i / blobCount) * Math.PI * 2,
-    radius: scale * 0.35 + Math.random() * scale * 0.25,
-    x: 0, // Will be calculated
-    z: 0, // Will be calculated
-    y: Math.random() * scale * 0.3,
-    blobScale: 0.6 + Math.random() * 0.55,
-    detail: 1 + Math.floor(Math.random() * 2) // More detail levels for texture
-  })), [blobCount, scale])
+  const blobIndices = useMemo(() => {
+    return new Array(blobCount).fill(0).map((_, i) => {
+      // Use seeded random based on index for consistent results
+      const seed1 = (i * 11 + 17) % 100 / 100
+      const seed2 = (i * 13 + 23) % 100 / 100
+      const seed3 = (i * 7 + 31) % 100 / 100
+      const seed4 = (i * 19 + 41) % 100 / 100
+      return {
+        angle: (i / blobCount) * Math.PI * 2,
+        radius: scale * 0.35 + seed1 * scale * 0.25,
+        x: 0, // Will be calculated
+        z: 0, // Will be calculated
+        y: seed2 * scale * 0.3,
+        blobScale: 0.6 + seed3 * 0.55,
+        detail: 1 + Math.floor(seed4 * 2) // More detail levels for texture
+      }
+    })
+  }, [blobCount, scale])
 
   return (
     <group position={position}>
       {blobIndices.map((blob, index) => {
-        const x = Math.cos(blob.angle) * blob.radius + (Math.random() - 0.5) * scale * 0.18
-        const z = Math.sin(blob.angle) * blob.radius + (Math.random() - 0.5) * scale * 0.18
+        // Use seeded random for consistent positioning
+        const seedX = (index * 43 + 61) % 100 / 100
+        const seedZ = (index * 47 + 67) % 100 / 100
+        const x = Math.cos(blob.angle) * blob.radius + (seedX - 0.5) * scale * 0.18
+        const z = Math.sin(blob.angle) * blob.radius + (seedZ - 0.5) * scale * 0.18
 
         return (
           <mesh
@@ -243,17 +257,21 @@ function Bush({ position, scale }) {
       {Array.from({ length: 3 }).map((_, i) => {
         const angle = (i / 3) * Math.PI * 2
         const radius = scale * 0.2
+        // Use seeded random for consistent positioning
+        const seed1 = (i * 29 + 47) % 100 / 100
+        const seed2 = (i * 31 + 53) % 100 / 100
+        const seed3 = (i * 37 + 59) % 100 / 100
         return (
           <mesh
             key={`bush-extra-${i}`}
             position={[
               Math.cos(angle) * radius,
-              scale * 0.15 + Math.random() * scale * 0.1,
+              scale * 0.15 + seed1 * scale * 0.1,
               Math.sin(angle) * radius
             ]}
             castShadow
             receiveShadow
-            scale={[0.4 + Math.random() * 0.3, 0.5 + Math.random() * 0.3, 0.4 + Math.random() * 0.3]}
+            scale={[0.4 + seed2 * 0.3, 0.5 + seed3 * 0.3, 0.4 + seed2 * 0.3]}
           >
             <icosahedronGeometry args={[scale * 0.35, 1]} />
             <meshStandardMaterial
