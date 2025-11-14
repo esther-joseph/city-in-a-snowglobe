@@ -20,7 +20,7 @@ function TemperatureTrend({ data }) {
   const pointSpacing = 60
   const paddingLeft = 44
   const paddingRight = 20
-  const paddingY = 18
+  const paddingY = 30
   const paddingBottom = 100 // Extra space for precipitation bars, weather text, and wind speed
   const width = points.length * pointSpacing + paddingLeft + paddingRight
   const height = 240 // Increased height to accommodate all elements
