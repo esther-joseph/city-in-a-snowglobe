@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react'
+import React, { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
@@ -675,7 +675,8 @@ function WeatherEffects({
   suppressClouds = false,
   enableNightStars = false,
   forceThunder = false,
-  forceSnow = false
+  forceSnow = false,
+  shakeTrigger = 0
 }) {
   const weatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
   const weatherDescription = weatherData?.weather?.[0]?.description?.toLowerCase?.() || ''
@@ -699,8 +700,38 @@ function WeatherEffects({
 
   const hasThunderstorm = weatherType.includes('thunder') || weatherDescription.includes('thunder') || forceThunder
 
+  const shakeGroupRef = useRef()
+  const shakeStateRef = useRef({ active: false, start: 0, duration: 0 })
+
+  useEffect(() => {
+    if (!shakeTrigger) return
+    shakeStateRef.current = {
+      active: true,
+      start: performance.now(),
+      duration: 3200
+    }
+  }, [shakeTrigger])
+
+  useFrame((state, delta) => {
+    const group = shakeGroupRef.current
+    const shakeState = shakeStateRef.current
+    if (!group || !shakeState.active) return
+    const elapsed = performance.now() - shakeState.start
+    if (elapsed >= shakeState.duration) {
+      shakeState.active = false
+      group.rotation.set(0, 0, 0)
+      return
+    }
+    const progress = elapsed / shakeState.duration
+    const intensity = Math.pow(1 - progress, 2)
+    const spinSpeed = 12 * intensity + 2
+    group.rotation.y += delta * spinSpeed
+    group.rotation.x = Math.sin(progress * Math.PI * 6) * 0.2 * intensity
+    group.rotation.z = Math.cos(progress * Math.PI * 4) * 0.15 * intensity
+  })
+
   return (
-    <>
+    <group ref={shakeGroupRef}>
       {hasRain && <RainParticles />}
       {(hasSnow || forceSnow) && <SnowParticles />}
       {hasCuteClouds && (
@@ -719,7 +750,7 @@ function WeatherEffects({
         />
       )}
       {enableNightStars && <StarLayer windDirection={windDirection} windSpeed={windSpeed} />}
-    </>
+    </group>
   )
 }
 
