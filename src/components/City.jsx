@@ -348,28 +348,57 @@ function Building({
 }
 
 function Bench({ position, rotation }) {
+  const slatColors = ['#8b5a2b', '#7a4a1f', '#915f32']
   return (
     <group position={position} rotation={rotation}>
-      <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
-        <boxGeometry args={[2.4, 0.2, 0.6]} />
-        <meshStandardMaterial color="#8b5a2b" roughness={0.6} />
-      </mesh>
-      <mesh position={[0, 0.9, -0.25]} castShadow receiveShadow>
-        <boxGeometry args={[2.4, 0.45, 0.15]} />
-        <meshStandardMaterial color="#7a4a1f" roughness={0.6} />
-      </mesh>
-      <mesh position={[0, 0.65, -0.28]} castShadow receiveShadow>
-        <boxGeometry args={[2.4, 0.1, 0.2]} />
-        <meshStandardMaterial color="#73411a" roughness={0.65} />
-      </mesh>
-      <mesh position={[1.05, 0.2, -0.2]} castShadow receiveShadow>
-        <boxGeometry args={[0.2, 0.4, 0.4]} />
-        <meshStandardMaterial color="#5c3714" roughness={0.7} />
-      </mesh>
-      <mesh position={[-1.05, 0.2, -0.2]} castShadow receiveShadow>
-        <boxGeometry args={[0.2, 0.4, 0.4]} />
-        <meshStandardMaterial color="#5c3714" roughness={0.7} />
-    </mesh>
+      {/* Seat slats */}
+      {Array.from({ length: 5 }).map((_, idx) => (
+        <mesh
+          key={`seat-slat-${idx}`}
+          position={[-0.96 + idx * 0.48, 0.55, 0]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[0.42, 0.08, 0.62]} />
+          <meshStandardMaterial color={slatColors[idx % slatColors.length]} roughness={0.55} />
+        </mesh>
+      ))}
+
+      {/* Backrest slats */}
+      {Array.from({ length: 4 }).map((_, idx) => (
+        <mesh
+          key={`back-slat-${idx}`}
+          position={[-0.96 + idx * 0.48, 1.0, -0.27]}
+          rotation={[Math.PI / 16, 0, 0]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[0.42, 0.07, 0.4]} />
+          <meshStandardMaterial color={slatColors[(idx + 1) % slatColors.length]} roughness={0.6} />
+        </mesh>
+      ))}
+
+      {/* Arm rests */}
+      {[1, -1].map((side) => (
+        <mesh key={`arm-${side}`} position={[side * 1.1, 0.95, -0.18]} castShadow receiveShadow>
+          <boxGeometry args={[0.18, 0.8, 0.12]} />
+          <meshStandardMaterial color="#5c3714" roughness={0.65} metalness={0.1} />
+        </mesh>
+      ))}
+
+      {/* Legs and braces */}
+      {[1, -1].map((side) => (
+        <group key={`leg-${side}`} position={[side * 1.05, 0.2, -0.05]}>
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[0.16, 0.4, 0.26]} />
+            <meshStandardMaterial color="#4b2f16" roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0.25, -0.22]} rotation={[0.3, 0, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.16, 0.36, 0.08]} />
+            <meshStandardMaterial color="#4b2f16" roughness={0.68} />
+          </mesh>
+        </group>
+      ))}
     </group>
   )
 }
@@ -702,28 +731,60 @@ function BridgeModel({ data }) {
 
 function LightPost({ position = [0, 0, 0], isNight }) {
   const [x, y, z] = position
-  const poleHeight = 2.8
-  const lampColor = isNight ? '#ffe9b0' : '#b5c6ff'
+  const poleHeight = 3.2
+  const lampColor = isNight ? '#ffe9b0' : '#d7e0ff'
+
   return (
     <group position={[x, y, z]}>
+      <mesh castShadow receiveShadow position={[0, 0.28, 0]}>
+        <cylinderGeometry args={[0.28, 0.36, 0.45, 24]} />
+        <meshStandardMaterial color="#353840" roughness={0.55} metalness={0.35} />
+      </mesh>
+
       <mesh castShadow receiveShadow position={[0, poleHeight / 2, 0]}>
-        <cylinderGeometry args={[0.08, 0.1, poleHeight, 10]} />
-        <meshStandardMaterial color="#40444d" roughness={0.6} metalness={0.35} />
+        <cylinderGeometry args={[0.09, 0.11, poleHeight, 18]} />
+        <meshStandardMaterial color="#40444d" roughness={0.45} metalness={0.45} />
       </mesh>
-      <mesh castShadow position={[0, poleHeight + 0.3, 0]}>
-        <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial
-          color={lampColor}
-          emissive={isNight ? lampColor : '#000000'}
-          emissiveIntensity={isNight ? 1.6 : 0.1}
-          roughness={0.35}
-          metalness={0.1}
-        />
+
+      {[0.6, 1.4, 2.4].map((offset, idx) => (
+        <mesh key={`ring-${idx}`} position={[0, offset, 0]} castShadow receiveShadow>
+          <torusGeometry args={[0.13, 0.02, 10, 32]} />
+          <meshStandardMaterial color="#5a616d" roughness={0.4} metalness={0.4} />
+        </mesh>
+      ))}
+
+      <mesh castShadow receiveShadow position={[0, poleHeight - 0.35, 0.15]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.7, 12]} />
+        <meshStandardMaterial color="#40444d" roughness={0.45} metalness={0.4} />
       </mesh>
+
+      <group position={[0, poleHeight + 0.25, 0.45]}>
+        <mesh castShadow receiveShadow>
+          <cylinderGeometry args={[0.22, 0.22, 0.18, 10]} />
+          <meshStandardMaterial color="#2d2f35" roughness={0.45} metalness={0.4} />
+        </mesh>
+        <mesh castShadow receiveShadow position={[0, -0.24, 0]}>
+          <boxGeometry args={[0.34, 0.42, 0.34]} />
+          <meshStandardMaterial
+            color={lampColor}
+            emissive={isNight ? lampColor : '#000000'}
+            emissiveIntensity={isNight ? 1.4 : 0.05}
+            roughness={0.1}
+            metalness={0.05}
+            transparent
+            opacity={0.85}
+          />
+        </mesh>
+        <mesh castShadow receiveShadow position={[0, -0.5, 0]}>
+          <cylinderGeometry args={[0.2, 0.26, 0.14, 10]} />
+          <meshStandardMaterial color="#2d2f35" roughness={0.5} metalness={0.4} />
+        </mesh>
+      </group>
+
       <pointLight
-        position={[0, poleHeight + 0.3, 0]}
-        intensity={isNight ? 1.4 : 0}
-        distance={8}
+        position={[0, poleHeight, 0]}
+        intensity={isNight ? 1.5 : 0}
+        distance={10}
         color={lampColor}
         decay={2}
       />

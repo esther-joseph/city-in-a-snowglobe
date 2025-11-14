@@ -39,18 +39,46 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
     groupRef.current.rotation.z = totalSway * windX
     groupRef.current.rotation.x = -totalSway * windZ // Negative for correct direction
   })
-  // Minimalist tree: Y-shaped trunk with three spherical leaves
-  const trunkWidth = 0.15 * foliageScale
-  const branchHeight = trunkHeight * 0.7
-  const branchLength = trunkHeight * 0.3
-  const branchAngle = Math.PI / 6 // 30 degrees
-  const leafSize = foliageScale * 0.4
+  const trunkWidth = 0.16 * foliageScale
+  const branchHeight = trunkHeight * 0.72
+  const branchLength = trunkHeight * 0.34
+  const branchAngle = Math.PI / 5
+  const leafSize = foliageScale * 0.42
+
+  const leafClusters = useMemo(() => {
+    const clusters = []
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2
+      const radius = 0.35 * leafSize + Math.random() * 0.25 * leafSize
+      clusters.push({
+        position: [
+          Math.cos(angle) * radius,
+          trunkHeight * 0.55 + Math.random() * trunkHeight * 0.45,
+          Math.sin(angle) * radius
+        ],
+        scale: 0.8 + Math.random() * 0.5,
+        colorIdx: i % 3
+      })
+    }
+    clusters.push({
+      position: [0, trunkHeight + leafSize * 0.3, 0],
+      scale: 1.2,
+      colorIdx: 1
+    })
+    return clusters
+  }, [trunkHeight, leafSize])
 
   return (
     <group ref={groupRef} position={position} rotation={[0, randomRotation, 0]}>
+      {/* Root flare */}
+      <mesh castShadow receiveShadow position={[0, trunkHeight * 0.08, 0]}>
+        <cylinderGeometry args={[trunkWidth * 1.8, trunkWidth * 1.1, trunkHeight * 0.16, 16]} />
+        <meshStandardMaterial color="#c79257" roughness={0.7} metalness={0.1} />
+      </mesh>
+
       {/* Main trunk */}
       <mesh castShadow receiveShadow position={[0, trunkHeight / 2, 0]}>
-        <cylinderGeometry args={[trunkWidth * 0.6, trunkWidth, trunkHeight, 8]} />
+        <cylinderGeometry args={[trunkWidth * 0.55, trunkWidth * 0.8, trunkHeight, 18]} />
         <meshStandardMaterial color="#d4a574" roughness={0.6} metalness={0.1} />
       </mesh>
       
@@ -65,7 +93,7 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
         ]}
         rotation={[0, branchAngle, -Math.PI / 6]}
       >
-        <cylinderGeometry args={[trunkWidth * 0.4, trunkWidth * 0.5, branchLength, 6]} />
+        <cylinderGeometry args={[trunkWidth * 0.35, trunkWidth * 0.45, branchLength, 12]} />
         <meshStandardMaterial color="#d4a574" roughness={0.6} metalness={0.1} />
       </mesh>
       
@@ -80,43 +108,26 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
         ]}
         rotation={[0, -branchAngle, Math.PI / 6]}
       >
-        <cylinderGeometry args={[trunkWidth * 0.4, trunkWidth * 0.5, branchLength, 6]} />
+        <cylinderGeometry args={[trunkWidth * 0.35, trunkWidth * 0.45, branchLength, 12]} />
         <meshStandardMaterial color="#d4a574" roughness={0.6} metalness={0.1} />
       </mesh>
       
-      {/* Top leaf (central, largest) - medium green */}
-      <mesh castShadow receiveShadow position={[0, trunkHeight + leafSize * 0.3, 0]}>
-        <sphereGeometry args={[leafSize, 16, 16]} />
-        <meshStandardMaterial color="#4a9e4a" roughness={0.3} metalness={0.05} />
-      </mesh>
-      
-      {/* Left leaf - lighter green */}
-      <mesh 
-        castShadow 
-        receiveShadow 
-        position={[
-          -Math.sin(branchAngle) * branchLength,
-          branchHeight + leafSize * 0.25,
-          -Math.cos(branchAngle) * branchLength
-        ]}
-      >
-        <sphereGeometry args={[leafSize * 0.85, 16, 16]} />
-        <meshStandardMaterial color="#5db85d" roughness={0.3} metalness={0.05} />
-      </mesh>
-      
-      {/* Right leaf - darker green */}
-      <mesh 
-        castShadow 
-        receiveShadow 
-        position={[
-          Math.sin(branchAngle) * branchLength,
-          branchHeight + leafSize * 0.25,
-          -Math.cos(branchAngle) * branchLength
-        ]}
-      >
-        <sphereGeometry args={[leafSize * 0.85, 16, 16]} />
-        <meshStandardMaterial color="#3d8f3d" roughness={0.3} metalness={0.05} />
-      </mesh>
+      {/* Foliage clusters */}
+      {leafClusters.map((cluster, idx) => {
+        const colors = ['#4a9e4a', '#5db85d', '#3d8f3d']
+        return (
+          <mesh
+            key={`leaf-cluster-${idx}`}
+            castShadow
+            receiveShadow
+            position={cluster.position}
+            scale={[cluster.scale, cluster.scale * 1.1, cluster.scale]}
+          >
+            <icosahedronGeometry args={[leafSize, 2]} />
+            <meshStandardMaterial color={colors[cluster.colorIdx]} roughness={0.25} metalness={0.04} />
+          </mesh>
+        )
+      })}
     </group>
   )
 }
@@ -130,18 +141,18 @@ Tree.propTypes = {
 }
 
 function Bush({ position, scale }) {
-  const blobCount = Math.max(3, Math.round(scale * 2.2))
+  const blobCount = Math.max(6, Math.round(scale * 3))
   const blobIndices = new Array(blobCount).fill(0)
 
   return (
     <group position={position}>
       {blobIndices.map((_, index) => {
         const angle = (index / blobCount) * Math.PI * 2
-        const radius = scale * 0.35 + Math.random() * scale * 0.25
+        const radius = scale * 0.3 + Math.random() * scale * 0.22
         const x = Math.cos(angle) * radius + (Math.random() - 0.5) * scale * 0.18
         const z = Math.sin(angle) * radius + (Math.random() - 0.5) * scale * 0.18
         const y = Math.random() * scale * 0.25
-        const blobScale = 0.6 + Math.random() * 0.55
+        const blobScale = 0.55 + Math.random() * 0.45
 
         return (
           <mesh
@@ -149,9 +160,9 @@ function Bush({ position, scale }) {
             position={[x, y, z]}
             castShadow
             receiveShadow
-            scale={[blobScale, blobScale * 1.1, blobScale]}
+            scale={[blobScale, blobScale * 1.15, blobScale]}
           >
-            <icosahedronGeometry args={[scale * 0.5, 1]} />
+            <sphereGeometry args={[scale * 0.45, 20, 20]} />
             <meshStandardMaterial
               color={index % 2 === 0 ? '#3f8f3d' : '#357b34'}
               roughness={0.6}
@@ -161,7 +172,7 @@ function Bush({ position, scale }) {
         )
       })}
       <mesh position={[0, scale * 0.25, 0]} castShadow receiveShadow>
-        <icosahedronGeometry args={[scale * 0.6, 1]} />
+        <sphereGeometry args={[scale * 0.55, 24, 24]} />
         <meshStandardMaterial color="#46a043" roughness={0.55} metalness={0.08} />
       </mesh>
     </group>
