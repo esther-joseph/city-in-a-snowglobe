@@ -8,6 +8,184 @@ const WINDOW_DAY_COLOR = '#4a90e2' // Reflective blue for daytime
 const WINDOW_NIGHT_COLOR = '#0b1623'
 const WINDOW_GLOW_COLOR = '#c9f1ff'
 
+function generateCityLayout(profile = {}) {
+  const {
+    gridSize = 8,
+    spacing = 8,
+    heightRange = [8, 18],
+    widthRange = [2.8, 4.8],
+    depthRange = [2.8, 4.8],
+    highRiseProbability = 0.3,
+    highRiseMultiplier = 2,
+    midRiseProbability = 0.4,
+    lowRiseProbability = 0.2,
+    colorPalette = ['#8B8B8B', '#A9A9A9', '#778899', '#696969'],
+    accentPalette = ['#d9d9d9', '#bfbfbf'],
+    centralClearance = 2,
+    shapeOptions = ['box', 'tapered', 'cylinder'],
+    landmarks = [],
+    bridges = [],
+    maxCityRadius = 45
+  } = profile || {}
+
+  const randomBetween = (min, max) => Math.random() * (max - min) + min
+  const pick = (array, fallback) =>
+    array && array.length ? array[Math.floor(Math.random() * array.length)] : fallback
+
+  const regularBuildings = []
+
+  const fountainExclusionRadius = 12
+  const vegetationInnerRadius = 13.5
+  const vegetationOuterRadius = 19
+
+  for (let x = -gridSize; x <= gridSize; x++) {
+    for (let z = -gridSize; z <= gridSize; z++) {
+      if (Math.abs(x) < centralClearance && Math.abs(z) < centralClearance) continue
+
+      const worldX = x * spacing
+      const worldZ = z * spacing
+      const distanceFromCenter = Math.sqrt(worldX * worldX + worldZ * worldZ)
+
+      const skipForFountain =
+        distanceFromCenter < fountainExclusionRadius ||
+        distanceFromCenter < fountainExclusionRadius + spacing * 0.35
+
+      if (skipForFountain) continue
+
+      const nearLandmark = (landmarks || []).some((landmark) => {
+        const dx = worldX - landmark.basePosition[0]
+        const dz = worldZ - landmark.basePosition[2]
+        const distance = Math.sqrt(dx * dx + dz * dz)
+        const exclusionRadius = Math.max(landmark.width, landmark.depth) * 1.2
+        return distance < exclusionRadius + spacing * 0.4
+      })
+      if (nearLandmark) continue
+
+      let height = randomBetween(heightRange[0], heightRange[1])
+      const roll = Math.random()
+      if (roll < highRiseProbability) {
+        height *= highRiseMultiplier
+      } else if (roll > 1 - lowRiseProbability) {
+        height *= 0.6
+      } else if (roll < highRiseProbability + midRiseProbability) {
+        height *= 1.25
+      }
+
+      const highRise = height > heightRange[1] * 1.2
+
+      const width = randomBetween(widthRange[0], widthRange[1]) * (highRise ? 0.85 : 1)
+      const depth = randomBetween(depthRange[0], depthRange[1]) * (highRise ? 0.85 : 1)
+
+      const footprint = Math.max(width, depth) * 0.5
+      const innerSafeRadius = vegetationInnerRadius - footprint - spacing * 0.25
+      const outerSafeRadius = vegetationOuterRadius + footprint + spacing * 0.35
+      if (
+        distanceFromCenter > innerSafeRadius &&
+        distanceFromCenter < outerSafeRadius
+      ) {
+        continue
+      }
+
+      const safetyMargin = Math.max(width, depth) * 0.7
+      if (distanceFromCenter + safetyMargin > maxCityRadius) continue
+
+      const shape = pick(shapeOptions, 'box')
+      const color = pick(colorPalette, '#8B8B8B')
+      const accentColor = pick(accentPalette, '#d9d9d9')
+
+      regularBuildings.push({
+        basePosition: [worldX, 0, worldZ],
+        height,
+        width,
+        depth,
+        color,
+        accentColor,
+        shape,
+        footprintRadius: Math.max(width, depth) * 0.5,
+        key: `building-${x}-${z}`,
+        distanceFromCenter
+      })
+    }
+  }
+
+  const landmarkEntries = (landmarks || [])
+    .map((landmark, index) => {
+      const width = landmark.width
+      const depth = landmark.depth
+      const distanceFromCenter = Math.sqrt(
+        (landmark.basePosition?.[0] || 0) ** 2 + (landmark.basePosition?.[2] || 0) ** 2
+      )
+      const safetyMargin = Math.max(width, depth) * 0.6
+      if (distanceFromCenter + safetyMargin > maxCityRadius) return null
+      const footprint = Math.max(width, depth) * 0.5
+      const intersectsVegetationRing =
+        distanceFromCenter - footprint < vegetationOuterRadius &&
+        distanceFromCenter + footprint > vegetationInnerRadius
+      if (distanceFromCenter - footprint <= fountainExclusionRadius || intersectsVegetationRing)
+        return null
+      return {
+        basePosition: landmark.basePosition,
+        height: landmark.height,
+        width,
+        depth,
+        color: landmark.color,
+        accentColor: landmark.accentColor,
+        shape: landmark.shape || 'box',
+        footprintRadius: Math.max(width, depth) * 0.55,
+        key: landmark.key || `landmark-${index}`,
+        isLandmark: true,
+        landmarkKey: landmark.key || `landmark-${index}`
+      }
+    })
+    .filter(Boolean)
+
+  const totalLimit = 35
+  const availableSlots = Math.max(0, totalLimit - landmarkEntries.length)
+  const trimmedRegular = regularBuildings
+    .sort((a, b) => a.distanceFromCenter - b.distanceFromCenter)
+    .slice(0, availableSlots)
+    .map(({ distanceFromCenter: _distance, ...rest }) => rest)
+
+  const forbiddenCenterRadius = Math.max(
+    vegetationOuterRadius + spacing * 0.5,
+    fountainExclusionRadius + spacing
+  )
+
+  return {
+    buildings: [...trimmedRegular, ...landmarkEntries],
+    landmarks: landmarkEntries,
+    bridges: (bridges || [])
+      .map((bridge, index) => {
+        const start = bridge.start || [0, 0, 0]
+        const end = bridge.end || [0, 0, 0]
+        const startRadius = Math.sqrt(start[0] * start[0] + start[2] * start[2])
+        const endRadius = Math.sqrt(end[0] * end[0] + end[2] * end[2])
+        const centerRadius = Math.sqrt(
+          ((start[0] + end[0]) / 2) ** 2 + ((start[2] + end[2]) / 2) ** 2
+        )
+        const margin = (bridge.deckWidth || 2) * 0.9
+
+        const intersectsCore =
+          startRadius < forbiddenCenterRadius + margin ||
+          endRadius < forbiddenCenterRadius + margin ||
+          centerRadius < forbiddenCenterRadius + margin
+        const exceedsDome =
+          startRadius + margin > maxCityRadius || endRadius + margin > maxCityRadius
+
+        if (intersectsCore || exceedsDome) {
+          return null
+        }
+
+        return {
+          ...bridge,
+          key: bridge.key || `bridge-${index}`
+        }
+      })
+      .filter(Boolean)
+  }
+}
+
+
 function RectangularWindows({
   width,
   depth,
@@ -378,10 +556,10 @@ function LandmarkModel({ data }) {
   const {
     landmarkKey,
     basePosition,
-    height,
-    width,
-    depth,
-    color,
+          height,
+          width,
+          depth,
+          color,
     accentColor,
     shape
   } = data
@@ -734,6 +912,7 @@ function LightPost({ position = [0, 0, 0], isNight }) {
 function City({
   profile = {},
   cityName = 'City',
+  citySeed = '',
   extraElements = null,
   isNight = false,
   windDirection = 0,
@@ -741,183 +920,7 @@ function City({
   weatherType = '',
   glassTint = '#eef8ff'
 }) {
-  // Generate random buildings
-  const cityLayout = useMemo(() => {
-    const {
-      gridSize = 8,
-      spacing = 8,
-      heightRange = [8, 18],
-      widthRange = [2.8, 4.8],
-      depthRange = [2.8, 4.8],
-      highRiseProbability = 0.3,
-      highRiseMultiplier = 2,
-      midRiseProbability = 0.4,
-      lowRiseProbability = 0.2,
-      colorPalette = ['#8B8B8B', '#A9A9A9', '#778899', '#696969'],
-      accentPalette = ['#d9d9d9', '#bfbfbf'],
-      centralClearance = 2,
-      shapeOptions = ['box', 'tapered', 'cylinder'],
-      landmarks = [],
-      bridges = [],
-      maxCityRadius = 45
-    } = profile || {}
-
-    const randomBetween = (min, max) => Math.random() * (max - min) + min
-    const pick = (array, fallback) =>
-      array && array.length ? array[Math.floor(Math.random() * array.length)] : fallback
-
-    const regularBuildings = []
-    
-    const fountainExclusionRadius = 12
-    const vegetationInnerRadius = 13.5
-    const vegetationOuterRadius = 19
-    
-    for (let x = -gridSize; x <= gridSize; x++) {
-      for (let z = -gridSize; z <= gridSize; z++) {
-        if (Math.abs(x) < centralClearance && Math.abs(z) < centralClearance) continue
-
-        const worldX = x * spacing
-        const worldZ = z * spacing
-        const distanceFromCenter = Math.sqrt(worldX * worldX + worldZ * worldZ)
-
-        const skipForFountain =
-          distanceFromCenter < fountainExclusionRadius ||
-          distanceFromCenter < fountainExclusionRadius + spacing * 0.35
-
-        if (skipForFountain) continue
-
-        const nearLandmark = (landmarks || []).some((landmark) => {
-          const dx = worldX - landmark.basePosition[0]
-          const dz = worldZ - landmark.basePosition[2]
-          const distance = Math.sqrt(dx * dx + dz * dz)
-          const exclusionRadius = Math.max(landmark.width, landmark.depth) * 1.2
-          return distance < exclusionRadius + spacing * 0.4
-        })
-        if (nearLandmark) continue
-
-        let height = randomBetween(heightRange[0], heightRange[1])
-        const roll = Math.random()
-        if (roll < highRiseProbability) {
-          height *= highRiseMultiplier
-        } else if (roll > 1 - lowRiseProbability) {
-          height *= 0.6
-        } else if (roll < highRiseProbability + midRiseProbability) {
-          height *= 1.25
-        }
-
-        const highRise = height > heightRange[1] * 1.2
-
-        const width = randomBetween(widthRange[0], widthRange[1]) * (highRise ? 0.85 : 1)
-        const depth = randomBetween(depthRange[0], depthRange[1]) * (highRise ? 0.85 : 1)
-
-        const footprint = Math.max(width, depth) * 0.5
-        const innerSafeRadius = vegetationInnerRadius - footprint - spacing * 0.25
-        const outerSafeRadius = vegetationOuterRadius + footprint + spacing * 0.35
-        if (
-          distanceFromCenter > innerSafeRadius &&
-          distanceFromCenter < outerSafeRadius
-        ) {
-          continue
-        }
-
-        const safetyMargin = Math.max(width, depth) * 0.7
-        if (distanceFromCenter + safetyMargin > maxCityRadius) continue
-
-        const shape = pick(shapeOptions, 'box')
-        const color = pick(colorPalette, '#8B8B8B')
-        const accentColor = pick(accentPalette, '#d9d9d9')
-        
-        regularBuildings.push({
-          basePosition: [worldX, 0, worldZ],
-          height,
-          width,
-          depth,
-          color,
-          accentColor,
-          shape,
-          footprintRadius: Math.max(width, depth) * 0.5,
-          key: `building-${x}-${z}`,
-          distanceFromCenter
-        })
-      }
-    }
-
-    const landmarkEntries = (landmarks || [])
-      .map((landmark, index) => {
-      const width = landmark.width
-      const depth = landmark.depth
-        const distanceFromCenter = Math.sqrt(
-          (landmark.basePosition?.[0] || 0) ** 2 + (landmark.basePosition?.[2] || 0) ** 2
-        )
-        const safetyMargin = Math.max(width, depth) * 0.6
-        if (distanceFromCenter + safetyMargin > maxCityRadius) return null
-        const footprint = Math.max(width, depth) * 0.5
-        const intersectsVegetationRing =
-          distanceFromCenter - footprint < vegetationOuterRadius &&
-          distanceFromCenter + footprint > vegetationInnerRadius
-        if (distanceFromCenter - footprint <= fountainExclusionRadius || intersectsVegetationRing)
-          return null
-        return {
-          basePosition: landmark.basePosition,
-          height: landmark.height,
-          width,
-          depth,
-          color: landmark.color,
-          accentColor: landmark.accentColor,
-          shape: landmark.shape || 'box',
-          footprintRadius: Math.max(width, depth) * 0.55,
-          key: landmark.key || `landmark-${index}`,
-          isLandmark: true,
-          landmarkKey: landmark.key || `landmark-${index}`
-        }
-      })
-      .filter(Boolean)
-    
-    const totalLimit = 35
-    const availableSlots = Math.max(0, totalLimit - landmarkEntries.length)
-    const trimmedRegular = regularBuildings
-      .sort((a, b) => a.distanceFromCenter - b.distanceFromCenter)
-      .slice(0, availableSlots)
-      .map(({ distanceFromCenter: _distance, ...rest }) => rest)
-
-    const forbiddenCenterRadius = Math.max(
-      vegetationOuterRadius + spacing * 0.5,
-      fountainExclusionRadius + spacing
-    )
-
-    return {
-      buildings: [...trimmedRegular, ...landmarkEntries],
-      landmarks: landmarkEntries,
-      bridges: (bridges || [])
-        .map((bridge, index) => {
-          const start = bridge.start || [0, 0, 0]
-          const end = bridge.end || [0, 0, 0]
-          const startRadius = Math.sqrt(start[0] * start[0] + start[2] * start[2])
-          const endRadius = Math.sqrt(end[0] * end[0] + end[2] * end[2])
-          const centerRadius = Math.sqrt(
-            ((start[0] + end[0]) / 2) ** 2 + ((start[2] + end[2]) / 2) ** 2
-          )
-          const margin = (bridge.deckWidth || 2) * 0.9
-
-          const intersectsCore =
-            startRadius < forbiddenCenterRadius + margin ||
-            endRadius < forbiddenCenterRadius + margin ||
-            centerRadius < forbiddenCenterRadius + margin
-          const exceedsDome =
-            startRadius + margin > maxCityRadius || endRadius + margin > maxCityRadius
-
-          if (intersectsCore || exceedsDome) {
-            return null
-          }
-
-          return {
-            ...bridge,
-            key: bridge.key || `bridge-${index}`
-          }
-        })
-        .filter(Boolean)
-    }
-  }, [profile])
+  const cityLayout = useMemo(() => generateCityLayout(profile), [profile, citySeed])
 
   const generatedBuildings = cityLayout.buildings || []
   const generatedBridges = cityLayout.bridges || []

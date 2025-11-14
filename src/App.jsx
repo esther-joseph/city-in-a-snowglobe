@@ -1018,6 +1018,7 @@ function App() {
       <City
         profile={cityProfile}
         cityName={displayCityName}
+        citySeed={normalizeCityName(displayCityName)}
         extraElements={globeExtras}
         isNight={celestialData.isNight}
         windDirection={weatherData?.wind?.deg || 0}

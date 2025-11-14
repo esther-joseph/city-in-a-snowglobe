@@ -351,7 +351,7 @@ function CloudLayer({ weatherType, windDirection, windSpeed, weatherData }) {
   }, [windDirection, windSpeed])
 
   const cloudConfigs = useMemo(() => {
-    const cloudCount = Math.round(6 + density * 6)
+    const cloudCount = Math.round(10 + density * 12)
     const baseRadius = 40
     const radiusJitter = 11
     // Raise clouds higher when raining to be above rain particles (rain is at y=25-50)
@@ -362,8 +362,8 @@ function CloudLayer({ weatherType, windDirection, windSpeed, weatherData }) {
       const angle = (index / cloudCount) * Math.PI * 2 + Math.random() * 0.4
       const radius = baseRadius + Math.random() * radiusJitter
       const height = minHeight + Math.random() * heightJitter
-      const baseScale = 1.85 + Math.random() * 1.25 * density
-      const puffCount = 4 + Math.floor(Math.random() * 3)
+      const baseScale = 2 + Math.random() * 1.4 * density
+      const puffCount = 5 + Math.floor(Math.random() * 4 + density * 3)
 
       const puffs = Array.from({ length: puffCount }).map((__, puffIndex) => {
         const puffScale = 0.65 + Math.random() * 0.45
