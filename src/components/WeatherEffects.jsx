@@ -230,7 +230,7 @@ function SnowParticles() {
 
 function ThunderboltParticles() {
   const instancedMeshRef = useRef()
-  const count = 220
+  const count = 75
 
   const boltGeometry = useMemo(() => {
     const geom = starGeometry.clone()
