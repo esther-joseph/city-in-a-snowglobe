@@ -230,7 +230,7 @@ function SnowParticles() {
 
 function ThunderboltParticles() {
   const instancedMeshRef = useRef()
-  const count = 400
+  const count = 220
 
   const boltGeometry = useMemo(() => {
     const geom = starGeometry.clone()
@@ -242,11 +242,11 @@ function ThunderboltParticles() {
   const boltMaterial = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: '#ffe86f',
-        emissive: '#fffcc5',
-        emissiveIntensity: 2.7,
-        roughness: 0.3,
-        metalness: 0.18,
+        color: '#fff45c',
+        emissive: '#fff682',
+        emissiveIntensity: 3.1,
+        roughness: 0.25,
+        metalness: 0.12,
         transparent: true,
         vertexColors: true,
         depthWrite: false,

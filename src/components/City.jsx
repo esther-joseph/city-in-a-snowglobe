@@ -881,26 +881,30 @@ function BridgeModel({ data }) {
 function LightPost({ position = [0, 0, 0], isNight }) {
   const [x, y, z] = position
   const poleHeight = 2.8
-  const lampColor = isNight ? '#ffe9b0' : '#b5c6ff'
+  const lampColor = isNight ? '#ffe9b0' : '#cbe0ff'
   return (
     <group position={[x, y, z]}>
       <mesh castShadow receiveShadow position={[0, poleHeight / 2, 0]}>
-        <cylinderGeometry args={[0.08, 0.1, poleHeight, 10]} />
-        <meshStandardMaterial color="#40444d" roughness={0.6} metalness={0.35} />
+        <boxGeometry args={[0.25, poleHeight, 0.25]} />
+        <meshStandardMaterial color="#4a3b2d" roughness={0.65} metalness={0.2} />
       </mesh>
-      <mesh castShadow position={[0, poleHeight + 0.3, 0]}>
-        <sphereGeometry args={[0.22, 16, 16]} />
+      <mesh castShadow position={[0, poleHeight + 0.35, 0]}>
+        <boxGeometry args={[0.8, 0.6, 0.8]} />
         <meshStandardMaterial
           color={lampColor}
           emissive={isNight ? lampColor : '#000000'}
-          emissiveIntensity={isNight ? 1.6 : 0.1}
-          roughness={0.35}
-          metalness={0.1}
+          emissiveIntensity={isNight ? 1.8 : 0.15}
+          roughness={0.25}
+          metalness={0.08}
         />
       </mesh>
+      <mesh castShadow position={[0, poleHeight + 0.75, 0]}>
+        <boxGeometry args={[1.0, 0.15, 1.0]} />
+        <meshStandardMaterial color="#2f241a" roughness={0.7} metalness={0.12} />
+      </mesh>
       <pointLight
-        position={[0, poleHeight + 0.3, 0]}
-        intensity={isNight ? 1.4 : 0}
+        position={[0, poleHeight + 0.35, 0]}
+        intensity={isNight ? 1.6 : 0}
         distance={8}
         color={lampColor}
         decay={2}
