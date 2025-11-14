@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
@@ -651,8 +651,6 @@ function App() {
   const [cameraFacing, setCameraFacing] = useState('environment') // 'environment' (back) or 'user' (front)
   const [arViewMode, setArViewMode] = useState('external') // 'inside' or 'external'
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
-  const arCanvasRef = useRef(null)
-  const arGlRef = useRef(null)
 
   // Initialize weather service (Dependency Inversion Principle)
   // Single Responsibility: WeatherService handles all API operations
@@ -734,32 +732,6 @@ function App() {
     }
   }, [])
 
-  // Handle page visibility changes (back button, app switching, etc.)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && renderMode === 'ar') {
-        // Clear canvas when app goes to background
-        clearARCanvas()
-      }
-    }
-
-    const handleBeforeUnload = () => {
-      if (renderMode === 'ar') {
-        clearARCanvas()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('pagehide', handleBeforeUnload)
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('pagehide', handleBeforeUnload)
-    }
-  }, [renderMode, clearARCanvas])
-
   useEffect(() => {
     if (weatherService) {
       fetchWeather(city)
@@ -781,32 +753,8 @@ function App() {
     return () => clearInterval(interval)
   }, [manualHour])
 
-  // Clear AR canvas when exiting AR mode
-  const clearARCanvas = useCallback(() => {
-    if (arGlRef.current && arCanvasRef.current) {
-      const gl = arGlRef.current
-      const canvas = arCanvasRef.current
-      
-      // Clear the canvas
-      gl.clearColor(0, 0, 0, 0)
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-      
-      // Force a repaint
-      gl.flush()
-      gl.finish()
-      
-      // Clear canvas element directly
-      const ctx = canvas.getContext('webgl2') || canvas.getContext('webgl')
-      if (ctx) {
-        ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT)
-      }
-    }
-  }, [])
-
   useEffect(() => {
     if (renderMode !== 'ar') {
-      // Clear canvas when exiting AR mode
-      clearARCanvas()
       stopSession().catch(() => {})
       return
     }
@@ -837,17 +785,10 @@ function App() {
             ? { optionalFeatures, domOverlay: { root: document.body } }
             : { optionalFeatures }
 
-        startSession('immersive-ar', sessionInit)
-          .then(() => {
-            // Clear canvas when session starts to avoid static image
-            if (!cancelled) {
-              setTimeout(() => clearARCanvas(), 100)
-            }
-          })
-          .catch((error) => {
-            console.warn('Failed to start AR session; reverting to 3D mode.', error)
-            if (!cancelled) setRenderMode('3d')
-          })
+        startSession('immersive-ar', sessionInit).catch((error) => {
+          console.warn('Failed to start AR session; reverting to 3D mode.', error)
+          if (!cancelled) setRenderMode('3d')
+        })
       })
       .catch((error) => {
         console.warn('Failed to query AR support; reverting to 3D mode.', error)
@@ -856,10 +797,9 @@ function App() {
 
     return () => {
       cancelled = true
-      clearARCanvas()
       stopSession().catch(() => {})
     }
-  }, [renderMode, setRenderMode, cameraFacing, clearARCanvas])
+  }, [renderMode, setRenderMode, cameraFacing])
 
   const cityProfile = useMemo(
     () => resolveCityProfile(weatherData?.name || city),
@@ -1094,50 +1034,15 @@ function App() {
           </Canvas>
         ) : (
           <Canvas
-            ref={arCanvasRef}
             camera={{ position: [0, 1.6, 0], fov: 50 }}
             onCreated={({ gl, scene, camera }) => {
-              // Store references for cleanup
-              arGlRef.current = gl
-              if (gl.domElement) {
-                arCanvasRef.current = gl.domElement
-              }
-              
               gl.xr.enabled = true
-              
-              // Optimize for mobile AR performance
-              const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-              const pixelRatio = isMobile 
-                ? Math.min(window.devicePixelRatio || 1, 1.5) 
-                : Math.min(window.devicePixelRatio || 1, 2)
-              
-              gl.setPixelRatio(pixelRatio)
-              
+              // Ensure proper viewport setup for AR
+              gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
               // Make sure background is transparent for AR
               gl.setClearColor(0x000000, 0)
-              
               // Ensure scene background is transparent
               scene.background = null
-              
-              // Clear canvas on creation to avoid static image
-              gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-              
-              // Handle session end to clear canvas
-              if (gl.xr && gl.xr.getSession) {
-                const session = gl.xr.getSession()
-                if (session) {
-                  session.addEventListener('end', () => {
-                    clearARCanvas()
-                  })
-                }
-              }
-              
-              // Listen for XR session end events
-              if (navigator.xr) {
-                navigator.xr.addEventListener('sessionend', () => {
-                  clearARCanvas()
-                })
-              }
             }}
             style={{ 
               width: '100%', 
@@ -1148,33 +1053,16 @@ function App() {
               touchAction: 'none',
               background: 'transparent'
             }}
-            dpr={typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? [1, 1.5] : [1, 2]}
+            dpr={[1, 2]}
             gl={{ 
-              antialias: false, // Disable antialiasing for better AR performance
+              antialias: true,
               alpha: true,
-              powerPreference: 'default', // Use default for better battery life
-              preserveDrawingBuffer: false,
-              stencil: false, // Disable stencil buffer for performance
-              depth: true,
-              logarithmicDepthBuffer: false
+              powerPreference: 'high-performance',
+              preserveDrawingBuffer: false
             }}
-            frameloop="always"
-            performance={{ min: 0.5 }} // Reduce frame rate for better performance
           >
             <Suspense fallback={null}>
-              <XR 
-                referenceSpace="local-floor"
-                onSessionStart={() => {
-                  // Clear canvas when session starts
-                  if (arGlRef.current) {
-                    arGlRef.current.clear(arGlRef.current.COLOR_BUFFER_BIT | arGlRef.current.DEPTH_BUFFER_BIT)
-                  }
-                }}
-                onSessionEnd={() => {
-                  // Clear canvas when session ends
-                  clearARCanvas()
-                }}
-              >
+              <XR referenceSpace="local-floor">
                 <Controllers />
                 {arViewMode === 'inside' ? (
                   // Inside view: User is inside the snowglobe near the fountain
@@ -1234,10 +1122,9 @@ function App() {
               
               // Stop current session and restart with new camera preference
               try {
-                clearARCanvas()
                 await stopSession()
-                // Small delay to ensure session is fully closed and canvas is cleared
-                await new Promise(resolve => setTimeout(resolve, 300))
+                // Small delay to ensure session is fully closed
+                await new Promise(resolve => setTimeout(resolve, 200))
                 
                 if (renderMode === 'ar' && navigator.xr) {
                   const supported = await navigator.xr.isSessionSupported('immersive-ar')
@@ -1263,14 +1150,10 @@ function App() {
                     } else {
                       await startSession('immersive-ar', sessionInit)
                     }
-                    
-                    // Clear canvas after session starts
-                    setTimeout(() => clearARCanvas(), 100)
                   }
                 }
               } catch (error) {
                 console.warn('Failed to switch camera:', error)
-                clearARCanvas()
               }
             }}
             style={{
