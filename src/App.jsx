@@ -1185,29 +1185,43 @@ function App() {
       </Canvas>
         )}
         {renderMode === '3d' && (
-          <button
-            onClick={triggerShakeEffect}
+          <div
             style={{
-              position: 'absolute',
-              bottom: '20px',
-              right: '20px',
-              zIndex: 50,
-              padding: '12px 20px',
-              backgroundColor: 'rgba(0, 0, 0, 0.75)',
-              color: '#fff',
-              border: '2px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '999px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              backdropFilter: 'blur(12px)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
-              pointerEvents: 'auto'
+              position: 'fixed',
+              bottom: 'clamp(12px, 4vh, 28px)',
+              right: 'clamp(12px, 6vw, 32px)',
+              left: 'auto',
+              width: 'auto',
+              maxWidth: 'calc(100vw - 24px)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              pointerEvents: 'none',
+              zIndex: 60
             }}
-            aria-label="Shake the snow globe"
           >
-            ✨ Shake Snow Globe
-          </button>
+            <button
+              onClick={triggerShakeEffect}
+              style={{
+                pointerEvents: 'auto',
+                padding: 'clamp(10px, 2.8vw, 16px) clamp(16px, 4vw, 26px)',
+                backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                color: '#fff',
+                border: '2px solid rgba(255, 255, 255, 0.25)',
+                borderRadius: '999px',
+                fontSize: 'clamp(13px, 3vw, 15px)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                backdropFilter: 'blur(12px)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
+                maxWidth: '320px',
+                width: '100%',
+                textAlign: 'center'
+              }}
+              aria-label="Shake the snow globe"
+            >
+              ✨ Shake Snow Globe
+            </button>
+          </div>
         )}
       </div>
     </div>

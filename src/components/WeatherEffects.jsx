@@ -154,34 +154,35 @@ function SnowParticles() {
 
 function ThunderboltParticles() {
   const instancedMeshRef = useRef()
-  const glowMeshRef = useRef()
   const count = 1600 // Match snow density
 
-  // Create zigzag lightning bolt geometry
-  const boltGeometry = useMemo(() => {
-    const shape = new THREE.Shape()
-    const height = 2.6
-    const halfWidth = 0.32
+  const boltGeometry = useMemo(() => new THREE.PlaneGeometry(1, 1.8), [])
 
-    shape.moveTo(-halfWidth * 0.8, 0)
-    shape.quadraticCurveTo(halfWidth * 0.5, height * 0.18, -halfWidth * 0.2, height * 0.35)
-    shape.quadraticCurveTo(-halfWidth, height * 0.55, halfWidth * 0.35, height * 0.75)
-    shape.quadraticCurveTo(halfWidth * 0.75, height * 0.95, halfWidth * 0.25, height * 1.15)
-    shape.lineTo(halfWidth * 0.95, height * 1.25)
-    shape.quadraticCurveTo(halfWidth * 0.15, height * 1.2, -halfWidth * 0.05, height * 1.0)
-    shape.quadraticCurveTo(-halfWidth * 0.85, height * 0.8, halfWidth * 0.1, height * 0.55)
-    shape.quadraticCurveTo(halfWidth * 0.6, height * 0.35, -halfWidth * 0.25, height * 0.15)
-    shape.quadraticCurveTo(-halfWidth * 0.45, height * 0.05, -halfWidth * 0.8, 0)
-
-    const extrudeSettings = {
-      depth: 0.18,
-      bevelEnabled: true,
-      bevelSize: 0.04,
-      bevelThickness: 0.04,
-      bevelSegments: 2
-    }
-    return new THREE.ExtrudeGeometry(shape, extrudeSettings)
+  const emojiTexture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 256
+    canvas.height = 256
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.font = 'bold 220px "Apple Color Emoji", "Segoe UI Emoji", system-ui'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('⚡', canvas.width / 2, canvas.height / 2 + 15)
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.anisotropy = 4
+    return texture
   }, [])
+
+  const boltMaterial = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        map: emojiTexture,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      }),
+    [emojiTexture]
+  )
 
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
@@ -203,25 +204,22 @@ function ThunderboltParticles() {
   }, [])
 
   useEffect(() => {
-    if (!instancedMeshRef.current || !glowMeshRef.current) return
+    if (!instancedMeshRef.current) return
     const matrix = new THREE.Matrix4()
     for (let i = 0; i < count; i++) {
-      // Rotate to point downward
-      matrix.makeRotationX(Math.PI / 2)
+      matrix.identity()
       matrix.setPosition(
         particles.positions[i * 3],
         particles.positions[i * 3 + 1],
         particles.positions[i * 3 + 2]
       )
       instancedMeshRef.current.setMatrixAt(i, matrix)
-      glowMeshRef.current.setMatrixAt(i, matrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
-    glowMeshRef.current.instanceMatrix.needsUpdate = true
   }, [particles, count])
 
   useFrame(() => {
-    if (!instancedMeshRef.current || !glowMeshRef.current) return
+    if (!instancedMeshRef.current) return
     
     const positions = particles.positions
     const visibilities = particles.visibilities
@@ -254,56 +252,21 @@ function ThunderboltParticles() {
     
     // Update instanced mesh positions and scales
     for (let i = 0; i < count; i++) {
-      // Main bolt
       const matrix = new THREE.Matrix4()
-      matrix.makeRotationX(Math.PI / 2) // Point downward
+      matrix.makeRotationX(-Math.PI / 2)
       matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
       instancedMeshRef.current.setMatrixAt(i, matrix)
-      
-      // Glow effect (scaled up)
-      const glowMatrix = new THREE.Matrix4()
-      glowMatrix.makeRotationX(Math.PI / 2)
-      glowMatrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-      glowMatrix.scale(new THREE.Vector3(1.6, 1.6, 1.6))
-      glowMeshRef.current.setMatrixAt(i, glowMatrix)
     }
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
-    glowMeshRef.current.instanceMatrix.needsUpdate = true
-    
-    // Update material opacity per instance would require custom shader
-    // For now, use average visibility for all bolts
+
     const avgVisibility = visibilities.reduce((a, b) => a + b, 0) / count
     if (instancedMeshRef.current.material) {
       instancedMeshRef.current.material.opacity = Math.max(0, Math.min(1, avgVisibility * 0.95))
     }
-    if (glowMeshRef.current.material) {
-      glowMeshRef.current.material.opacity = Math.max(0, Math.min(1, avgVisibility * 0.4))
-    }
   })
 
   return (
-    <>
-      {/* Main bolts */}
-      <instancedMesh ref={instancedMeshRef} args={[boltGeometry, null, count]}>
-        <meshStandardMaterial
-          color="#ffed4f"
-          emissive="#ffd500"
-          emissiveIntensity={2.5}
-          transparent
-          opacity={0.95}
-        />
-      </instancedMesh>
-      {/* Glow effect */}
-      <instancedMesh ref={glowMeshRef} args={[boltGeometry, null, count]}>
-        <meshStandardMaterial
-          color="#fff48c"
-          emissive="#ffdd55"
-          emissiveIntensity={1.8}
-          transparent
-          opacity={0.5}
-        />
-      </instancedMesh>
-    </>
+    <instancedMesh ref={instancedMeshRef} args={[boltGeometry, boltMaterial, count]} />
   )
 }
 
