@@ -11,7 +11,6 @@ function getWeatherIcon(weatherMain) {
 
 function TemperatureTrend({ data }) {
   const containerRef = useRef(null)
-  const hoursRef = useRef(null)
 
   if (!data?.points?.length) return null
 
@@ -97,17 +96,12 @@ function TemperatureTrend({ data }) {
 
   // Scroll to selected time when it changes
   useEffect(() => {
-    if (selectedIndex !== undefined && selectedIndex >= 0 && containerRef.current && hoursRef.current) {
+    if (selectedIndex !== undefined && selectedIndex >= 0 && containerRef.current) {
       const selectedPoint = plottedPoints[selectedIndex]
       if (selectedPoint) {
         // Calculate scroll position to center the selected point
         const scrollPosition = selectedPoint.x - containerRef.current.clientWidth / 2
         containerRef.current.scrollTo({
-          left: Math.max(0, scrollPosition),
-          behavior: 'smooth'
-        })
-        // Also scroll the hours container
-        hoursRef.current.scrollTo({
           left: Math.max(0, scrollPosition),
           behavior: 'smooth'
         })
@@ -226,6 +220,20 @@ function TemperatureTrend({ data }) {
             )
           })}
           
+          {/* Hour labels */}
+          {plottedPoints.map((point) => (
+            <text
+              key={`hour-label-${point.id ?? point.hourLabel}`}
+              x={point.x}
+              y={height - paddingBottom + 24}
+              textAnchor="middle"
+              fontSize="10"
+              className="temperature-hour-label"
+            >
+              {point.hourLabel}
+            </text>
+          ))}
+
           {/* Temperature scale labels on left */}
           {horizontalGridLines.map((line, index) => {
             const tempValue = min + (max - min) * (index / (horizontalGridLines.length - 1))
@@ -243,16 +251,6 @@ function TemperatureTrend({ data }) {
             )
           })}
         </svg>
-      </div>
-      <div ref={hoursRef} className="temperature-chart-hours">
-        {plottedPoints.map((point) => (
-          <span 
-            key={`hour-${point.id ?? point.hourLabel}`}
-            className={point.isSelected ? 'temperature-hour-selected' : ''}
-          >
-            {point.hourLabel}
-          </span>
-        ))}
       </div>
     </div>
   )
