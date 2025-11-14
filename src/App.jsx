@@ -639,6 +639,7 @@ function App() {
   const [weatherData, setWeatherData] = useState(null)
   const [hourlyForecast, setHourlyForecast] = useState(null)
   const [weeklyForecast, setWeeklyForecast] = useState(null)
+  const [uvIndex, setUvIndex] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [city, setCity] = useState('New York')
@@ -701,6 +702,7 @@ function App() {
       setError(null)
       setHourlyForecast(null)
       setWeeklyForecast(null)
+      setUvIndex(null)
       
       // Use service to get complete weather data (CRUD: Read)
       const weatherData = await weatherService.getCompleteWeatherData(cityName)
@@ -708,6 +710,7 @@ function App() {
       setWeatherData(weatherData.current)
       setHourlyForecast(weatherData.hourly)
       setWeeklyForecast(weatherData.weekly)
+      setUvIndex(weatherData.uvIndex)
       setLoading(false)
     } catch (err) {
       setHourlyForecast(null)
@@ -969,6 +972,7 @@ function App() {
         weatherData={weatherData}
         hourlyForecast={hourlyForecast}
         weeklyForecast={weeklyForecast}
+        uvIndex={uvIndex}
         celestialData={celestialData}
         loading={loading}
         error={error}
@@ -995,7 +999,7 @@ function App() {
 
       <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
         {renderMode === '3d' ? (
-          <Canvas 
+      <Canvas
             camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}
             onCreated={({ gl }) => {
               // Optimize for mobile performance
@@ -1019,7 +1023,7 @@ function App() {
                 enableRotate
                 minDistance={18}
                 maxDistance={200}
-           maxPolarAngle={Math.PI / 2}
+          maxPolarAngle={Math.PI / 2}
                 target={[0, 7, 0]}
                 dampingFactor={0.05}
                 enableDamping

@@ -6,6 +6,7 @@ function WeatherDrawer({
   weatherData,
   hourlyForecast,
   weeklyForecast,
+  uvIndex,
   celestialData,
   loading,
   error,
@@ -60,6 +61,7 @@ function WeatherDrawer({
             weatherData={weatherData}
             hourlyForecast={hourlyForecast}
             weeklyForecast={weeklyForecast}
+            uvIndex={uvIndex}
             celestialData={celestialData}
             loading={loading}
             error={error}

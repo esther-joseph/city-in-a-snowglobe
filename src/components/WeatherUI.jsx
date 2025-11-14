@@ -20,18 +20,35 @@ function TemperatureTrend({ data }) {
   const pointSpacing = 60
   const paddingX = 20
   const paddingY = 18
+  const paddingBottom = 100 // Extra space for precipitation bars, weather text, and wind speed
   const width = points.length * pointSpacing + paddingX * 2
-  const height = 80
+  const height = 200 // Increased height to accommodate all elements
   const innerWidth = width - paddingX * 2
-  const innerHeight = height - paddingY * 2
+  const innerHeight = height - paddingY - paddingBottom
   const range = max - min === 0 ? 1 : max - min
+  
+  // Calculate max precipitation for scaling bars
+  const maxPrecipitation = Math.max(...points.map(p => p.precipitation || 0), 0.1)
 
   const plottedPoints = points.map((point, index) => {
     const ratio = points.length > 1 ? index / (points.length - 1) : 0.5
     const x = paddingX + ratio * innerWidth
     const normalized = (point.temp - min) / range
     const y = paddingY + (1 - normalized) * innerHeight
-    return { ...point, x, y }
+    
+    // Calculate precipitation bar height (scaled to fit in bottom section)
+    const precipitationBarHeight = point.precipitation > 0 
+      ? (point.precipitation / maxPrecipitation) * 30 // Max 30px height for bars
+      : 0
+    const precipitationBarY = height - paddingBottom + 20 // Start position for bars
+    
+    return { 
+      ...point, 
+      x, 
+      y,
+      precipitationBarHeight,
+      precipitationBarY
+    }
   })
 
   const path = plottedPoints.reduce((acc, point, index) => {
@@ -120,6 +137,8 @@ function TemperatureTrend({ data }) {
             ))}
           </g>
           {path && <path d={path} className="temperature-chart-line" />}
+          
+          {/* Temperature points and labels */}
           {plottedPoints.map((point, index) => (
             <g key={point.id ?? point.hourLabel}>
               <circle 
@@ -128,33 +147,124 @@ function TemperatureTrend({ data }) {
                 r={point.isSelected ? "3.5" : "2.5"} 
                 className={`temperature-chart-node ${point.isSelected ? 'temperature-chart-node-selected' : ''}`}
               />
-              {point.icon && (
-                <foreignObject
-                  x={point.x - 8}
-                  y={point.y - 18}
-                  width="16"
-                  height="16"
-                  className="temperature-chart-icon-wrapper"
-                >
-                  <MeteoconIcon
-                    weatherMain={point.icon}
-                    isNight={point.isNight}
-                    size={16}
-                    className="temperature-chart-icon"
-                  />
-                </foreignObject>
-              )}
               <text
                 x={point.x}
-                y={point.y + 12}
+                y={point.y - 8}
                 textAnchor="middle"
-                fontSize="9"
+                fontSize="10"
                 className="temperature-chart-temp"
               >
                 {`${point.roundedTemp}°F`}
               </text>
             </g>
           ))}
+          
+          {/* Precipitation bars */}
+          {plottedPoints.map((point) => {
+            if (point.precipitation <= 0) return null
+            const barWidth = 8
+            return (
+              <g key={`precip-${point.id}`}>
+                <rect
+                  x={point.x - barWidth / 2}
+                  y={point.precipitationBarY}
+                  width={barWidth}
+                  height={point.precipitationBarHeight}
+                  className="temperature-precipitation-bar"
+                  rx="2"
+                />
+                <text
+                  x={point.x}
+                  y={point.precipitationBarY - 8}
+                  textAnchor="middle"
+                  fontSize="8"
+                  className="temperature-precipitation-text"
+                >
+                  {point.precipitation.toFixed(2)}mm/h
+                </text>
+                {point.pop > 0 && (
+                  <text
+                    x={point.x}
+                    y={point.precipitationBarY - 18}
+                    textAnchor="middle"
+                    fontSize="7"
+                    className="temperature-precipitation-prob"
+                  >
+                    {Math.round(point.pop * 100)}%
+                  </text>
+                )}
+              </g>
+            )
+          })}
+          
+          {/* Weather condition text */}
+          {plottedPoints.map((point) => {
+            const textY = height - paddingBottom + 60
+            return (
+              <text
+                key={`condition-${point.id}`}
+                x={point.x}
+                y={textY}
+                textAnchor="middle"
+                fontSize="9"
+                className="temperature-weather-condition"
+              >
+                {point.description || point.condition}
+              </text>
+            )
+          })}
+          
+          {/* Cloud coverage text */}
+          {plottedPoints.map((point) => {
+            if (point.clouds > 0 && point.precipitation <= 0) {
+              return (
+                <text
+                  key={`clouds-${point.id}`}
+                  x={point.x}
+                  y={height - paddingBottom + 75}
+                  textAnchor="middle"
+                  fontSize="8"
+                  className="temperature-cloud-coverage"
+                >
+                  {point.clouds}%
+                </text>
+              )
+            }
+            return null
+          })}
+          
+          {/* Wind speed */}
+          {plottedPoints.map((point) => {
+            return (
+              <text
+                key={`wind-${point.id}`}
+                x={point.x}
+                y={height - paddingBottom + 90}
+                textAnchor="middle"
+                fontSize="8"
+                className="temperature-wind-speed"
+              >
+                {point.windSpeed?.toFixed(1) || '0.0'}m/s
+              </text>
+            )
+          })}
+          
+          {/* Temperature scale labels on left */}
+          {horizontalGridLines.map((line, index) => {
+            const tempValue = min + (max - min) * (1 - index / (horizontalGridLines.length - 1))
+            return (
+              <text
+                key={`temp-label-${index}`}
+                x={paddingX - 5}
+                y={line.y1 + 4}
+                textAnchor="end"
+                fontSize="9"
+                className="temperature-scale-label"
+              >
+                {Math.round(tempValue)}°F
+              </text>
+            )
+          })}
         </svg>
       </div>
       <div ref={hoursRef} className="temperature-chart-hours">
@@ -175,6 +285,7 @@ function WeatherUI({
   weatherData,
   hourlyForecast,
   weeklyForecast,
+  uvIndex,
   celestialData,
   loading,
   error,
@@ -394,6 +505,55 @@ function WeatherUI({
   const iconMain = weatherData?.weather?.[0]?.main
   const sunrise = formatLocalTime(weatherData?.sys?.sunrise)
   const sunset = formatLocalTime(weatherData?.sys?.sunset)
+  
+  // Calculate pollen index (0-10 scale) based on weather conditions
+  // Higher values indicate higher pollen levels
+  const pollenIndex = useMemo(() => {
+    if (!weatherData) return null
+    
+    let index = 5 // Base value
+    
+    // Wind speed: Moderate wind (5-15 mph) increases pollen, very high wind decreases it
+    if (windSpeed !== undefined) {
+      const windMph = windSpeed * 2.237 // Convert m/s to mph
+      if (windMph >= 5 && windMph <= 15) {
+        index += 2 // Moderate wind spreads pollen
+      } else if (windMph > 15) {
+        index -= 1 // High wind disperses pollen
+      } else if (windMph < 2) {
+        index -= 1 // Very low wind allows pollen to settle
+      }
+    }
+    
+    // Humidity: Low humidity (30-50%) increases pollen, high humidity decreases it
+    if (humidity !== undefined) {
+      if (humidity < 30) {
+        index += 1.5 // Very dry air keeps pollen airborne
+      } else if (humidity >= 30 && humidity <= 50) {
+        index += 1 // Optimal for pollen
+      } else if (humidity > 70) {
+        index -= 2 // High humidity weighs down pollen
+      }
+    }
+    
+    // Temperature: Warm temperatures (60-80°F) increase pollen
+    if (temperatureF !== undefined) {
+      if (temperatureF >= 60 && temperatureF <= 80) {
+        index += 1.5 // Optimal temperature for pollen release
+      } else if (temperatureF < 40 || temperatureF > 90) {
+        index -= 1 // Extreme temperatures reduce pollen
+      }
+    }
+    
+    // Rain/Precipitation: Reduces pollen significantly
+    const weatherMain = weatherData?.weather?.[0]?.main
+    if (weatherMain === 'Rain' || weatherMain === 'Drizzle' || weatherMain === 'Thunderstorm') {
+      index -= 3 // Rain washes away pollen
+    }
+    
+    // Clamp between 0 and 10
+    return Math.max(0, Math.min(10, Math.round(index * 10) / 10))
+  }, [weatherData, windSpeed, humidity, temperatureF])
 
   const hourlyTrend = useMemo(() => {
     const entries = hourlyForecast?.entries
@@ -462,6 +622,18 @@ function WeatherUI({
       // Determine if it's night for this entry
       const entryIsNight = entryHour >= 20 || entryHour < 6
       
+      // Get precipitation data
+      const rain = entry.rain?.['3h'] || entry.rain?.['1h'] || 0
+      const snow = entry.snow?.['3h'] || entry.snow?.['1h'] || 0
+      const precipitation = rain + snow
+      const pop = entry.pop || 0 // Probability of precipitation (0-1)
+      
+      // Get wind speed
+      const windSpeed = entry.wind?.speed || 0
+      
+      // Get cloud coverage
+      const clouds = entry.clouds?.all || 0
+      
       return {
         id: entry.dt,
         temp: tempValue,
@@ -473,7 +645,11 @@ function WeatherUI({
         description: entry.weather?.[0]?.description || '',
         hour: entryHour,
         isSelected,
-        index: startIndex + index
+        index: startIndex + index,
+        precipitation: precipitation,
+        pop: pop,
+        windSpeed: windSpeed,
+        clouds: clouds
       }
     }).filter((point) => Number.isFinite(point.temp))
 
@@ -675,6 +851,18 @@ function WeatherUI({
                       <div className="stat-item">
                         <span className="stat-label">Feels Like</span>
                         <span className="stat-value">{Math.round(feelsLikeF)}°F</span>
+                      </div>
+                    )}
+                    {viewMode === 'informational' && uvIndex !== null && uvIndex !== undefined && (
+                      <div className="stat-item">
+                        <span className="stat-label">UV Index</span>
+                        <span className="stat-value">{Math.round(uvIndex)}</span>
+                      </div>
+                    )}
+                    {viewMode === 'informational' && pollenIndex !== null && pollenIndex !== undefined && (
+                      <div className="stat-item">
+                        <span className="stat-label">Pollen Index</span>
+                        <span className="stat-value">{pollenIndex.toFixed(1)}</span>
                       </div>
                     )}
                   </div>

@@ -187,6 +187,34 @@ class WeatherService {
   }
 
   /**
+   * CRUD: Read - Get UV index data
+   * @param {number} lat - Latitude
+   * @param {number} lon - Longitude
+   * @returns {Promise<number|null>} UV index value or null if unavailable
+   */
+  async getUVIndex(lat, lon) {
+    if (typeof lat !== 'number' || typeof lon !== 'number') {
+      return null
+    }
+
+    const url = `${this.baseUrl}/uvi?lat=${lat}&lon=${lon}&appid=${this.apiKey}`
+    
+    try {
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        return null
+      }
+      
+      const data = await response.json()
+      return typeof data.value === 'number' ? data.value : null
+    } catch (error) {
+      console.warn('Failed to fetch UV index:', error)
+      return null
+    }
+  }
+
+  /**
    * CRUD: Read - Get complete weather data (current + forecast)
    * Convenience method that combines getCurrentWeather and getForecast
    * @param {string} cityName - Name of the city
@@ -200,6 +228,8 @@ class WeatherService {
     const timezone = currentWeather?.timezone ?? 0
 
     let forecast = { hourly: null, weekly: null }
+    let uvIndex = null
+    
     if (typeof lat === 'number' && typeof lon === 'number') {
       try {
         forecast = await this.getForecast(lat, lon, timezone)
@@ -207,12 +237,20 @@ class WeatherService {
         // Forecast is optional, continue with current weather only
         console.warn('Forecast fetch failed, continuing with current weather only:', error)
       }
+      
+      try {
+        uvIndex = await this.getUVIndex(lat, lon)
+      } catch (error) {
+        // UV index is optional
+        console.warn('UV index fetch failed:', error)
+      }
     }
 
     return {
       current: currentWeather,
       hourly: forecast.hourly,
-      weekly: forecast.weekly
+      weekly: forecast.weekly,
+      uvIndex: uvIndex
     }
   }
 }
