@@ -936,6 +936,18 @@ function WeatherUI({
                         <span className="stat-value">{pollenIndex.toFixed(1)}</span>
                       </div>
                     )}
+                    {viewMode === 'informational' && (
+                      <div className="stat-item">
+                        <span className="stat-label">Sunrise</span>
+                        <span className="stat-value">{sunrise}</span>
+                      </div>
+                    )}
+                    {viewMode === 'informational' && (
+                      <div className="stat-item">
+                        <span className="stat-label">Sunset</span>
+                        <span className="stat-value">{sunset}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1001,24 +1013,6 @@ function WeatherUI({
                 </div>
               )}
 
-              {viewMode === 'compact' && (
-                <div className="time-card time-card--compact">
-                  <div className="time-basic">
-                    <div>
-                      <span>Sunrise</span>
-                      <strong>{sunrise}</strong>
-                    </div>
-                    <div>
-                      <span>Sunset</span>
-                      <strong>{sunset}</strong>
-                    </div>
-                    <div>
-                      <span>Feels</span>
-                      <strong>{feelsLikeF !== undefined ? `${Math.round(feelsLikeF)}°F` : '--'}</strong>
-            </div>
-          </div>
-        </div>
-      )}
             </>
           )
         ) : (
