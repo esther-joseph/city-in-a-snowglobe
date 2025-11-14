@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect } from 'react'
+import React, { useRef, useMemo, useEffect, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
