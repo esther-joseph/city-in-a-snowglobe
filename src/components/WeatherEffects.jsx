@@ -253,7 +253,7 @@ function ThunderboltParticles() {
     // Update instanced mesh positions and scales
     for (let i = 0; i < count; i++) {
       const matrix = new THREE.Matrix4()
-      matrix.makeRotationX(-Math.PI / 2)
+      matrix.identity()
       matrix.setPosition(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
       instancedMeshRef.current.setMatrixAt(i, matrix)
     }
