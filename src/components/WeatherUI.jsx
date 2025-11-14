@@ -18,12 +18,13 @@ function TemperatureTrend({ data }) {
   const { points, min, max, selectedIndex } = data
   // Calculate width based on number of points - give each point 60px of space
   const pointSpacing = 60
-  const paddingX = 20
+  const paddingLeft = 38
+  const paddingRight = 20
   const paddingY = 18
   const paddingBottom = 100 // Extra space for precipitation bars, weather text, and wind speed
-  const width = points.length * pointSpacing + paddingX * 2
-  const height = 200 // Increased height to accommodate all elements
-  const innerWidth = width - paddingX * 2
+  const width = points.length * pointSpacing + paddingLeft + paddingRight
+  const height = 240 // Increased height to accommodate all elements
+  const innerWidth = width - paddingLeft - paddingRight
   const innerHeight = height - paddingY - paddingBottom
   const range = max - min === 0 ? 1 : max - min
   
@@ -34,7 +35,7 @@ function TemperatureTrend({ data }) {
 
   const plottedPoints = points.map((point, index) => {
     const ratio = points.length > 1 ? index / (points.length - 1) : 0.5
-    const x = paddingX + ratio * innerWidth
+    const x = paddingLeft + ratio * innerWidth
     const normalized = (point.temp - min) / range
     const y = paddingY + (1 - normalized) * innerHeight
     
@@ -76,9 +77,9 @@ function TemperatureTrend({ data }) {
     const ratio = i / numHorizontalLines
     const y = paddingY + (1 - ratio) * innerHeight
     horizontalGridLines.push({
-      x1: paddingX,
+      x1: paddingLeft,
       y1: y,
-      x2: paddingX + innerWidth,
+      x2: paddingLeft + innerWidth,
       y2: y
     })
   }
@@ -158,6 +159,24 @@ function TemperatureTrend({ data }) {
                 r={point.isSelected ? "3.5" : "2.5"} 
                 className={`temperature-chart-node ${point.isSelected ? 'temperature-chart-node-selected' : ''}`}
               />
+              {point.icon && (
+                <foreignObject
+                  x={point.x - 12}
+                  y={point.y - 34}
+                  width="24"
+                  height="24"
+                  className="temperature-chart-icon-wrapper"
+                >
+                  <div xmlns="http://www.w3.org/1999/xhtml" className="temperature-chart-icon-content">
+                    <MeteoconIcon
+                      weatherMain={point.icon}
+                      isNight={point.isNight}
+                      size={20}
+                      className="temperature-chart-icon"
+                    />
+                  </div>
+                </foreignObject>
+              )}
               <text
                 x={point.x}
                 y={point.y - 8}
@@ -326,7 +345,7 @@ function TemperatureTrend({ data }) {
             return (
               <text
                 key={`temp-label-${index}`}
-                x={paddingX - 5}
+                x={paddingLeft - 8}
                 y={line.y1 + 4}
                 textAnchor="end"
                 fontSize="9"

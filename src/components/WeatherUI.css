@@ -421,7 +421,7 @@
 
 .temperature-chart {
   min-width: 100%;
-  height: 200px;
+  height: 240px;
   overflow: visible;
   display: block;
 }
@@ -473,6 +473,16 @@
 .temperature-chart-temp {
   fill: rgba(255, 255, 255, 0.85);
   font-weight: 600;
+}
+
+.temperature-chart-icon-wrapper {
+  pointer-events: none;
+}
+
+.temperature-chart-icon-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .temperature-precipitation-bar {
