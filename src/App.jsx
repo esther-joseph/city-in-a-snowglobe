@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { XR, Controllers, startSession, stopSession } from '@react-three/xr'
 import City from './components/City'
@@ -1001,6 +1001,51 @@ function App() {
     </>
   )
 
+  const ShakeableScene = ({ includeSky }) => {
+    const groupRef = useRef()
+    const animationRef = useRef({ active: false })
+
+    useEffect(() => {
+      if (!shakeTrigger) return
+      animationRef.current = {
+        active: true,
+        start: performance.now(),
+        duration: 1400,
+        keyframes: [
+          { start: 0, end: 350, from: 0, to: Math.PI * 1.5 },
+          { start: 350, end: 700, from: Math.PI * 1.5, to: -Math.PI * 1.5 },
+          { start: 700, end: 1400, from: -Math.PI * 1.5, to: 0 }
+        ]
+      }
+    }, [shakeTrigger])
+
+    useFrame(() => {
+      const anim = animationRef.current
+      const group = groupRef.current
+      if (!group || !anim.active) return
+      const now = performance.now()
+      const elapsed = now - anim.start
+
+      if (elapsed >= anim.duration) {
+        anim.active = false
+        group.rotation.set(0, 0, 0)
+        return
+      }
+
+      const frame = anim.keyframes.find((kf) => elapsed <= kf.end) || anim.keyframes[anim.keyframes.length - 1]
+      const progress = Math.max(0, Math.min(1, (elapsed - frame.start) / Math.max(frame.end - frame.start, 1)))
+      const eased = progress * (2 - progress)
+      const angle = frame.from + (frame.to - frame.from) * eased
+      group.rotation.y = angle
+    })
+
+    return (
+      <group ref={groupRef}>
+        <BaseScene includeSky={includeSky} />
+      </group>
+    )
+  }
+
   return (
     <div
       style={{
@@ -1058,7 +1103,7 @@ function App() {
           >
             <Suspense fallback={null}>
               <color attach="background" args={[celestialData.backgroundColor]} />
-              <BaseScene includeSky />
+              <ShakeableScene includeSky />
         <OrbitControls 
                 enablePan
                 enableZoom
@@ -1106,7 +1151,7 @@ function App() {
               <XR referenceSpace="local-floor">
                 <Controllers />
                 <group position={[0, 0, 0]}>
-                  <BaseScene includeSky={false} />
+                  <ShakeableScene includeSky={false} />
                 </group>
               </XR>
             </Suspense>
