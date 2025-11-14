@@ -155,7 +155,7 @@ function SnowParticles() {
 function ThunderboltParticles() {
   const instancedMeshRef = useRef()
   const glowMeshRef = useRef()
-  const count = 15 // Fewer bolts than rain drops
+  const count = 1600 // Match snow density
 
   // Create zigzag lightning bolt geometry
   const boltGeometry = useMemo(() => {
@@ -187,8 +187,8 @@ function ThunderboltParticles() {
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count)
     const visibilities = new Float32Array(count) // Track if bolt is visible/flashing
-    const horizontalSpan = 58
-    const verticalSpan = 25
+    const horizontalSpan = 80
+    const verticalSpan = 45
     const baseHeight = 35 // Start at cloud height
     
     for (let i = 0; i < count; i++) {
