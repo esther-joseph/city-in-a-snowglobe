@@ -649,7 +649,6 @@ function App() {
   const [forceSnow, setForceSnow] = useState(false)
   const [renderMode, setRenderMode] = useState('3d')
   const [cameraFacing, setCameraFacing] = useState('environment') // 'environment' (back) or 'user' (front)
-  const [arViewMode, setArViewMode] = useState('external') // 'inside' or 'external'
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
   // Initialize weather service (Dependency Inversion Principle)
@@ -1064,53 +1063,12 @@ function App() {
             <Suspense fallback={null}>
               <XR referenceSpace="local-floor">
                 <Controllers />
-                {arViewMode === 'inside' ? (
-                  // Inside view: User is inside the snowglobe near the fountain
-                  // Position scene so city ground (y=0.22) is at AR floor level (y=0)
-                  <group position={[0, -0.22, 0]}>
-                    <BaseScene includeSky={false} />
-                  </group>
-                ) : (
-                  // External view: Snowglobe sits on a physical surface
-                  // Position scene so base bottom (y=-3.2) is at AR floor level (y=0)
-                  <group position={[0, 3.2, 0]}>
-                    <BaseScene includeSky={false} />
-                  </group>
-                )}
+                <group position={[0, 0, 0]}>
+                  <BaseScene includeSky={false} />
+                </group>
               </XR>
             </Suspense>
       </Canvas>
-        )}
-        
-        {/* AR View Mode Toggle */}
-        {renderMode === 'ar' && (
-          <button
-            onClick={() => setArViewMode(arViewMode === 'inside' ? 'external' : 'inside')}
-            style={{
-              position: 'fixed',
-              bottom: '80px',
-              right: '20px',
-              zIndex: 1000,
-              padding: '12px 20px',
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              color: 'white',
-              border: '2px solid rgba(255, 255, 255, 0.3)',
-              borderRadius: '25px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              backdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-              pointerEvents: 'auto'
-            }}
-            aria-label={`Switch to ${arViewMode === 'inside' ? 'external' : 'inside'} view`}
-          >
-            <span>{arViewMode === 'inside' ? '🔍' : '🏠'}</span>
-            <span>{arViewMode === 'inside' ? 'External View' : 'Inside View'}</span>
-          </button>
         )}
         
         {/* Camera Toggle Button for AR Mode */}
