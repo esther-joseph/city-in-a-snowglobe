@@ -653,8 +653,6 @@ function App() {
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
   const arCanvasRef = useRef(null)
   const arGlRef = useRef(null)
-  const cityRef = useRef(city) // Keep city in ref for access in event handlers
-  const isManualModeSwitchRef = useRef(false) // Track if user manually switched modes
 
   // Initialize weather service (Dependency Inversion Principle)
   // Single Responsibility: WeatherService handles all API operations
@@ -726,21 +724,6 @@ function App() {
     }
   }
 
-  // Keep city ref in sync with city state
-  useEffect(() => {
-    cityRef.current = city
-  }, [city])
-
-  // Restore city from sessionStorage on initial load
-  useEffect(() => {
-    const savedCity = sessionStorage.getItem('saved-city')
-    if (savedCity) {
-      setCity(savedCity)
-      // Clear the saved city after restoring
-      sessionStorage.removeItem('saved-city')
-    }
-  }, [])
-
   // Reload page on first launch
   useEffect(() => {
     const hasReloaded = sessionStorage.getItem('app-has-reloaded')
@@ -754,61 +737,28 @@ function App() {
   // Handle page visibility changes (back button, app switching, etc.)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && renderMode === 'ar' && !isManualModeSwitchRef.current) {
-        // Save current city and refresh when exiting AR via back button
-        const currentCity = cityRef.current || city
-        sessionStorage.setItem('saved-city', currentCity)
+      if (document.hidden && renderMode === 'ar') {
+        // Clear canvas when app goes to background
         clearARCanvas()
-        // Small delay to ensure city is saved before refresh
-        setTimeout(() => {
-          window.location.reload()
-        }, 100)
       }
     }
 
     const handleBeforeUnload = () => {
       if (renderMode === 'ar') {
-        // Save city before page unloads
-        sessionStorage.setItem('saved-city', city)
         clearARCanvas()
-      }
-    }
-
-    // Handle AR session end (back button typically ends the session)
-    const handleSessionEnd = () => {
-      if (renderMode === 'ar' && !isManualModeSwitchRef.current) {
-        // Save current city before refresh (only if not manual switch)
-        const currentCity = cityRef.current || city
-        sessionStorage.setItem('saved-city', currentCity)
-        clearARCanvas()
-        // Refresh page after a short delay
-        setTimeout(() => {
-          window.location.reload()
-        }, 100)
-      } else if (isManualModeSwitchRef.current) {
-        // Reset flag after handling manual switch
-        isManualModeSwitchRef.current = false
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('beforeunload', handleBeforeUnload)
     window.addEventListener('pagehide', handleBeforeUnload)
-    
-    // Listen for XR session end events (back button triggers this)
-    if (navigator.xr) {
-      navigator.xr.addEventListener('sessionend', handleSessionEnd)
-    }
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('beforeunload', handleBeforeUnload)
       window.removeEventListener('pagehide', handleBeforeUnload)
-      if (navigator.xr) {
-        navigator.xr.removeEventListener('sessionend', handleSessionEnd)
-      }
     }
-  }, [renderMode, clearARCanvas, city])
+  }, [renderMode, clearARCanvas])
 
   useEffect(() => {
     if (weatherService) {
@@ -823,14 +773,6 @@ function App() {
   const handleSearch = (newCity) => {
     setCity(newCity)
     fetchWeather(newCity)
-  }
-
-  const handleRenderModeChange = (newMode) => {
-    // Mark as manual switch to prevent refresh
-    if (renderMode === 'ar' && newMode !== 'ar') {
-      isManualModeSwitchRef.current = true
-    }
-    setRenderMode(newMode)
   }
 
   useEffect(() => {
@@ -869,13 +811,6 @@ function App() {
       return
     }
 
-    // Track if we're entering AR mode from a non-AR state
-    // This helps detect when user manually switches modes vs back button
-    const wasInAR = sessionStorage.getItem('was-in-ar') === 'true'
-    if (!wasInAR) {
-      sessionStorage.setItem('was-in-ar', 'true')
-    }
-
     if (typeof window === 'undefined' || !('xr' in navigator)) {
       console.warn('WebXR not available; reverting to 3D mode.')
       setRenderMode('3d')
@@ -911,10 +846,7 @@ function App() {
           })
           .catch((error) => {
             console.warn('Failed to start AR session; reverting to 3D mode.', error)
-            if (!cancelled) {
-              setRenderMode('3d')
-              sessionStorage.removeItem('was-in-ar')
-            }
+            if (!cancelled) setRenderMode('3d')
           })
       })
       .catch((error) => {
@@ -926,16 +858,6 @@ function App() {
       cancelled = true
       clearARCanvas()
       stopSession().catch(() => {})
-      
-      // If exiting AR mode and was in AR, check if it was due to back button
-      // The session end event will handle the refresh, so we just mark it
-      if (renderMode === 'ar') {
-        // Check if session was ended (back button scenario)
-        // The sessionend event listener will handle the refresh
-      } else {
-        // User manually switched to 3D mode, don't refresh
-        sessionStorage.removeItem('was-in-ar')
-      }
     }
   }, [renderMode, setRenderMode, cameraFacing, clearARCanvas])
 
@@ -1133,7 +1055,7 @@ function App() {
         onSnowToggle={setForceSnow}
         forceSnow={forceSnow}
         renderMode={renderMode}
-        onRenderModeChange={handleRenderModeChange}
+        onRenderModeChange={setRenderMode}
         weatherService={weatherService}
       />
 
@@ -1251,18 +1173,6 @@ function App() {
                 onSessionEnd={() => {
                   // Clear canvas when session ends
                   clearARCanvas()
-                  // Only refresh if it wasn't a manual mode switch (back button scenario)
-                  if (!isManualModeSwitchRef.current) {
-                    // Save current city and refresh page when AR session ends (back button)
-                    const currentCity = cityRef.current || city
-                    sessionStorage.setItem('saved-city', currentCity)
-                    setTimeout(() => {
-                      window.location.reload()
-                    }, 100)
-                  } else {
-                    // Reset flag after handling manual switch
-                    isManualModeSwitchRef.current = false
-                  }
                 }}
               >
                 <Controllers />
