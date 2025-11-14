@@ -32,18 +32,25 @@ function RainParticles() {
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count)
-    const horizontalSpan = 80
+    const domeRadius = 32
     const verticalSpan = 45
     const baseHeight = 35
-    
-    for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
-      positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
-      positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
-      velocities[i] = Math.random() * 0.22 + 0.18
+
+    const sampleXZ = () => {
+      const theta = Math.random() * Math.PI * 2
+      const radius = Math.sqrt(Math.random()) * domeRadius
+      return [Math.cos(theta) * radius, Math.sin(theta) * radius]
     }
     
-    return { positions, velocities, horizontalSpan, verticalSpan, baseHeight }
+    for (let i = 0; i < count; i++) {
+      const [x, z] = sampleXZ()
+      positions[i * 3] = x
+      positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
+      positions[i * 3 + 2] = z
+      velocities[i] = Math.random() * 0.22 + 0.18
+    }
+
+    return { positions, velocities, sampleXZ, verticalSpan, baseHeight, domeRadius }
   }, [])
 
   const ripplePool = useMemo(() => {
@@ -97,8 +104,9 @@ function RainParticles() {
       if (positions[i * 3 + 1] < 0) {
         triggerRipple(positions[i * 3], positions[i * 3 + 2])
         positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
-        positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
-        positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
+        const [x, z] = particles.sampleXZ()
+        positions[i * 3] = x
+        positions[i * 3 + 2] = z
       }
     }
     
@@ -253,7 +261,7 @@ function ThunderboltParticles() {
     }
 
     extractedGeometry.center()
-    const scaleMatrix = new THREE.Matrix4().makeScale(0.04, 0.04, 0.04)
+    const scaleMatrix = new THREE.Matrix4().makeScale(0.065, 0.065, 0.065)
     extractedGeometry.applyMatrix4(scaleMatrix)
     extractedGeometry.computeVertexNormals()
     return extractedGeometry
