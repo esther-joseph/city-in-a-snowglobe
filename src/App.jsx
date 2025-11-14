@@ -1059,7 +1059,7 @@ function App() {
                 <Controllers />
                 <ARGlobeBillboard
                   backgroundColor={celestialData.backgroundColor}
-                  renderScene={() => <BaseScene includeSky />}
+                  renderScene={() => <BaseScene includeSky={false} />}
                 />
               </XR>
             </Suspense>
