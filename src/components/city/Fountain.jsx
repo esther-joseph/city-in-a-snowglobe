@@ -217,61 +217,35 @@ function Fountain() {
         <meshStandardMaterial color="#b8ac9c" roughness={0.6} />
       </mesh>
 
-      {/* Middle tier */}
-      <mesh position={[0, 1.5, 0]} castShadow>
-        <cylinderGeometry args={[1.4, 1.6, 0.8, 32]} />
+      {/* Upper pedestal */}
+      <mesh position={[0, 1.6, 0]} castShadow>
+        <cylinderGeometry args={[1.4, 1.7, 1.0, 32]} />
         <meshStandardMaterial color="#d1c4b3" roughness={0.7} />
       </mesh>
       <TierWater
-        radius={1.55}
-        height={1.98}
-        color="#79d2fb"
+        radius={1.45}
+        height={2.05}
+        color="#7fd4ff"
         transmission={0.94}
         rippleCount={4}
-        rippleSpeed={1.2}
+        rippleSpeed={1.3}
         rippleOpacity={0.3}
       />
       <FountainSpray
-        origin={[0, 1.98, 0]}
-        radiusRange={[0.2, 0.55]}
-        heightRange={[0.7, 1.1]}
-        velocityRange={[0.65, 1.05]}
-        count={90}
+        origin={[0, 2.05, 0]}
+        radiusRange={[0.15, 0.45]}
+        heightRange={[0.85, 1.2]}
+        velocityRange={[0.7, 1.1]}
+        count={120}
       />
-      <mesh position={[0, 2.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.6, 0.06, 16, 48]} />
+      <mesh position={[0, 2.18, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.5, 0.05, 16, 48]} />
         <meshStandardMaterial color="#b8ac9c" roughness={0.6} />
       </mesh>
 
-      {/* Upper tier */}
-      <mesh position={[0, 2.6, 0]} castShadow>
-        <cylinderGeometry args={[0.6, 0.8, 0.7, 16]} />
-        <meshStandardMaterial color="#d8ccb9" roughness={0.65} />
-      </mesh>
-      <TierWater
-        radius={0.52}
-        height={2.95}
-        color="#8fe6ff"
-        transmission={0.97}
-        rippleCount={3}
-        rippleSpeed={1.6}
-        rippleOpacity={0.35}
-      />
-      <FountainSpray
-        origin={[0, 2.95, 0]}
-        radiusRange={[0.08, 0.22]}
-        heightRange={[0.95, 1.35]}
-        velocityRange={[0.85, 1.25]}
-        count={120}
-      />
-      <mesh position={[0, 3.0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.58, 0.05, 16, 48]} />
-        <meshStandardMaterial color="#b8ac9c" roughness={0.55} />
-      </mesh>
-
-      {/* Finial */}
-      <mesh position={[0, 3.35, 0]} castShadow>
-        <sphereGeometry args={[0.25, 16, 16]} />
+      {/* Final finial */}
+      <mesh position={[0, 2.55, 0]} castShadow>
+        <sphereGeometry args={[0.32, 18, 18]} />
         <meshStandardMaterial color="#e2d6c3" roughness={0.5} />
       </mesh>
     </group>
