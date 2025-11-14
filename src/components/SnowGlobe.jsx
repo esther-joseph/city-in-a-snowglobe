@@ -16,7 +16,9 @@ function SnowGlobe({
   domeRadius = 14.5,
   glassOpacity = 0.22,
   position = [0, 0, 0],
-  rotation = [0, 0, 0]
+  rotation = [0, 0, 0],
+  weatherType = null,
+  tintColor = '#eef8ff'
 }) {
   const normalizedName = useMemo(
     () => (cityName && typeof cityName === 'string' ? cityName : 'CITY').toUpperCase(),
@@ -27,6 +29,16 @@ function SnowGlobe({
   const domeCenterY = cityYOffset + 9.8
   const labelY = baseHeight / 2 + upperBaseHeight * 0.4
   const labelRadius = baseRadius * 1.12
+  const isFoggy = weatherType
+    ? ['fog', 'mist', 'haze', 'smoke'].some((term) => weatherType.toLowerCase().includes(term))
+    : false
+
+  const glassColor = useMemo(() => {
+    if (!isFoggy) return tintColor
+    const base = new THREE.Color(tintColor)
+    const fog = new THREE.Color('#d6dbe5')
+    return base.lerp(fog, 0.45).getStyle()
+  }, [tintColor, isFoggy])
 
   return (
     <group position={position} rotation={rotation}>
@@ -46,10 +58,10 @@ function SnowGlobe({
       <mesh position={[0, domeCenterY, 0]}>
         <sphereGeometry args={[domeRadius, 80, 80]} />
         <meshStandardMaterial
-          color="#eef8ff"
+          color={glassColor}
           transparent
-          opacity={glassOpacity}
-          roughness={0.08}
+          opacity={Math.min(0.55, glassOpacity + (isFoggy ? 0.15 : 0))}
+          roughness={isFoggy ? 0.32 : 0.08}
           metalness={0.1}
           reflectivity={0.42}
           clearcoat={0.35}

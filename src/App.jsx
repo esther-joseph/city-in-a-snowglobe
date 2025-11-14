@@ -899,8 +899,14 @@ function App() {
   const globeExtras = useMemo(() => {
     const elements = []
 
-  const sunOuterPosition = projectToGlobe(celestialData.sunPosition, 20)
-  const moonOuterPosition = projectToGlobe(celestialData.moonPosition, 18)
+  const sunOuterPosition = projectToGlobe(
+    [celestialData.sunPosition[0], celestialData.sunPosition[1] + 12, celestialData.sunPosition[2]],
+    24
+  )
+  const moonOuterPosition = projectToGlobe(
+    [celestialData.moonPosition[0], celestialData.moonPosition[1] + 10, celestialData.moonPosition[2]],
+    22
+  )
 
     elements.push(
       <group key="celestial">
@@ -957,6 +963,25 @@ function App() {
     return new Date().getHours()
   }, [manualHour, celestialData, weatherData])
 
+  const weatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
+
+  const glassTint = useMemo(() => {
+    const hour = displayHour ?? new Date().getHours()
+    if (celestialData.isNight) {
+      return '#c7d1ff'
+    }
+    if (hour >= 5 && hour < 8) {
+      return '#ffd9a8'
+    }
+    if (hour >= 8 && hour < 16) {
+      return '#eef8ff'
+    }
+    if (hour >= 16 && hour < 19) {
+      return '#ffc472'
+    }
+    return '#dfe9ff'
+  }, [displayHour, celestialData.isNight])
+
   const displayCityName = weatherData?.name || city
 
   const BaseScene = ({ includeSky = true }) => (
@@ -997,6 +1022,8 @@ function App() {
         isNight={celestialData.isNight}
         windDirection={weatherData?.wind?.deg || 0}
         windSpeed={weatherData?.wind?.speed || 0}
+        weatherType={weatherType}
+        glassTint={glassTint}
       />
     </>
   )

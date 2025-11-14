@@ -731,7 +731,16 @@ function LightPost({ position = [0, 0, 0], isNight }) {
   )
 }
 
-function City({ profile = {}, cityName = 'City', extraElements = null, isNight = false, windDirection = 0, windSpeed = 0 }) {
+function City({
+  profile = {},
+  cityName = 'City',
+  extraElements = null,
+  isNight = false,
+  windDirection = 0,
+  windSpeed = 0,
+  weatherType = '',
+  glassTint = '#eef8ff'
+}) {
   // Generate random buildings
   const cityLayout = useMemo(() => {
     const {
@@ -994,7 +1003,7 @@ function City({ profile = {}, cityName = 'City', extraElements = null, isNight =
   }, [generatedBuildings])
 
   return (
-    <SnowGlobe cityName={cityName}>
+    <SnowGlobe cityName={cityName} weatherType={weatherType} tintColor={glassTint}>
       <group position={[0, 0.02, 0]}>
         {generatedBuildings.map((building) =>
           building.isLandmark ? (

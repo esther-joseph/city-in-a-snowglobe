@@ -904,7 +904,7 @@ function WeatherUI({
                     )}
                     {viewMode === 'informational' && pollenIndex !== null && pollenIndex !== undefined && (
                       <div className="stat-item">
-                        <span className="stat-label">Pollen Index</span>
+                        <span className="stat-label">Allergy Index</span>
                         <span className="stat-value">{pollenIndex.toFixed(1)}</span>
                       </div>
                     )}

@@ -80,7 +80,7 @@
 .clear-button {
   position: absolute;
   right: 8px;
-  top: 50%;
+  top: 44%;
   transform: translateY(-50%);
   background: transparent;
   border: none;
