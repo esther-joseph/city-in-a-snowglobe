@@ -936,16 +936,10 @@ function WeatherUI({
                         <span className="stat-value">{pollenIndex.toFixed(1)}</span>
                       </div>
                     )}
-                    {viewMode === 'informational' && (
+                    {viewMode === 'compact' && sunrise && sunset && (
                       <div className="stat-item">
-                        <span className="stat-label">Sunrise</span>
-                        <span className="stat-value">{sunrise}</span>
-                      </div>
-                    )}
-                    {viewMode === 'informational' && (
-                      <div className="stat-item">
-                        <span className="stat-label">Sunset</span>
-                        <span className="stat-value">{sunset}</span>
+                        <span className="stat-label">Sunrise/Sunset</span>
+                        <span className="stat-value">{sunrise}/{sunset}</span>
                       </div>
                     )}
                   </div>
