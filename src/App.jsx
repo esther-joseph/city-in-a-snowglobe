@@ -942,6 +942,7 @@ function App() {
             enableNightStars={celestialData.isNight}
             forceThunder={forceThunder}
             forceSnow={forceSnow}
+            forceRain={forceRain}
             shakeTrigger={shakeTrigger}
           />
         </group>
@@ -949,7 +950,7 @@ function App() {
     }
 
     return elements
-  }, [celestialData, weatherData, forceThunder, forceSnow, shakeTrigger])
+  }, [celestialData, weatherData, forceThunder, forceSnow, forceRain, shakeTrigger])
 
   const displayHour = useMemo(() => {
     if (manualHour !== null) return manualHour
