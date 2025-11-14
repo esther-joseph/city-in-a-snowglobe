@@ -660,39 +660,38 @@ function WeatherUI({
         </form>
         <div className="view-toggle">
           {VIEW_MODES.map((mode) => (
-            <button
-              type="button"
+          <button 
+            type="button" 
               key={mode.id}
               className={`view-toggle-button${viewMode === mode.id ? ' active' : ''}`}
               onClick={() => setViewMode(mode.id)}
             >
               {mode.label}
-            </button>
+          </button>
           ))}
+      </div>
+        <div className="test-toggles">
+          {onThunderToggle && (
+            <button
+              type="button"
+              className={`thunder-toggle${forceThunder ? ' active' : ''}`}
+              onClick={() => onThunderToggle(!forceThunder)}
+              title="Toggle Thunder Test Mode"
+            >
+              ⚡ {forceThunder ? 'Thunder ON' : 'Thunder OFF'}
+            </button>
+          )}
+          {onSnowToggle && (
+            <button
+              type="button"
+              className={`snow-toggle${forceSnow ? ' active' : ''}`}
+              onClick={() => onSnowToggle(!forceSnow)}
+              title="Toggle Snow Test Mode"
+            >
+              ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
+            </button>
+          )}
         </div>
-         {/* Thunder and Snow test toggles - commented out for production */}
-         {/* <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            {onThunderToggle && (
-              <button
-                type="button"
-                className={`thunder-toggle${forceThunder ? ' active' : ''}`}
-                onClick={() => onThunderToggle(!forceThunder)}
-                title="Toggle Thunder Test Mode"
-              >
-                ⚡ {forceThunder ? 'Thunder ON' : 'Thunder OFF'}
-              </button>
-            )}
-            {onSnowToggle && (
-              <button
-                type="button"
-                className={`snow-toggle${forceSnow ? ' active' : ''}`}
-                onClick={() => onSnowToggle(!forceSnow)}
-                title="Toggle Snow Test Mode"
-              >
-                ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
-              </button>
-            )}
-         </div> */}
       </div>
 
       {error && (

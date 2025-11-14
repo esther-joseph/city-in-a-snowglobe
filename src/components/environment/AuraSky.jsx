@@ -1,3 +1,4 @@
+/*
 import React, { useMemo } from 'react'
 import { GradientTexture } from '@react-three/drei'
 import * as THREE from 'three'
@@ -19,4 +20,5 @@ function AuraSky({ radius = 400, colors = [], rotation = [0, 0, 0] }) {
 }
 
 export default AuraSky
+*/
 

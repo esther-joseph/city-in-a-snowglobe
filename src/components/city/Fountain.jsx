@@ -162,32 +162,6 @@ function RippleRings({
   )
 }
 
-function TierWater({
-  radius,
-  height,
-  color,
-  transmission = 0.9,
-  rippleColor = '#b8f4ff',
-  rippleCount = 4,
-  rippleSpeed = 1.1,
-  rippleOpacity = 0.24
-}) {
-  return (
-    <group>
-      <WaterSurface radius={radius} position={[0, height, 0]} color={color} transmission={transmission} />
-      <RippleRings
-        radius={radius * 0.86}
-        position={[0, height + 0.01, 0]}
-        count={rippleCount}
-        maxScale={1.6}
-        speedMultiplier={rippleSpeed}
-        color={rippleColor}
-        opacity={rippleOpacity}
-      />
-    </group>
-  )
-}
-
 function Fountain() {
   return (
     <group>
@@ -196,58 +170,40 @@ function Fountain() {
         <cylinderGeometry args={[3.5, 3.7, 0.5, 48]} />
         <meshStandardMaterial color="#c4b8a6" roughness={0.8} />
       </mesh>
-      <TierWater
-        radius={3.25}
-        height={0.43}
-        color="#68c1ea"
-        transmission={0.9}
-        rippleCount={5}
-        rippleSpeed={0.9}
-        rippleOpacity={0.2}
-      />
-      <FountainSpray
-        origin={[0, 0.45, 0]}
-        radiusRange={[0.55, 1.1]}
-        heightRange={[0.35, 0.7]}
-        velocityRange={[0.45, 0.85]}
-        count={80}
-      />
+      <WaterSurface radius={3.25} position={[0, 0.43, 0]} color="#6bc8ef" />
       <mesh position={[0, 0.6, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[3.3, 0.08, 16, 64]} />
         <meshStandardMaterial color="#b8ac9c" roughness={0.6} />
       </mesh>
 
-      {/* Upper pedestal */}
-      <mesh position={[0, 1.6, 0]} castShadow>
-        <cylinderGeometry args={[1.4, 1.7, 1.0, 32]} />
+      {/* Middle tier */}
+      <mesh position={[0, 1.5, 0]} castShadow>
+        <cylinderGeometry args={[1.4, 1.6, 0.8, 32]} />
         <meshStandardMaterial color="#d1c4b3" roughness={0.7} />
       </mesh>
-      <TierWater
-        radius={1.45}
-        height={2.05}
-        color="#7fd4ff"
-        transmission={0.94}
-        rippleCount={4}
-        rippleSpeed={1.3}
-        rippleOpacity={0.3}
-      />
-      <FountainSpray
-        origin={[0, 2.05, 0]}
-        radiusRange={[0.15, 0.45]}
-        heightRange={[0.85, 1.2]}
-        velocityRange={[0.7, 1.1]}
-        count={120}
-      />
-      <mesh position={[0, 2.18, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.5, 0.05, 16, 48]} />
+      <WaterSurface radius={1.55} position={[0, 1.98, 0]} color="#7dd8ff" />
+      <mesh position={[0, 2.1, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.6, 0.06, 16, 48]} />
         <meshStandardMaterial color="#b8ac9c" roughness={0.6} />
       </mesh>
 
-      {/* Final finial */}
-      <mesh position={[0, 2.55, 0]} castShadow>
-        <sphereGeometry args={[0.32, 18, 18]} />
+      {/* Upper tier */}
+      <mesh position={[0, 2.6, 0]} castShadow>
+        <cylinderGeometry args={[0.6, 0.8, 0.7, 16]} />
+        <meshStandardMaterial color="#d8ccb9" roughness={0.65} />
+      </mesh>
+      <WaterSurface radius={0.52} position={[0, 2.95, 0]} color="#8be2ff" transmission={0.96} />
+      <mesh position={[0, 3.0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.58, 0.05, 16, 48]} />
+        <meshStandardMaterial color="#b8ac9c" roughness={0.55} />
+      </mesh>
+
+      {/* Finial */}
+      <mesh position={[0, 3.35, 0]} castShadow>
+        <sphereGeometry args={[0.25, 16, 16]} />
         <meshStandardMaterial color="#e2d6c3" roughness={0.5} />
       </mesh>
+
     </group>
   )
 }

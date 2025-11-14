@@ -678,8 +678,18 @@ function WeatherEffects({
   forceSnow = false,
   shakeTrigger = 0
 }) {
-  const weatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
-  const weatherDescription = weatherData?.weather?.[0]?.description?.toLowerCase?.() || ''
+  const baseWeatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
+  const baseWeatherDescription = weatherData?.weather?.[0]?.description?.toLowerCase?.() || ''
+  const weatherType = forceSnow
+    ? 'snow'
+    : forceThunder
+      ? 'thunderstorm'
+      : baseWeatherType
+  const weatherDescription = forceSnow
+    ? 'snow'
+    : forceThunder
+      ? 'thunderstorm'
+      : baseWeatherDescription
   const windSpeed = weatherData?.wind?.speed || 0
   const windDirection = weatherData?.wind?.deg
 

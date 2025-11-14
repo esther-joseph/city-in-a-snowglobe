@@ -972,8 +972,8 @@ function City({
         trunkHeight,
         foliageScale,
         key: `tree-${i}`
-      })
-    }
+        })
+      }
     return treeArray
   }, [generatedBuildings])
 

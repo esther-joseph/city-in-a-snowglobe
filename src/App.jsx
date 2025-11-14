@@ -10,7 +10,7 @@ import { SNOW_GLOBE_CONTENT_SCALE } from './components/SnowGlobe'
 import Sun from './components/environment/Sun'
 import Moon from './components/environment/Moon'
 import StarField from './components/environment/StarField'
-import AuraSky from './components/environment/AuraSky'
+// import AuraSky from './components/environment/AuraSky'
 import WeatherService from './services/WeatherService'
 import './App.css'
 
@@ -963,7 +963,8 @@ function App() {
     return new Date().getHours()
   }, [manualHour, celestialData, weatherData])
 
-  const weatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
+  const baseWeatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
+  const weatherType = forceSnow ? 'snow' : forceThunder ? 'thunderstorm' : baseWeatherType
 
   const glassTint = useMemo(() => {
     const hour = displayHour ?? new Date().getHours()
@@ -1012,9 +1013,7 @@ function App() {
             fade={celestialData.starSettings.fade}
             speed={celestialData.starSettings.speed}
           />
-        ) : (
-          <AuraSky radius={420} colors={auraGradient} rotation={auraRotation} />
-        ))}
+        ) : null)}
       <City
         profile={cityProfile}
         cityName={displayCityName}
