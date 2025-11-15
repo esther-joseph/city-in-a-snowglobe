@@ -434,9 +434,10 @@ function CloudLayer({
   }, [windDirection, windSpeed])
 
   const cloudConfigs = useMemo(() => {
+    const densityBoost = performanceScale < 1 ? 1 : 1.4
     const cloudCount = Math.max(
-      6,
-      Math.round((10 + density * 12) * (performanceScale < 1 ? 0.7 : 1))
+      8,
+      Math.round((12 + density * 18) * (performanceScale < 1 ? 0.85 : densityBoost))
     )
     const baseRadius = 40
     const radiusJitter = 11
