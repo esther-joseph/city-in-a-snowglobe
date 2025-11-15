@@ -47,6 +47,23 @@ function Fountain() {
 
       {/* Finial */}
       <StoneBlock size={[0.4, 0.55, 0.4]} position={[0, 2.425, 0]} color="#f0e4cd" roughness={0.55} />
+      <mesh position={[0, 2.8, 0]} castShadow>
+        <boxGeometry args={[0.18, 0.18, 0.18]} />
+        <meshStandardMaterial
+          color="#ffe9b0"
+          emissive="#ffd877"
+          emissiveIntensity={1.4}
+          roughness={0.2}
+          metalness={0.05}
+        />
+      </mesh>
+      <pointLight
+        position={[0, 2.85, 0]}
+        intensity={1.2}
+        distance={6}
+        color="#ffd877"
+        decay={2}
+      />
     </group>
   )
 }
