@@ -1,28 +1,38 @@
 import React from 'react'
 
-function BlockWater({ size = [1, 0.12, 1], position = [0, 0, 0], color = '#6ec6ff' }) {
+function Tier({ radius = 1, height = 0.2, y = 0, color = '#d1c4b3', trimColor = '#bda98f' }) {
   return (
-    <mesh position={position} receiveShadow>
-      <boxGeometry args={size} />
+    <group>
+      <mesh castShadow receiveShadow position={[0, y + height / 2, 0]}>
+        <cylinderGeometry args={[radius * 1.05, radius * 1.1, height, 48]} />
+        <meshStandardMaterial color={color} roughness={0.62} metalness={0.15} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[0, y + height + 0.04, 0]}>
+        <cylinderGeometry args={[radius, radius * 0.98, 0.18, 48]} />
+        <meshStandardMaterial color={color} roughness={0.58} metalness={0.12} />
+      </mesh>
+      <mesh castShadow receiveShadow position={[0, y + height + 0.16, 0]}>
+        <torusGeometry args={[radius * 0.98, 0.04, 24, 64]} />
+        <meshStandardMaterial color={trimColor} roughness={0.45} metalness={0.25} />
+      </mesh>
+    </group>
+  )
+}
+
+function TierWater({ radius = 1, thickness = 0.08, y = 0, color = '#6ec6ff' }) {
+  return (
+    <mesh position={[0, y + thickness / 2, 0]} receiveShadow>
+      <cylinderGeometry args={[radius * 0.92, radius * 0.9, thickness, 48]} />
       <meshPhysicalMaterial
         color={color}
         transparent
         opacity={0.78}
-        roughness={0.18}
+        roughness={0.15}
         metalness={0.05}
-        transmission={0.9}
-        clearcoat={0.35}
-        clearcoatRoughness={0.2}
+        transmission={0.92}
+        clearcoat={0.4}
+        clearcoatRoughness={0.25}
       />
-    </mesh>
-  )
-}
-
-function StoneBlock({ size = [1, 1, 1], position = [0, 0, 0], color = '#c4b8a6', roughness = 0.75 }) {
-  return (
-    <mesh position={position} castShadow receiveShadow>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color={color} roughness={roughness} metalness={0.1} />
     </mesh>
   )
 }
@@ -31,22 +41,24 @@ function Fountain() {
   return (
     <group>
       {/* Base plinth */}
-      <StoneBlock size={[4, 0.25, 4]} position={[0, 0.125, 0]} color="#9a856b" roughness={0.85} />
-      <StoneBlock size={[3.3, 0.35, 3.3]} position={[0, 0.425, 0]} color="#b39b7c" />
-      <BlockWater size={[3.1, 0.1, 3.1]} position={[0, 0.525, 0]} color="#63c4f1" />
+      <Tier radius={3.5} height={0.45} y={0} color="#9f8b75" trimColor="#cdbca5" />
+      <TierWater radius={3.1} thickness={0.12} y={0.45} color="#63c4f1" />
 
       {/* Middle tier */}
-      <StoneBlock size={[2.1, 0.3, 2.1]} position={[0, 0.95, 0]} color="#cfc0a9" roughness={0.72} />
-      <StoneBlock size={[1.75, 0.45, 1.75]} position={[0, 1.3, 0]} color="#d6c7b3" roughness={0.68} />
-      <BlockWater size={[1.6, 0.09, 1.6]} position={[0, 1.425, 0]} color="#6fd8ff" />
+      <Tier radius={2.15} height={0.32} y={1.0} color="#d8c8b3" trimColor="#c4b39b" />
+      <Tier y={1.35} radius={1.78} height={0.46} color="#e3d4c1" trimColor="#cfc0a9" />
+      <TierWater radius={1.55} thickness={0.1} y={1.84} color="#6fd8ff" />
 
       {/* Upper tier */}
-      <StoneBlock size={[0.9, 0.25, 0.9]} position={[0, 1.725, 0]} color="#dccfba" roughness={0.62} />
-      <StoneBlock size={[0.6, 0.45, 0.6]} position={[0, 2.025, 0]} color="#e7dcc6" roughness={0.58} />
-      <BlockWater size={[0.5, 0.08, 0.5]} position={[0, 2.15, 0]} color="#84eaff" />
+      <Tier radius={0.95} height={0.24} y={2.15} color="#e6d9c8" trimColor="#d4c4af" />
+      <Tier y={2.39} radius={0.65} height={0.42} color="#f1e3d3" trimColor="#dccfba" />
+      <TierWater radius={0.48} thickness={0.08} y={2.73} color="#84eaff" />
 
       {/* Finial */}
-      <StoneBlock size={[0.4, 0.55, 0.4]} position={[0, 2.425, 0]} color="#f0e4cd" roughness={0.55} />
+      <mesh castShadow position={[0, 3.1, 0]}>
+        <sphereGeometry args={[0.28, 24, 24]} />
+        <meshStandardMaterial color="#f8ecda" roughness={0.5} metalness={0.2} />
+      </mesh>
     </group>
   )
 }
