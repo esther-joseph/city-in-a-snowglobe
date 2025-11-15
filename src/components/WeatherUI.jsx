@@ -672,7 +672,7 @@ function WeatherUI({
           </button>
           ))}
       </div>
-        <div className="test-toggles">
+        {/* <div className="test-toggles">
           {onThunderToggle && (
             <button
               type="button"
@@ -703,7 +703,7 @@ function WeatherUI({
               ❄️ {forceSnow ? 'Snow ON' : 'Snow OFF'}
             </button>
           )}
-        </div>
+        </div> */}
       </div>
 
       {error && (
