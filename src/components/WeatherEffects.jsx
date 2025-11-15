@@ -261,7 +261,7 @@ function ThunderboltParticles() {
     }
 
     extractedGeometry.center()
-    const scaleMatrix = new THREE.Matrix4().makeScale(0.065 * 50, 0.065 * 50, 0.065 * 50)
+    const scaleMatrix = new THREE.Matrix4().makeScale(0.065 * 10, 0.065 * 10, 0.065 * 10)
     extractedGeometry.applyMatrix4(scaleMatrix)
     extractedGeometry.computeVertexNormals()
     return extractedGeometry
