@@ -944,13 +944,14 @@ function App() {
             forceSnow={forceSnow}
             forceRain={forceRain}
             shakeTrigger={shakeTrigger}
+            performanceTier={renderMode === 'ar' ? 'mobile-ar' : 'default'}
           />
         </group>
       )
     }
 
     return elements
-  }, [celestialData, weatherData, forceThunder, forceSnow, forceRain, shakeTrigger])
+  }, [celestialData, weatherData, forceThunder, forceSnow, forceRain, shakeTrigger, renderMode])
 
   const displayHour = useMemo(() => {
     if (manualHour !== null) return manualHour
@@ -1161,7 +1162,12 @@ function App() {
             onCreated={({ gl, scene, camera }) => {
               gl.xr.enabled = true
               // Ensure proper viewport setup for AR
-              gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+              const pixelRatio = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 1.2)
+              gl.setPixelRatio(pixelRatio)
+              if (gl.xr?.setFoveation) {
+                gl.xr.setFoveation(1)
+              }
+              gl.shadowMap.enabled = false
               // Make sure background is transparent for AR
               gl.setClearColor(0x000000, 0)
               // Ensure scene background is transparent
@@ -1176,11 +1182,11 @@ function App() {
               touchAction: 'none',
               background: 'transparent'
             }}
-            dpr={[1, 2]}
+            dpr={[1, 1.2]}
             gl={{ 
-              antialias: true,
+              antialias: false,
               alpha: true,
-              powerPreference: 'high-performance',
+              powerPreference: 'default',
               preserveDrawingBuffer: false
             }}
           >

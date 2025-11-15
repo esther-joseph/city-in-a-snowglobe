@@ -4,11 +4,12 @@ import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 
-function RainParticles() {
+function RainParticles({ performanceScale = 1 }) {
   const instancedMeshRef = useRef()
   const rippleRefs = useRef([])
-  const count = 1600
-  const rippleCount = 10
+  const count = Math.max(500, Math.round(1600 * performanceScale))
+  const rippleCount = performanceScale < 0.85 ? 6 : 10
+  const domeRadius = performanceScale < 0.85 ? 28 : 32
 
   const dropGeometry = useMemo(() => {
     const shape = new THREE.Shape()
@@ -27,12 +28,11 @@ function RainParticles() {
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
     geometry.center()
     return geometry
-  }, [])
+  }, [count])
 
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count)
-    const domeRadius = 32
     const verticalSpan = 45
     const baseHeight = 35
 
@@ -51,7 +51,7 @@ function RainParticles() {
     }
 
     return { positions, velocities, sampleXZ, verticalSpan, baseHeight, domeRadius }
-  }, [])
+  }, [count, domeRadius])
 
   const ripplePool = useMemo(() => {
     const pool = []
@@ -176,9 +176,9 @@ function RainParticles() {
   )
 }
 
-function SnowParticles() {
+function SnowParticles({ performanceScale = 1 }) {
   const points = useRef()
-  const count = 2600
+  const count = Math.max(900, Math.round(2600 * performanceScale))
 
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
@@ -237,9 +237,9 @@ function SnowParticles() {
   )
 }
 
-function ThunderboltParticles() {
+function ThunderboltParticles({ performanceScale = 1 }) {
   const instancedMeshRef = useRef()
-  const count = 25
+  const count = Math.max(10, Math.round(25 * performanceScale))
   const lightningModel = useLoader(
     FBXLoader,
     new URL('../models/lightining-bolt/Lightning Bolt.fbx', import.meta.url).href
@@ -261,7 +261,7 @@ function ThunderboltParticles() {
     }
 
     extractedGeometry.center()
-    const scaleMatrix = new THREE.Matrix4().makeScale(0.065 * 10, 0.065 * 10, 0.065 * 10)
+    const scaleMatrix = new THREE.Matrix4().makeScale(0.65, 0.65, 0.65)
     extractedGeometry.applyMatrix4(scaleMatrix)
     extractedGeometry.computeVertexNormals()
     return extractedGeometry
@@ -384,14 +384,21 @@ function ThunderboltParticles() {
   )
 }
 
-function Thunderbolts({ weatherType, weatherDescription, forceThunder = false }) {
+function Thunderbolts({ weatherType, weatherDescription, forceThunder = false, performanceScale = 1 }) {
   const hasThunder = forceThunder || weatherType?.includes('thunder') || weatherDescription?.includes('thunder')
   if (!hasThunder) return null
 
-  return <ThunderboltParticles />
+  return <ThunderboltParticles performanceScale={performanceScale} />
 }
 
-function CloudLayer({ weatherType, windDirection, windSpeed, weatherData, validateNightSpread = false }) {
+function CloudLayer({
+  weatherType,
+  windDirection,
+  windSpeed,
+  weatherData,
+  validateNightSpread = false,
+  performanceScale = 1
+}) {
   const density = useMemo(() => {
     // Get cloud coverage percentage from API (0-100)
     const cloudCoverage = weatherData?.clouds?.all ?? 0
@@ -427,7 +434,10 @@ function CloudLayer({ weatherType, windDirection, windSpeed, weatherData, valida
   }, [windDirection, windSpeed])
 
   const cloudConfigs = useMemo(() => {
-    const cloudCount = Math.round(10 + density * 12)
+    const cloudCount = Math.max(
+      6,
+      Math.round((10 + density * 12) * (performanceScale < 1 ? 0.7 : 1))
+    )
     const baseRadius = 40
     const radiusJitter = 11
     // Raise clouds higher when raining to be above rain particles (rain is at y=25-50)
@@ -475,7 +485,7 @@ function CloudLayer({ weatherType, windDirection, windSpeed, weatherData, valida
         puffs
       }
     })
-  }, [density, weatherType])
+  }, [density, weatherType, performanceScale])
 
   const cloudRefs = useMemo(
     () => cloudConfigs.map(() => React.createRef()),
@@ -583,7 +593,7 @@ function CloudLayer({ weatherType, windDirection, windSpeed, weatherData, valida
   )
 }
 
-function StarLayer({ windDirection, windSpeed }) {
+function StarLayer({ windDirection, windSpeed, performanceScale = 1 }) {
   const windVector = useMemo(() => {
     if (!windDirection && windDirection !== 0) return { x: 0.03, z: 0.05 }
     const radians = (windDirection * Math.PI) / 180
@@ -597,7 +607,7 @@ function StarLayer({ windDirection, windSpeed }) {
   const driftVector = useMemo(() => ({ x: windVector.x, z: windVector.z }), [windVector])
 
   const starConfigs = useMemo(() => {
-    const count = 26
+    const count = Math.max(10, Math.round(26 * performanceScale))
     return Array.from({ length: count }).map((_, index) => {
       const angle = (index / count) * Math.PI * 2 + Math.random() * 0.4
       const radius = 34 + Math.random() * 26
@@ -615,7 +625,7 @@ function StarLayer({ windDirection, windSpeed }) {
         initialZRotation: Math.random() * Math.PI * 2 // Random z-orientation
       }
     })
-  }, [])
+  }, [performanceScale])
 
   const starSpreadReloadRef = useRef(false)
 
@@ -783,8 +793,12 @@ function WeatherEffects({
   forceThunder = false,
   forceSnow = false,
   forceRain = false,
-  shakeTrigger = 0
+  shakeTrigger = 0,
+  performanceTier = 'default'
 }) {
+  const performanceScale = performanceTier === 'mobile-ar' ? 0.6 : 1
+  const starPerformanceScale = performanceTier === 'mobile-ar' ? 0.5 : 1
+  const thunderPerformanceScale = performanceTier === 'mobile-ar' ? 0.7 : 1
   const baseWeatherType = weatherData?.weather?.[0]?.main?.toLowerCase?.() || ''
   const baseWeatherDescription = weatherData?.weather?.[0]?.description?.toLowerCase?.() || ''
   const weatherType = forceSnow
@@ -849,8 +863,8 @@ function WeatherEffects({
 
   return (
     <group ref={shakeGroupRef}>
-      {(hasRain || forceRain) && <RainParticles />}
-      {(hasSnow || forceSnow) && <SnowParticles />}
+      {(hasRain || forceRain) && <RainParticles performanceScale={performanceScale} />}
+      {(hasSnow || forceSnow) && <SnowParticles performanceScale={performanceScale} />}
       {hasCuteClouds && (
         <CloudLayer
           weatherType={weatherType}
@@ -858,6 +872,7 @@ function WeatherEffects({
           windSpeed={windSpeed}
           weatherData={weatherData}
           validateNightSpread={enableNightStars}
+          performanceScale={performanceScale}
         />
       )}
       {(hasThunderstorm || forceThunder) && (
@@ -865,9 +880,16 @@ function WeatherEffects({
           weatherType={weatherType} 
           weatherDescription={weatherDescription} 
           forceThunder={forceThunder}
+          performanceScale={thunderPerformanceScale}
         />
       )}
-      {enableNightStars && <StarLayer windDirection={windDirection} windSpeed={windSpeed} />}
+      {enableNightStars && (
+        <StarLayer
+          windDirection={windDirection}
+          windSpeed={windSpeed}
+          performanceScale={starPerformanceScale}
+        />
+      )}
     </group>
   )
 }
