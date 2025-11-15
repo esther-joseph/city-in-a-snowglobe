@@ -608,7 +608,7 @@ function WeatherUI({
        <div className="controls-hint">
           <p>🖱️ Left click + drag to rotate | Scroll to zoom | Right click + drag to pan</p>
         </div>
-        <h1>3D Weather City</h1>
+        <h1>City In A Snowglobe</h1>
         <form onSubmit={handleSubmit} className="search-form">
           <div className="search-input-wrapper" ref={suggestionsRef}>
           <input

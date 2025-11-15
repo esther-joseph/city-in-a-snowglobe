@@ -1,4 +1,5 @@
-# 3D Weather City Visualization
+# City In A Snowglobe
+
 
 An interactive snow-globe city that visualizes real-time weather data from OpenWeatherMap using React, React-Three-Fiber, and @react-three/xr.
 
