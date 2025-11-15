@@ -391,7 +391,7 @@ function Thunderbolts({ weatherType, weatherDescription, forceThunder = false })
   return <ThunderboltParticles />
 }
 
-function CloudLayer({ weatherType, windDirection, windSpeed, weatherData }) {
+function CloudLayer({ weatherType, windDirection, windSpeed, weatherData, validateNightSpread = false }) {
   const density = useMemo(() => {
     // Get cloud coverage percentage from API (0-100)
     const cloudCoverage = weatherData?.clouds?.all ?? 0
@@ -483,6 +483,21 @@ function CloudLayer({ weatherType, windDirection, windSpeed, weatherData }) {
   )
 
   const driftVector = useMemo(() => ({ x: windVector.x, z: windVector.z }), [windVector])
+
+  const cloudSpreadReloadRef = useRef(false)
+
+  useEffect(() => {
+    if (!validateNightSpread || cloudSpreadReloadRef.current) return
+    if (!cloudConfigs?.length) return
+    const radii = cloudConfigs.map((cloud) => Math.hypot(cloud.position[0], cloud.position[2]))
+    const spread = Math.max(...radii) - Math.min(...radii)
+    if (!Number.isFinite(spread) || spread < 5) {
+      cloudSpreadReloadRef.current = true
+      if (typeof window !== 'undefined') {
+        window.location.reload()
+      }
+    }
+  }, [validateNightSpread, cloudConfigs])
 
   useFrame((state, delta) => {
     const moveX = driftVector.x * delta * 12
@@ -601,6 +616,21 @@ function StarLayer({ windDirection, windSpeed }) {
       }
     })
   }, [])
+
+  const starSpreadReloadRef = useRef(false)
+
+  useEffect(() => {
+    if (starSpreadReloadRef.current) return
+    if (!starConfigs?.length) return
+    const radii = starConfigs.map((star) => Math.hypot(star.position[0], star.position[2]))
+    const spread = Math.max(...radii) - Math.min(...radii)
+    if (!Number.isFinite(spread) || spread < 5) {
+      starSpreadReloadRef.current = true
+      if (typeof window !== 'undefined') {
+        window.location.reload()
+      }
+    }
+  }, [starConfigs])
 
   return (
     <group>
@@ -827,6 +857,7 @@ function WeatherEffects({
           windDirection={windDirection}
           windSpeed={windSpeed}
           weatherData={weatherData}
+          validateNightSpread={enableNightStars}
         />
       )}
       {(hasThunderstorm || forceThunder) && (
