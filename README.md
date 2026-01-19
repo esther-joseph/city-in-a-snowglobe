@@ -11,7 +11,7 @@ An interactive snow-globe city that visualizes real-time weather data from OpenW
 - 🔆 **Sun & Moon Timeline** – 12-hour slider that updates temperatures, icons, and star/sun positions in real time
 - ✨ **Shakeable Globe** – Dedicated “Shake Snow Globe” button (and device motion on mobile) to spin particles and rotation with responsive positioning
 - 🗂️ **Weather Drawer UI** – Tailwind-inspired drawer containing view toggles (Minimal / Compact / Informational), sun-position diagram, metrics grid, pollen/UV indices, thunder/snow debug toggles, and city search with autocomplete
-- 📱 **3D & AR Modes** – Switch between the default 3D canvas and an AR view powered by `@react-three/xr`. AR mode works on iOS 17+ (Safari) and Android devices with camera permission. Automatic device detection and graceful fallback for unsupported devices.
+- 📱 **3D & AR Modes** – Switch between the default 3D canvas and an AR view powered by `@react-three/xr` (transparent background, re-instantiating sessions for stability)
 - 🌁 **Dynamic Glass Tinting** – Snow-globe glass tint, fogging, and aura colors adapt to time of day and weather conditions
 - 🖱️ **Interactive Controls** – OrbitControls for rotate/pan/zoom plus mobile-friendly layout adjustments
 - ✅ **Vercel Ready** – Uses `OPENWEATHER_API_KEY` env variable only (no inline entry) and includes `vercel.json`
