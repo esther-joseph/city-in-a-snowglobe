@@ -11,23 +11,34 @@ An interactive snow-globe city that visualizes real-time weather data from OpenW
 - 🔆 **Sun & Moon Timeline** – 12-hour slider that updates temperatures, icons, and star/sun positions in real time
 - ✨ **Shakeable Globe** – Dedicated “Shake Snow Globe” button (and device motion on mobile) to spin particles and rotation with responsive positioning
 - 🗂️ **Weather Drawer UI** – Tailwind-inspired drawer containing view toggles (Minimal / Compact / Informational), sun-position diagram, metrics grid, pollen/UV indices, thunder/snow debug toggles, and city search with autocomplete
-- 📱 **3D & AR Modes** – Switch between the default 3D canvas and an AR view powered by `@react-three/xr` (transparent background, re-instantiating sessions for stability)
+- 📱 **3D & AR Modes** – Switch between the default 3D canvas and an AR view powered by `@react-three/xr`. AR mode works on iOS 17+ (Safari) and Android devices with camera permission. Automatic device detection and graceful fallback for unsupported devices.
 - 🌁 **Dynamic Glass Tinting** – Snow-globe glass tint, fogging, and aura colors adapt to time of day and weather conditions
 - 🖱️ **Interactive Controls** – OrbitControls for rotate/pan/zoom plus mobile-friendly layout adjustments
 - ✅ **Vercel Ready** – Uses `OPENWEATHER_API_KEY` env variable only (no inline entry) and includes `vercel.json`
 
-## Documentation Highlights
+## Documentation
 
-This README intentionally covers the most common needs when onboarding to the project:
+### Getting Started
+- **Setup Instructions** – API key creation, dependency install, `npm run dev`, and `.env` usage
+- **Usage Guide** – Walkthrough of drawer UI, search, view modes, timeline, shake mode, and weather effects
+- **Technologies** – Complete list of dependencies and their purposes
 
-1. **Run the project locally & mirror the dev environment**  
-   - See _Setup Instructions_ (API key creation, dependency install, `npm run dev`, and `.env` usage) plus the _Deploy to Vercel_ and _Preview Production Build_ sections for parity with hosted environments.
+### Platform-Specific Guides
+- **[Android Release Guide](docs/android/README.md)** – Complete guide for building and releasing to Google Play Store
+  - Getting started with Capacitor
+  - Build commands and signing setup
+  - Play Store submission checklist
+- **[iOS AR Setup](docs/ios-ar-setup.md)** – iOS AR mode configuration and troubleshooting
+  - iOS 17+ WebXR support
+  - Camera permission handling
+  - Device compatibility
 
-2. **Navigate the core prototype interactions**  
-   - The _Usage_ and _Weather Effects_ sections walk through the drawer UI, search/autocomplete, view toggles, time slider, shake mode, and weather overrides so testers know how to explore the experience.
-
-3. **Understand third-party APIs & libraries**  
-   - _Technologies Used_ lists every major dependency (React, R3F, drei, XR, OpenWeatherMap, Vite) along with why they’re included (3D rendering, AR mode, weather data, build tooling).
+### Development & Polish
+- **[Game-Feel Audit](docs/game-feel/GAME_FEEL_AUDIT.md)** – Comprehensive game-feel polish guide
+  - Animation improvements
+  - Particle system refinements
+  - Perceived performance optimizations
+  - Optional delight features
 
 ## Setup Instructions
 
@@ -68,7 +79,7 @@ The app runs at `http://localhost:5173` by default (Vite).
 4. **Time Slider** – Drag the 12-hour slider to update the main temperature readout, graph, weather icons, and sun/moon positions. Sunrise/sunset labels update per-city/time zone.
 5. **Thunder/Snow Testing** – In the drawer header, tap the highlighted toggles to override weather data and preview thunder or snow particle systems.
 6. **Shake the Globe** – Press the floating “✨ Shake Snow Globe” button (always within viewport thanks to responsive clamps) or shake a physical device with motion permissions granted.
-7. **3D vs AR** – Use the Mode toggle at the bottom of the drawer to swap between 3D canvas (with aura sky / starfield) and AR (transparent background, reloaded session for performance).
+7. **3D vs AR** – Use the Mode toggle at the bottom of the drawer to swap between 3D canvas (with aura sky / starfield) and AR (transparent background, reloaded session for performance). AR mode requires iOS 17+ or Android device with WebXR support and camera permission. The toggle automatically disables if AR is not supported on your device.
 8. **Scene Controls** – Outside the drawer, left-drag to rotate, right-drag to pan, scroll/pinch to zoom.
 
 ## Weather Effects
@@ -126,15 +137,55 @@ weather-city-3d/
 │   │   ├── WeatherEffects.jsx      # Rain, snow, thunder, clouds, stars
 │   │   ├── WeatherDrawer.jsx       # Drawer shell with toggle button
 │   │   ├── WeatherUI.jsx / .css    # Drawer content, graphs, metrics, toggles
-│   │   ├── ModeToggle.jsx          # 3D / AR switcher
+│   │   ├── ModeToggle.jsx          # 3D / AR switcher (with device detection)
 │   │   └── city/*, environment/*   # Fountain, vegetation ring, sun/moon, etc.
 │   ├── services/WeatherService.js  # CRUD wrapper for OpenWeatherMap APIs
+│   ├── utils/
+│   │   └── arSupport.js            # AR capability detection (iOS/Android)
 │   ├── App.jsx                     # Main scene + Canvas/XR + shake button
 │   ├── App.css                     # Global styles / layout helpers
 │   └── main.jsx                    # Entry point
-├── index.html                 # HTML template
-├── vite.config.js            # Vite configuration
-└── package.json              # Dependencies
+├── docs/
+│   ├── android/                    # Android release documentation
+│   ├── game-feel/                  # Game-feel polish guide
+│   └── ios-ar-setup.md             # iOS AR mode guide
+├── index.html                      # HTML template (with iOS meta tags)
+├── vite.config.js                  # Vite configuration
+├── capacitor.config.js             # Capacitor configuration (iOS/Android)
+└── package.json                    # Dependencies
+```
+
+## Platform Support
+
+### Web (Desktop & Mobile)
+- ✅ All modern browsers (Chrome, Firefox, Safari, Edge)
+- ✅ WebGL 2.0 required for 3D rendering
+- ✅ Responsive design for mobile browsers
+
+### AR Mode Requirements
+- **iOS**: iOS 17+ with Safari browser, camera permission
+- **Android**: WebXR-compatible browser (Chrome recommended), camera permission
+- **Desktop**: Limited AR support (depends on WebXR availability)
+
+See [iOS AR Setup Guide](docs/ios-ar-setup.md) for detailed iOS requirements.
+
+### Mobile App (Capacitor)
+- ✅ **Android**: Full support with Capacitor wrapper (see [Android Release Guide](docs/android/README.md))
+- ✅ **iOS**: Capacitor support available, AR requires iOS 17+ for WebXR
+
+## Development Scripts
+
+```bash
+# Development
+npm run dev              # Start dev server
+npm run build            # Build for production
+npm run preview          # Preview production build
+
+# Android (requires Capacitor setup)
+npm run android:sync     # Build web app and sync to Android
+npm run android:open     # Open Android project in Android Studio
+npm run android:build    # Build release APK
+npm run android:bundle   # Build release AAB for Play Store
 ```
 
 ## API Rate Limits
@@ -157,6 +208,12 @@ This is more than enough for personal use!
 - Try a different browser (Chrome, Firefox, Edge recommended)
 - Check browser console for errors
 
+**AR Mode Not Working?**
+- **iOS**: Requires iOS 17+ and Safari browser. Camera permission must be granted. See [iOS AR Setup Guide](docs/ios-ar-setup.md)
+- **Android**: Requires WebXR-compatible browser (Chrome recommended) and camera permission
+- Ensure you're on a physical device (simulators don't support AR)
+- Check that AR button is enabled (it will be disabled if not supported)
+
 **City Not Found?**
 - Try different spelling or add country code (e.g., "London, GB")
 - Use major city names
@@ -165,6 +222,17 @@ This is more than enough for personal use!
 
 MIT - Feel free to use this project however you like!
 
+## Additional Resources
+
+- **[Game-Feel Audit](docs/game-feel/GAME_FEEL_AUDIT.md)** – Animation polish, particle refinement, and performance optimizations
+- **[Android Release Guide](docs/android/README.md)** – Complete Play Store submission guide
+- **[iOS AR Setup](docs/ios-ar-setup.md)** – iOS AR mode configuration
+
 ## Credits
 
 Built with ❤️ using React-Three-Fiber and OpenWeatherMap API
+
+### Special Thanks
+- OpenWeatherMap for weather data API
+- Three.js community for amazing 3D tools
+- React Three Fiber team for the excellent React renderer

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import './ModeToggle.css'
 
@@ -16,6 +16,34 @@ const VIEW_OPTIONS = [
 ]
 
 function ModeToggle({ mode = '3d', onChange }) {
+  const [arSupported, setArSupported] = useState(true)
+  const [arMessage, setArMessage] = useState(null)
+
+  useEffect(() => {
+    // Check AR support
+    import('../utils/arSupport').then(({ getARCapability }) => {
+      getARCapability().then((capability) => {
+        setArSupported(capability.supported)
+        setArMessage(capability.message)
+      }).catch(() => {
+        setArSupported(true) // Assume supported if check fails
+      })
+    }).catch(() => {
+      setArSupported(true) // Assume supported if module fails to load
+    })
+  }, [])
+
+  const handleModeChange = (newMode) => {
+    if (newMode === 'ar' && !arSupported) {
+      // Show message if AR is not supported
+      if (arMessage) {
+        alert(arMessage)
+      }
+      return
+    }
+    onChange?.(newMode)
+  }
+
   return (
     <section className="mode-toggle">
       <header className="mode-toggle__header">
@@ -25,22 +53,30 @@ function ModeToggle({ mode = '3d', onChange }) {
       <div className="mode-toggle__options">
         {VIEW_OPTIONS.map((option) => {
           const isActive = option.id === mode
+          const isARDisabled = option.id === 'ar' && !arSupported
           return (
             <button
               key={option.id}
               type="button"
-              className={isActive ? 'mode-toggle__button active' : 'mode-toggle__button'}
+              className={`mode-toggle__button ${isActive ? 'active' : ''} ${isARDisabled ? 'disabled' : ''}`}
               aria-pressed={isActive}
-              onClick={() => onChange?.(option.id)}
+              aria-disabled={isARDisabled}
+              disabled={isARDisabled}
+              onClick={() => handleModeChange(option.id)}
             >
               <span className="mode-toggle__label">{option.label}</span>
               <span className="mode-toggle__description">{option.description}</span>
+              {isARDisabled && (
+                <span className="mode-toggle__unsupported">(Not available on this device)</span>
+              )}
             </button>
           )
         })}
       </div>
       <footer className="mode-toggle__footnote">
-        AR mode requires camera permission and works best in a well-lit, open area.
+        {arSupported 
+          ? 'AR mode requires camera permission and works best in a well-lit, open area.'
+          : 'AR mode is not supported on this device. Please use 3D mode.'}
       </footer>
     </section>
   )

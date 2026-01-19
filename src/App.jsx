@@ -773,46 +773,86 @@ function App() {
       return
     }
 
-    if (typeof window === 'undefined' || !('xr' in navigator)) {
-      console.warn('WebXR not available; reverting to 3D mode.')
-      setRenderMode('3d')
-      return
-    }
+    // Import AR support utilities
+    import('./utils/arSupport').then(({ getARCapability, requestCameraPermission }) => {
+      let cancelled = false
 
-    let cancelled = false
+      // Check AR capability
+      getARCapability().then(async (capability) => {
+        if (cancelled) return
 
-    navigator.xr
-      .isSessionSupported('immersive-ar')
-      .then((supported) => {
-        if (!supported) {
-          if (!cancelled) {
-            console.warn('AR not supported on this device; reverting to 3D mode.')
+        // Check WebXR availability first
+        if (!capability.webXRAvailable) {
+          console.warn('WebXR not available:', capability.message || 'WebXR not supported on this device')
+          setRenderMode('3d')
+          if (capability.message) {
+            // Optional: Show user-friendly message
+            alert(capability.message)
+          }
+          return
+        }
+
+        // Request camera permission (especially important for iOS)
+        const hasPermission = await requestCameraPermission()
+        if (!hasPermission && !cancelled) {
+          console.warn('Camera permission denied; AR mode requires camera access')
+          setRenderMode('3d')
+          alert('AR mode requires camera permission. Please allow camera access in your browser settings.')
+          return
+        }
+
+        // Check if immersive-ar is supported
+        if (!capability.webXRARSupported) {
+          if (capability.isIOS && capability.iosVersion < 17) {
+            console.warn('iOS 17+ required for WebXR AR support')
+            setRenderMode('3d')
+            alert('AR mode requires iOS 17 or later. Please update your device.')
+          } else {
+            console.warn('AR not supported on this device:', capability.message)
             setRenderMode('3d')
           }
           return
         }
 
-        const optionalFeatures = ['local-floor', 'hit-test']
-        if (typeof document !== 'undefined') optionalFeatures.push('dom-overlay')
+        // iOS-specific: Use 'local' reference space for better compatibility
+        // Android can use 'local-floor' but iOS WebXR may prefer 'local'
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+        const optionalFeatures = isIOS 
+          ? ['local'] // iOS prefers 'local' over 'local-floor'
+          : ['local-floor', 'hit-test']
+        
+        // DOM overlay may not be supported on iOS
+        if (typeof document !== 'undefined' && !isIOS) {
+          optionalFeatures.push('dom-overlay')
+        }
+
         const sessionInit =
-          typeof document !== 'undefined'
+          typeof document !== 'undefined' && !isIOS
             ? { optionalFeatures, domOverlay: { root: document.body } }
             : { optionalFeatures }
 
         startSession('immersive-ar', sessionInit).catch((error) => {
-          console.warn('Failed to start AR session; reverting to 3D mode.', error)
-          if (!cancelled) setRenderMode('3d')
+          console.warn('Failed to start AR session:', error)
+          if (!cancelled) {
+            setRenderMode('3d')
+            alert('Failed to start AR session. Please try again or use 3D mode.')
+          }
         })
-      })
-      .catch((error) => {
-        console.warn('Failed to query AR support; reverting to 3D mode.', error)
-        if (!cancelled) setRenderMode('3d')
+      }).catch((error) => {
+        console.warn('Failed to check AR capability:', error)
+        if (!cancelled) {
+          setRenderMode('3d')
+        }
       })
 
-    return () => {
-      cancelled = true
-      stopSession().catch(() => {})
-    }
+      return () => {
+        cancelled = true
+        stopSession().catch(() => {})
+      }
+    }).catch((error) => {
+      console.error('Failed to load AR support utilities:', error)
+      setRenderMode('3d')
+    })
   }, [renderMode, setRenderMode])
 
   useEffect(() => {
@@ -1191,7 +1231,7 @@ function App() {
             }}
           >
             <Suspense fallback={null}>
-              <XR referenceSpace="local-floor">
+              <XR referenceSpace={/iPhone|iPad|iPod/i.test(navigator.userAgent) ? "local" : "local-floor"}>
                 <Controllers />
                 <group position={[0, 0, 0]}>
                   <ShakeableScene includeSky={false} />

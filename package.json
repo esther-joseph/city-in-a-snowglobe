@@ -7,12 +7,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:build": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
+    "android:bundle": "npm run build && npx cap sync android && cd android && ./gradlew bundleRelease"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/splash-screen": "^6.0.2",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.4.0",
     "@react-three/xr": "^5.7.1",
@@ -24,6 +31,8 @@
     "three": "^0.181.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.2",
+    "@capacitor/cli": "^6.1.2",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.22",
     "postcss": "^8.5.6",

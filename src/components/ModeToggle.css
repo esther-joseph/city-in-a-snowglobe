@@ -59,6 +59,26 @@
   box-shadow: 0 12px 24px rgba(74, 118, 255, 0.22);
 }
 
+.mode-toggle__button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+
+.mode-toggle__button.disabled:hover {
+  background: rgba(30, 36, 52, 0.4);
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.mode-toggle__unsupported {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4px;
+  font-style: italic;
+}
+
 .mode-toggle__label {
   font-weight: 600;
   letter-spacing: 0.02em;
