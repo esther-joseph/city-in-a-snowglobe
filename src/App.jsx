@@ -784,13 +784,13 @@ function App() {
         // Check WebXR availability first
         if (!capability.webXRAvailable) {
           console.warn('WebXR not available:', capability.message || 'WebXR not supported on this device')
-          setRenderMode('3d')
+      setRenderMode('3d')
           if (capability.message) {
             // Optional: Show user-friendly message
             alert(capability.message)
           }
-          return
-        }
+      return
+    }
 
         // Request camera permission (especially important for iOS)
         const hasPermission = await requestCameraPermission()
@@ -845,10 +845,10 @@ function App() {
         }
       })
 
-      return () => {
-        cancelled = true
-        stopSession().catch(() => {})
-      }
+    return () => {
+      cancelled = true
+      stopSession().catch(() => {})
+    }
     }).catch((error) => {
       console.error('Failed to load AR support utilities:', error)
       setRenderMode('3d')
