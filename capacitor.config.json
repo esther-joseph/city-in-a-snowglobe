@@ -1,0 +1,32 @@
+{
+  "appId": "com.estherjoseph.citysnowglobe",
+  "appName": "City In A Snowglobe",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#000000",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "scheme": "https",
+    "contentInset": "always",
+    "permissions": {
+      "camera": "AR mode requires access to the camera to display and track the snow globe in your space."
+    }
+  }
+}
