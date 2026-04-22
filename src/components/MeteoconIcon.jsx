@@ -2,10 +2,8 @@ import React from 'react'
 import PropTypes from 'prop-types'
 
 /**
- * MeteoconIcon - Renders animated outlined Meteocons weather icons
- * Uses the Meteocons library from https://basmilius.github.io/weather-icons/
- * 
- * Maps OpenWeatherMap weather conditions to Meteocons icon names
+ * MeteoconIcon — Meteocons line-style weather icons, served from /public (see postinstall).
+ * Icon files come from @meteocons/svg-static (copied to public/weather-icons/line).
  */
 function MeteoconIcon({ weatherMain, isNight = false, className = '', size = 24, ...props }) {
   // Map OpenWeatherMap weather conditions to Meteocons icon names
@@ -50,10 +48,8 @@ function MeteoconIcon({ weatherMain, isNight = false, className = '', size = 24,
   }
 
   const iconName = getIconName(weatherMain, isNight)
-
-  // Use Meteocons CDN for the outlined animated icons (line style)
-  // Try GitHub Pages first, then fallback to raw GitHub
-  const iconUrl = `https://basmilius.github.io/weather-icons/production/line/all/${iconName}.svg`
+  const iconUrl = `/weather-icons/line/${iconName}.svg`
+  const fallbackUrl = '/weather-icons/line/not-available.svg'
 
   return (
     <img
@@ -68,8 +64,9 @@ function MeteoconIcon({ weatherMain, isNight = false, className = '', size = 24,
         objectFit: 'contain'
       }}
       onError={(e) => {
-        // Fallback to raw GitHub if GitHub Pages fails
-        e.target.src = `https://raw.githubusercontent.com/basmilius/weather-icons/master/production/line/all/${iconName}.svg`
+        if (e.target.dataset.fallbackApplied) return
+        e.target.dataset.fallbackApplied = '1'
+        e.target.src = fallbackUrl
       }}
       {...props}
     />

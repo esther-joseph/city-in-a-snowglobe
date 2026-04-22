@@ -5,6 +5,8 @@
   "description": "3D City Weather Visualization",
   "main": "index.js",
   "scripts": {
+    "copy-weather-icons": "node scripts/copy-weather-icons.mjs",
+    "postinstall": "node scripts/copy-weather-icons.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -23,6 +25,7 @@
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.4.0",
     "@react-three/xr": "^5.7.1",
+    "@meteocons/svg-static": "^0.1.0",
     "@vercel/speed-insights": "^1.2.0",
     "meteocons": "^3.0.0-dev",
     "prop-types": "^15.8.1",
