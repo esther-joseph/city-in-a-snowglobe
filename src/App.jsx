@@ -10,6 +10,7 @@ import { SNOW_GLOBE_CONTENT_SCALE } from './components/SnowGlobe'
 import Sun from './components/environment/Sun'
 import Moon from './components/environment/Moon'
 import StarField from './components/environment/StarField'
+import LiquidChromeBackground from './components/environment/LiquidChromeBackground'
 // import AuraSky from './components/environment/AuraSky'
 import WeatherService from './services/WeatherService'
 import './App.css'
@@ -1036,6 +1037,13 @@ function App() {
 
   const BaseScene = ({ includeSky = true }) => (
     <>
+      {includeSky && (
+        <LiquidChromeBackground
+          colorSky={auraGradient[0]}
+          colorAura={auraGradient[1]}
+          colorGround={auraGradient[2]}
+        />
+      )}
       <ambientLight
         color={celestialData.ambientSkyColor}
         intensity={ambientLightIntensity}
@@ -1128,7 +1136,7 @@ function App() {
         width: '100vw',
         height: '100vh',
         display: 'flex',
-        background: renderMode === '3d' ? celestialData.backgroundColor : 'transparent'
+        background: '#000'
       }}
     >
       <WeatherDrawer
@@ -1174,13 +1182,14 @@ function App() {
               }
             }}
             dpr={typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? [1, 1.5] : [1, 2]}
-            gl={{ 
+            gl={{
               antialias: true,
+              alpha: true,
               powerPreference: typeof window !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 'default' : 'high-performance'
             }}
+            style={{ background: 'transparent' }}
           >
             <Suspense fallback={null}>
-              <color attach="background" args={[celestialData.backgroundColor]} />
               <ShakeableScene includeSky />
         <OrbitControls 
                 enablePan
