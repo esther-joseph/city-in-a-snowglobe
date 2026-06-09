@@ -2,7 +2,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } fr
 import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { XR, Controllers, startSession, stopSession } from '@react-three/xr'
+import { XR, XROrigin, createXRStore } from '@react-three/xr'
 import City from './components/City'
 import WeatherEffects from './components/WeatherEffects'
 import WeatherDrawer from './components/WeatherDrawer'
@@ -14,6 +14,13 @@ import LiquidChromeBackground from './components/environment/LiquidChromeBackgro
 // import AuraSky from './components/environment/AuraSky'
 import WeatherService from './services/WeatherService'
 import './App.css'
+
+// Single WebXR store for the whole app (xr v6 API). Created once at module
+// scope so the session survives re-renders. Defaults request hit-test,
+// dom-overlay, plane/mesh detection, anchors, etc. all as OPTIONAL features,
+// so the session still starts on devices that lack some of them — which is
+// what makes it work on both ARCore (Android) and ARKit (iOS 17+ Safari).
+const xrStore = createXRStore()
 
 function hexToRgb(hex) {
   if (!hex) return { r: 255, g: 255, b: 255 }
@@ -776,7 +783,7 @@ function App() {
 
   useEffect(() => {
     if (renderMode !== 'ar') {
-      stopSession().catch(() => {})
+      xrStore.getState().session?.end().catch(() => {})
       return
     }
 
@@ -821,24 +828,12 @@ function App() {
           return
         }
 
-        // iOS-specific: Use 'local' reference space for better compatibility
-        // Android can use 'local-floor' but iOS WebXR may prefer 'local'
-        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-        const optionalFeatures = isIOS 
-          ? ['local'] // iOS prefers 'local' over 'local-floor'
-          : ['local-floor', 'hit-test']
-        
-        // DOM overlay may not be supported on iOS
-        if (typeof document !== 'undefined' && !isIOS) {
-          optionalFeatures.push('dom-overlay')
-        }
-
-        const sessionInit =
-          typeof document !== 'undefined' && !isIOS
-            ? { optionalFeatures, domOverlay: { root: document.body } }
-            : { optionalFeatures }
-
-        startSession('immersive-ar', sessionInit).catch((error) => {
+        // Enter immersive AR via the xr v6 store. enterAR() builds the session
+        // init internally (local-floor reference space + the optional features
+        // configured on the store) and connects it to the <XR> renderer. This
+        // replaces the old startSession() helper, which was incompatible with
+        // @react-three/fiber v9 / React 19 and produced the black screen.
+        xrStore.enterAR().catch((error) => {
           console.warn('Failed to start AR session:', error)
           if (!cancelled) {
             setRenderMode('3d')
@@ -854,7 +849,7 @@ function App() {
 
     return () => {
       cancelled = true
-      stopSession().catch(() => {})
+      xrStore.getState().session?.end().catch(() => {})
     }
     }).catch((error) => {
       console.error('Failed to load AR support utilities:', error)
@@ -1216,18 +1211,14 @@ function App() {
           <Canvas
             key={`ar-session-${arSessionKey}`}
             camera={{ position: [0, 1.6, 0], fov: 50 }}
-            onCreated={({ gl, scene, camera }) => {
-              gl.xr.enabled = true
-              // Ensure proper viewport setup for AR
+            onCreated={({ gl, scene }) => {
+              // <XR> (v6) enables gl.xr and manages the session/reference space
+              // itself; we only need to guarantee a transparent framebuffer so
+              // the camera passthrough shows through behind the scene.
               const pixelRatio = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 1.2)
               gl.setPixelRatio(pixelRatio)
-              if (gl.xr?.setFoveation) {
-                gl.xr.setFoveation(1)
-              }
               gl.shadowMap.enabled = false
-              // Make sure background is transparent for AR
               gl.setClearColor(0x000000, 0)
-              // Ensure scene background is transparent
               scene.background = null
             }}
             style={{ 
@@ -1247,29 +1238,22 @@ function App() {
               preserveDrawingBuffer: false
             }}
           >
-            <Suspense fallback={null}>
-              <XR referenceSpace={/iPhone|iPad|iPod/i.test(navigator.userAgent) ? "local" : "local-floor"}>
-                <Controllers />
-                {/* XR origin — spawn the user a few feet back from the fountain, standing in
-                    the central park looking toward the city centre. The whole scene is shifted
-                    down so the park ground meets the user's floor, and pushed forward (−Z) so
-                    the fountain sits ~1.4 m (a few feet) directly ahead.
-                    iOS 'local' reference space origins at head height (~1.6 m); Android
-                    'local-floor' origins at the floor — so the vertical drop differs.
-                    Tweak XR_VIEW_DISTANCE / the Y offsets to taste. */}
-                {(() => {
-                  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-                  const XR_VIEW_DISTANCE = 1.4   // metres in front of the user (~4.5 ft)
-                  // Park ground sits a touch above the scene origin; drop it to the floor.
-                  const XR_FLOOR_DROP = isIOS ? -1.73 : -0.23
-                  return (
-                    <group position={[0, XR_FLOOR_DROP, -XR_VIEW_DISTANCE]}>
-                      <ShakeableScene includeSky={false} />
-                    </group>
-                  )
-                })()}
-              </XR>
-            </Suspense>
+            <XR store={xrStore}>
+              {/* XROrigin = where the user stands. v6 normalises to the
+                  'local-floor' reference space on BOTH ARCore and ARKit, so y=0
+                  is the real floor on every device — no more platform-specific
+                  head-height hack. Standing the user at +Z and facing −Z puts the
+                  fountain (scene origin) ~1.4 m (a few feet) directly ahead.
+                  Tweak XR_VIEW_DISTANCE / XR_GROUND_OFFSET on-device to taste. */}
+              {(() => {
+                const XR_VIEW_DISTANCE = 1.4   // metres the user stands from centre (~4.5 ft)
+                const XR_GROUND_OFFSET = 0      // raise (+) / lower (−) the user vs. the scene floor
+                return <XROrigin position={[0, XR_GROUND_OFFSET, XR_VIEW_DISTANCE]} />
+              })()}
+              <Suspense fallback={null}>
+                <ShakeableScene includeSky={false} />
+              </Suspense>
+            </XR>
       </Canvas>
         )}
         {renderMode === '3d' && (
