@@ -25,7 +25,8 @@ function generateCityLayout(profile = {}) {
     shapeOptions = ['box', 'tapered', 'cylinder'],
     landmarks = [],
     bridges = [],
-    maxCityRadius = 45
+    maxCityRadius = 45,
+    materialStyle = { metalness: 0.20, roughness: 0.60, glassChance: 0.25 }
   } = profile || {}
 
   const randomBetween = (min, max) => Math.random() * (max - min) + min
@@ -101,6 +102,7 @@ function generateCityLayout(profile = {}) {
         color,
         accentColor,
         shape,
+        materialStyle,
         footprintRadius: Math.max(width, depth) * 0.5,
         key: `building-${x}-${z}`,
         distanceFromCenter
@@ -352,12 +354,19 @@ function Building({
   color,
   accentColor = '#ececec',
   shape = 'box',
-  isNight = false
+  isNight = false,
+  materialStyle
 }) {
   const [x, baseY = 0, z] = basePosition
   const centerHeight = height / 2
   const primaryColor = color
   const secondaryColor = accentColor
+
+  const stableRand = (((basePosition[0] * 31 + basePosition[2] * 17) % 1) + 1) % 1
+  const isGlass = stableRand < (materialStyle?.glassChance ?? 0.25)
+  const matProps = isGlass
+    ? { color: accentColor, metalness: Math.min(0.95, (materialStyle?.metalness ?? 0.2) + 0.15), roughness: Math.max(0.05, (materialStyle?.roughness ?? 0.6) - 0.15) }
+    : { color, metalness: materialStyle?.metalness ?? 0.2, roughness: materialStyle?.roughness ?? 0.6 }
 
   if (shape === 'cylinder') {
     const radius = Math.max(width, depth) / 2
@@ -365,7 +374,7 @@ function Building({
       <group position={[x, baseY, z]}>
         <mesh position={[0, centerHeight, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[radius, radius * 0.95, height, 24]} />
-          <meshStandardMaterial color={primaryColor} metalness={0.2} roughness={0.6} />
+          <meshStandardMaterial {...matProps} />
         </mesh>
         <CylinderWindows radius={radius} height={height} isNight={isNight} />
       </group>
@@ -377,15 +386,15 @@ function Building({
       <group position={[x, baseY, z]}>
         <mesh position={[0, height * 0.35, 0]} castShadow receiveShadow>
           <boxGeometry args={[width, height * 0.7, depth]} />
-          <meshStandardMaterial color={primaryColor} roughness={0.65} />
+          <meshStandardMaterial {...matProps} />
         </mesh>
         <mesh position={[0, height * 0.8, 0]} castShadow receiveShadow>
           <boxGeometry args={[width * 0.6, height * 0.4, depth * 0.6]} />
-          <meshStandardMaterial color={secondaryColor} roughness={0.5} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <mesh position={[0, height * 1.05, 0]} castShadow>
           <boxGeometry args={[width * 0.3, height * 0.1, depth * 0.3]} />
-          <meshStandardMaterial color={secondaryColor} metalness={0.2} roughness={0.4} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <RectangularWindows
           width={width}
@@ -414,15 +423,15 @@ function Building({
       <group position={[x, baseY, z]}>
         <mesh position={[0, baseHeight / 2, 0]} castShadow receiveShadow>
           <boxGeometry args={[width * 1.05, baseHeight, depth * 1.05]} />
-          <meshStandardMaterial color={primaryColor} roughness={0.55} />
+          <meshStandardMaterial {...matProps} />
         </mesh>
         <mesh position={[0, baseHeight, 0]} castShadow>
           <cylinderGeometry args={[radius * 0.6, radius * 0.95, baseHeight * 0.4, 24]} />
-          <meshStandardMaterial color={secondaryColor} roughness={0.4} metalness={0.25} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <mesh position={[0, baseHeight + spireHeight / 2, 0]} castShadow>
           <coneGeometry args={[radius * 0.4, spireHeight, 24]} />
-          <meshStandardMaterial color={secondaryColor} metalness={0.35} roughness={0.3} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <RectangularWindows
           width={width * 1.05}
@@ -444,15 +453,15 @@ function Building({
       <group position={[x, baseY, z]}>
         <mesh position={[0, baseHeight / 2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[radius * 1.3, radius * 1.4, baseHeight, 32]} />
-          <meshStandardMaterial color={primaryColor} roughness={0.45} metalness={0.35} />
+          <meshStandardMaterial {...matProps} />
         </mesh>
         <mesh position={[0, baseHeight + midHeight / 2, 0]} castShadow>
           <cylinderGeometry args={[radius * 0.9, radius * 1.1, midHeight, 28]} />
-          <meshStandardMaterial color={secondaryColor} metalness={0.4} roughness={0.3} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <mesh position={[0, baseHeight + midHeight + tipHeight / 2, 0]} castShadow>
           <coneGeometry args={[radius * 0.45, tipHeight, 32]} />
-          <meshStandardMaterial color={secondaryColor} metalness={0.5} roughness={0.25} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <CylinderWindows
           radius={radius * 1.4}
@@ -471,15 +480,15 @@ function Building({
       <group position={[x, baseY, z]}>
         <mesh position={[0, baseHeight / 2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[width * 0.45, width * 0.6, baseHeight, 18]} />
-          <meshStandardMaterial color={primaryColor} roughness={0.55} />
+          <meshStandardMaterial {...matProps} />
         </mesh>
         <mesh position={[0, baseHeight + towerHeight / 2, 0]} castShadow>
           <boxGeometry args={[width * 0.6, towerHeight, depth * 0.6]} />
-          <meshStandardMaterial color={secondaryColor} roughness={0.4} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <mesh position={[0, baseHeight + towerHeight + spireHeight / 2, 0]} castShadow>
           <coneGeometry args={[width * 0.25, spireHeight, 16]} />
-          <meshStandardMaterial color={secondaryColor} metalness={0.3} roughness={0.35} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
         </mesh>
         <CylinderWindows
           radius={width * 0.6}
@@ -502,7 +511,7 @@ function Building({
       <group position={[x, baseY, z]}>
         <mesh position={[0, height / 2, 0]} castShadow receiveShadow scale={[1, height / width, 1]}>
           <sphereGeometry args={[width / 2, 24, 24]} />
-          <meshStandardMaterial color={primaryColor} roughness={0.5} metalness={0.25} />
+          <meshStandardMaterial {...matProps} />
         </mesh>
         <CylinderWindows
           radius={(width / 2) * 0.95}
@@ -514,11 +523,63 @@ function Building({
     )
   }
 
+  // Box shape — stepped setbacks for tall buildings, plain for short ones
+  if (height > 14) {
+    const baseH = height * 0.60
+    const midH = height * 0.25
+    const topH = height * 0.15
+    const baseY0 = height * 0.30
+    const midY = height * 0.725
+    const topY = height * 0.925
+    return (
+      <group position={[x, baseY, z]}>
+        {/* Base tier */}
+        <mesh position={[0, baseY0, 0]} castShadow receiveShadow>
+          <boxGeometry args={[width, baseH, depth]} />
+          <meshStandardMaterial {...matProps} />
+        </mesh>
+        <RectangularWindows
+          width={width}
+          depth={depth}
+          height={baseH}
+          baseY={baseY0 - baseH / 2}
+          isNight={isNight}
+        />
+        {/* Mid tier */}
+        <mesh position={[0, midY, 0]} castShadow receiveShadow>
+          <boxGeometry args={[width * 0.78, midH, depth * 0.78]} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
+        </mesh>
+        <RectangularWindows
+          width={width * 0.78}
+          depth={depth * 0.78}
+          height={midH}
+          baseY={midY - midH / 2}
+          isNight={isNight}
+          segmentBias={0.85}
+        />
+        {/* Top tier */}
+        <mesh position={[0, topY, 0]} castShadow receiveShadow>
+          <boxGeometry args={[width * 0.55, topH, depth * 0.55]} />
+          <meshStandardMaterial {...matProps} color={secondaryColor} />
+        </mesh>
+        <RectangularWindows
+          width={width * 0.55}
+          depth={depth * 0.55}
+          height={topH}
+          baseY={topY - topH / 2}
+          isNight={isNight}
+          segmentBias={0.7}
+        />
+      </group>
+    )
+  }
+
   return (
     <group position={[x, baseY, z]}>
       <mesh position={[0, centerHeight, 0]} castShadow receiveShadow>
-      <boxGeometry args={[width, height, depth]} />
-        <meshStandardMaterial color={primaryColor} roughness={0.65} />
+        <boxGeometry args={[width, height, depth]} />
+        <meshStandardMaterial {...matProps} />
       </mesh>
       <RectangularWindows width={width} depth={depth} height={height} isNight={isNight} />
     </group>
@@ -878,35 +939,61 @@ function BridgeModel({ data }) {
   )
 }
 
+// Mid-century modern lamp post — tapered pole, gooseneck arm, globe lantern
+// The arm automatically faces the fountain center.
 function LightPost({ position = [0, 0, 0], isNight }) {
   const [x, y, z] = position
-  const poleHeight = 2.8
-  const lampColor = isNight ? '#ffe9b0' : '#cbe0ff'
+  const poleH = 3.2
+  const lampColor = isNight ? '#fff5b0' : '#e6f2ff'
+  const emissive = isNight ? '#ffd84a' : '#000000'
+  // Rotate group so the arm (local +x) always points toward origin (fountain center)
+  const rotY = Math.atan2(z, -x)
+
   return (
-    <group position={[x, y, z]}>
-      <mesh castShadow receiveShadow position={[0, poleHeight / 2, 0]}>
-        <boxGeometry args={[0.25, poleHeight, 0.25]} />
-        <meshStandardMaterial color="#4a3b2d" roughness={0.65} metalness={0.2} />
+    <group position={[x, y, z]} rotation={[0, rotY, 0]}>
+      {/* Flared base */}
+      <mesh castShadow receiveShadow position={[0, 0.14, 0]}>
+        <cylinderGeometry args={[0.18, 0.26, 0.28, 10]} />
+        <meshStandardMaterial color="#1e1e1e" roughness={0.50} metalness={0.60} />
       </mesh>
-      <mesh castShadow position={[0, poleHeight + 0.35, 0]}>
-        <boxGeometry args={[0.8, 0.6, 0.8]} />
+      {/* Tapered pole */}
+      <mesh castShadow receiveShadow position={[0, poleH * 0.5 + 0.28, 0]}>
+        <cylinderGeometry args={[0.048, 0.12, poleH, 10]} />
+        <meshStandardMaterial color="#1c1c1c" roughness={0.48} metalness={0.62} />
+      </mesh>
+      {/* Horizontal arm */}
+      <mesh castShadow position={[0.42, poleH + 0.30, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.032, 0.044, 0.90, 8]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.48} metalness={0.62} />
+      </mesh>
+      {/* Downward knuckle */}
+      <mesh castShadow position={[0.84, poleH + 0.11, 0]} rotation={[0, 0, -Math.PI * 0.28]}>
+        <cylinderGeometry args={[0.032, 0.038, 0.38, 8]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.48} metalness={0.62} />
+      </mesh>
+      {/* Globe lantern */}
+      <mesh castShadow position={[0.84, poleH - 0.10, 0]}>
+        <sphereGeometry args={[0.24, 14, 14]} />
         <meshStandardMaterial
           color={lampColor}
-          emissive={isNight ? lampColor : '#000000'}
-          emissiveIntensity={isNight ? 1.8 : 0.15}
-          roughness={0.25}
-          metalness={0.08}
+          emissive={emissive}
+          emissiveIntensity={isNight ? 2.2 : 0.08}
+          roughness={0.08}
+          metalness={0.0}
+          transparent
+          opacity={isNight ? 0.92 : 0.70}
         />
       </mesh>
-      <mesh castShadow position={[0, poleHeight + 0.75, 0]}>
-        <boxGeometry args={[1.0, 0.15, 1.0]} />
-        <meshStandardMaterial color="#2f241a" roughness={0.7} metalness={0.12} />
+      {/* Globe cap ring */}
+      <mesh castShadow position={[0.84, poleH + 0.15, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.26, 0.028, 8, 20]} />
+        <meshStandardMaterial color="#111" roughness={0.5} metalness={0.7} />
       </mesh>
       <pointLight
-        position={[0, poleHeight + 0.35, 0]}
-        intensity={isNight ? 1.6 : 0}
-        distance={8}
-        color={lampColor}
+        position={[0.84, poleH - 0.10, 0]}
+        intensity={isNight ? 1.8 : 0}
+        distance={9}
+        color="#ffe8a0"
         decay={2}
       />
     </group>
@@ -923,89 +1010,123 @@ function City({
   windSpeed = 0,
   weatherType = '',
   glassTint = '#eef8ff'
+
 }) {
   const cityLayout = useMemo(() => generateCityLayout(profile), [profile, citySeed])
 
   const generatedBuildings = cityLayout.buildings || []
   const generatedBridges = cityLayout.bridges || []
 
+  // Benches placed diagonally between paths so they don't block walkways
   const benches = useMemo(
     () => [
-      {
-        position: [7, 0.25, 0],
-        rotation: [0, -Math.PI / 2, 0]
-      },
-      {
-        position: [-7, 0.25, 0],
-        rotation: [0, Math.PI / 2, 0]
-      },
-      {
-        position: [0, 0.25, 7],
-        rotation: [0, Math.PI, 0]
-      },
-      {
-        position: [0, 0.25, -7],
-        rotation: [0, 0, 0]
-      }
+      { position: [6.0, 0.25,  6.0], rotation: [0,  Math.PI * 1.25, 0] }, // NE → faces SW
+      { position: [-6.0, 0.25, 6.0], rotation: [0,  Math.PI * 0.75, 0] }, // NW → faces SE
+      { position: [-6.0, 0.25,-6.0], rotation: [0,  Math.PI * 0.25, 0] }, // SW → faces NE
+      { position: [ 6.0, 0.25,-6.0], rotation: [0, -Math.PI * 0.25, 0] }, // SE → faces NW
     ],
     []
   )
 
+  // Returns true if (x, z) falls within the width of any radial stone path.
+  // Paths run at 0°/90°/180°/270°, width 1.3, from radius 4.6 to 18.3.
+  const onStonePath = (x, z, margin = 0.9) => {
+    const pathAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5]
+    const pathInner = 4.6
+    const pathOuter = 18.3
+    return pathAngles.some((a) => {
+      const along = x * Math.sin(a) + z * Math.cos(a)   // distance along path direction
+      const perp  = Math.abs(x * Math.cos(a) - z * Math.sin(a)) // distance from path centre
+      return along > pathInner && along < pathOuter && perp < margin
+    })
+  }
+
   const trees = useMemo(() => {
     const treeArray = []
-    const treeCount = 16
-    const baseRadius = 16
-    for (let i = 0; i < treeCount; i++) {
-      const angle = (i / treeCount) * Math.PI * 2
-      const radius = baseRadius + (Math.random() - 0.5) * 1.5
+
+    // Outer ring — full-size trees around the vegetation band
+    const outerCount = 28
+    const outerBaseR = 16
+    for (let i = 0; i < outerCount; i++) {
+      const angle = (i / outerCount) * Math.PI * 2
+      const radius = outerBaseR + (Math.random() - 0.5) * 2.2
       const x = Math.cos(angle) * radius
       const z = Math.sin(angle) * radius
-      const minDistanceToBuilding = generatedBuildings.reduce((min, building) => {
-        const dx = x - building.basePosition[0]
-        const dz = z - building.basePosition[2]
-        const footprint =
-          (building.footprintRadius || Math.max(building.width, building.depth) * 0.5) + 1
-        const distance = Math.sqrt(dx * dx + dz * dz) - footprint
-        return Math.min(min, distance)
-      }, Infinity)
-      if (minDistanceToBuilding < 1.5) continue
-      const trunkHeight = 2.4 + Math.random() * 1.2
-      const foliageScale = 2 + Math.random() * 0.8
+      const tooClose = generatedBuildings.some((b) => {
+        const dx = x - b.basePosition[0]
+        const dz = z - b.basePosition[2]
+        const fp = (b.footprintRadius || Math.max(b.width, b.depth) * 0.5) + 1
+        return Math.sqrt(dx * dx + dz * dz) < fp + 1.5
+      })
+      if (tooClose || onStonePath(x, z, 1.1)) continue
       treeArray.push({
         position: [x, 0, z],
-        trunkHeight,
-        foliageScale,
-        key: `tree-${i}`
-        })
-      }
+        trunkHeight: 2.4 + Math.random() * 1.4,
+        foliageScale: 2.0 + Math.random() * 0.9,
+        key: `tree-outer-${i}`
+      })
+    }
+
+    // Inner cluster — smaller accent trees around the park interior
+    const innerCount = 12
+    const innerBaseR = 10.5
+    for (let i = 0; i < innerCount; i++) {
+      const angle = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount
+      const radius = innerBaseR + (Math.random() - 0.5) * 1.0
+      const x = Math.cos(angle) * radius
+      const z = Math.sin(angle) * radius
+      if (onStonePath(x, z, 1.1)) continue
+      treeArray.push({
+        position: [x, 0, z],
+        trunkHeight: 1.5 + Math.random() * 0.8,
+        foliageScale: 1.3 + Math.random() * 0.5,
+        key: `tree-inner-${i}`
+      })
+    }
+
     return treeArray
   }, [generatedBuildings])
 
   const bushes = useMemo(() => {
     const bushArray = []
-    const bushCount = 20
-    const baseRadius = 13.5
-    for (let i = 0; i < bushCount; i++) {
-      const angle = (i / bushCount) * Math.PI * 2 + Math.random() * 0.15
-      const radius = baseRadius + (Math.random() - 0.5) * 0.8
+
+    // Outer bush ring (fringing the vegetation band)
+    const outerCount = 32
+    const outerR = 13.5
+    for (let i = 0; i < outerCount; i++) {
+      const angle = (i / outerCount) * Math.PI * 2 + Math.random() * 0.18
+      const radius = outerR + (Math.random() - 0.5) * 1.2
       const x = Math.cos(angle) * radius
       const z = Math.sin(angle) * radius
-      const minDistanceToBuilding = generatedBuildings.reduce((min, building) => {
-        const dx = x - building.basePosition[0]
-        const dz = z - building.basePosition[2]
-        const footprint =
-          (building.footprintRadius || Math.max(building.width, building.depth) * 0.5) + 0.7
-        const distance = Math.sqrt(dx * dx + dz * dz) - footprint
-        return Math.min(min, distance)
-      }, Infinity)
-      if (minDistanceToBuilding < 1.5) continue
-      const scale = 0.9 + Math.random() * 0.5
+      const tooClose = generatedBuildings.some((b) => {
+        const dx = x - b.basePosition[0]
+        const dz = z - b.basePosition[2]
+        const fp = (b.footprintRadius || Math.max(b.width, b.depth) * 0.5) + 0.7
+        return Math.sqrt(dx * dx + dz * dz) < fp + 1.5
+      })
+      if (tooClose || onStonePath(x, z, 1.0)) continue
       bushArray.push({
         position: [x, 0.4, z],
-        scale,
-        key: `bush-${i}`
+        scale: 0.9 + Math.random() * 0.6,
+        key: `bush-outer-${i}`
       })
     }
+
+    // Inner scattered bushes filling the park interior
+    const innerCount = 16
+    for (let i = 0; i < innerCount; i++) {
+      const angle = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount * 0.7
+      const radius = 8.5 + (Math.random() - 0.5) * 1.5
+      const x = Math.cos(angle) * radius
+      const z = Math.sin(angle) * radius
+      if (onStonePath(x, z, 1.0)) continue
+      bushArray.push({
+        position: [x, 0.4, z],
+        scale: 0.6 + Math.random() * 0.4,
+        key: `bush-inner-${i}`
+      })
+    }
+
     return bushArray
   }, [generatedBuildings])
 
@@ -1026,15 +1147,84 @@ function City({
             accentColor={building.accentColor}
             shape={building.shape}
             isNight={isNight}
+            materialStyle={building.materialStyle}
         />
           )
         )}
       
-      {/* Central plaza */}
-      <mesh position={[0, 0.1, 0]} receiveShadow>
-        <cylinderGeometry args={[12, 12, 0.2, 32]} />
-        <meshStandardMaterial color="#cccccc" />
+      {/* ── City ground ── */}
+      {/* Dark asphalt base — the bare gaps between the green blocks read as roads */}
+      <mesh position={[0, 0.01, 0]} receiveShadow>
+        <cylinderGeometry args={[46, 46, 0.08, 64]} />
+        <meshStandardMaterial color="#2c2a28" roughness={0.95} metalness={0.03} />
       </mesh>
+
+      {/* Thin ring road hugging the park edge — raised above asphalt to avoid z-fighting */}
+      <mesh position={[0, 0.07, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[20.3, 22.0, 72]} />
+        <meshStandardMaterial color="#3e3b38" roughness={0.90} metalness={0.04} />
+      </mesh>
+
+      {/* Grass ground — lush green base for the park */}
+      <mesh position={[0, 0.05, 0]} receiveShadow>
+        <cylinderGeometry args={[20, 20, 0.18, 48]} />
+        <meshStandardMaterial color="#4a8c3f" roughness={0.95} metalness={0.0} />
+      </mesh>
+
+      {/* Stone pathways — 4 radiating, spanning from inner fountain ring to outer walkway ring */}
+      {[0, 1, 2, 3].map((i) => {
+        const angle = (i / 4) * Math.PI * 2
+        // inner ring inner edge ≈ 4.6, outer ring outer edge ≈ 18.3
+        const pathStart = 4.6
+        const pathEnd   = 18.3
+        const pathLen   = pathEnd - pathStart          // 13.7
+        const pathCenterR = (pathStart + pathEnd) / 2  // 11.45
+        return (
+          <mesh key={`path-${i}`}
+            position={[Math.sin(angle) * pathCenterR, 0.17, Math.cos(angle) * pathCenterR]}
+            rotation={[0, angle, 0]} receiveShadow>
+            <boxGeometry args={[1.3, 0.06, pathLen]} />
+            <meshStandardMaterial color="#c8bfb0" roughness={0.88} metalness={0.05} />
+          </mesh>
+        )
+      })}
+
+      {/* Circular path ring — flat disc around fountain, raised above grass */}
+      <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[4.6, 5.85, 64]} />
+        <meshStandardMaterial color="#c8bfb0" roughness={0.85} metalness={0.05} side={2} />
+      </mesh>
+
+      {/* Outer walkway ring at park perimeter — flat disc, raised above grass */}
+      <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <ringGeometry args={[16.8, 18.3, 80]} />
+        <meshStandardMaterial color="#c0b7a4" roughness={0.85} metalness={0.05} side={2} />
+      </mesh>
+
+      {/* Flower beds — two rings, more variety */}
+      {[...Array(48)].map((_, i) => {
+        const isOuter = i >= 24
+        const j = isOuter ? i - 24 : i
+        const total = 24
+        const angle = (j / total) * Math.PI * 2 + (isOuter ? Math.PI / total : 0.08)
+        const r = isOuter
+          ? 14.2 + (j % 3) * 0.7
+          : 12.8 + (j % 3) * 0.6
+        const flowerColors = ['#ff6b8a', '#ffcd3c', '#ff8c42', '#c084fc', '#f472b6', '#86efac', '#ff9fcc', '#a5f3fc']
+        return (
+          <mesh key={`flower-${i}`}
+            position={[Math.sin(angle) * r, 0.14, Math.cos(angle) * r]}
+            receiveShadow>
+            <cylinderGeometry args={[0.30, 0.30, 0.07, 6]} />
+            <meshStandardMaterial
+              color={flowerColors[i % flowerColors.length]}
+              roughness={0.7}
+              emissive={flowerColors[i % flowerColors.length]}
+              emissiveIntensity={0.14}
+            />
+          </mesh>
+        )
+      })}
       
       {/* Fountain */}
         <Fountain />
@@ -1047,12 +1237,14 @@ function City({
         {/* Vegetation */}
         <VegetationRing trees={trees} bushes={bushes} windDirection={windDirection} windSpeed={windSpeed} />
 
-        {/* Light posts */}
+        {/* Light posts — 4 total, one beside each bench end (not blocking the view) */}
         {[
-          [5.2, 0, 5.2],
-          [-5.2, 0, 5.2],
-          [-5.2, 0, -5.2],
-          [5.2, 0, -5.2]
+          // Each post is offset ~1.6 units perpendicular to the bench/fountain line,
+          // placing it at the side of the bench rather than directly in front.
+          [ 7.4, 0,  5.2],   // beside NE bench [6,0,6], shifted toward +x
+          [-5.2, 0,  7.4],   // beside NW bench [-6,0,6], shifted toward +z
+          [-7.4, 0, -5.2],   // beside SW bench [-6,0,-6], shifted toward -x
+          [ 5.2, 0, -7.4],   // beside SE bench [6,0,-6], shifted toward -z
         ].map((pos, index) => (
           <LightPost key={`lightpost-${index}`} position={pos} isNight={isNight} />
         ))}
