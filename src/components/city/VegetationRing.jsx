@@ -2,89 +2,71 @@ import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import PropTypes from 'prop-types'
 
+// Richer, multi-layer tree with rounded canopy tiers
 function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpeed = 0 }) {
   const canopyRef = useRef()
-  
-  // Random Y-axis rotation (0 to 2π) for each tree
   const randomRotation = useMemo(() => Math.random() * Math.PI * 2, [])
-  
-  // Convert wind direction from degrees to radians
+
   const windRadians = (windDirection * Math.PI) / 180
-  // Calculate wind vector (direction the wind is blowing)
   const windX = Math.sin(windRadians)
   const windZ = Math.cos(windRadians)
-  
-  // Wind strength factor (0-1)
-  const windStrength = Math.min(windSpeed / 15, 1) // Normalize to 0-1, max at 15 m/s
-  
+  const windStrength = Math.min(windSpeed / 15, 1)
+
   useFrame((state) => {
     if (!canopyRef.current) return
     const time = state.clock.elapsedTime
-    // S-curve swaying: use sine wave with phase offset for smooth s-curve motion
-    const swayAmount = windStrength * 0.15 // Maximum sway angle in radians
-    const swayFrequency = 0.8 + windStrength * 0.4 // Sway speed based on wind
-    
-    // Create s-curve by using sine with different phases for different parts
-    // Base sway in wind direction
+    const swayAmount = windStrength * 0.15
+    const swayFrequency = 0.8 + windStrength * 0.4
     const baseSway = Math.sin(time * swayFrequency) * swayAmount
-    
-    // Add secondary oscillation for s-curve effect (sine wave with phase offset)
     const sCurvePhase = Math.sin(time * swayFrequency * 1.3 + Math.PI / 4) * swayAmount * 0.6
-    
-    // Combine for smooth s-curve motion
     const totalSway = baseSway + sCurvePhase
-    
-    // Apply rotation in wind direction
     canopyRef.current.rotation.z = totalSway * windX
-    canopyRef.current.rotation.x = -totalSway * windZ // Negative for correct direction
+    canopyRef.current.rotation.x = -totalSway * windZ
   })
-  const trunkWidth = 0.16 * foliageScale
-  const branchHeight = trunkHeight * 0.72
-  const branchLength = trunkHeight * 0.34
-  const branchAngle = Math.PI / 5
-  const leafSize = foliageScale * 0.42
 
-  const leafClusters = useMemo(() => {
-    const clusters = []
-    for (let i = 0; i < 6; i++) {
-      const angle = (i / 6) * Math.PI * 2
-      const radius = 0.35 * leafSize + Math.random() * 0.25 * leafSize
-      clusters.push({
-        position: [
-          Math.cos(angle) * radius,
-          trunkHeight * 0.55 + Math.random() * trunkHeight * 0.45,
-          Math.sin(angle) * radius
-        ],
-        scale: 0.8 + Math.random() * 0.5,
-        colorIdx: i % 3
-      })
-    }
-    clusters.push({
-      position: [0, trunkHeight + leafSize * 0.3, 0],
-      scale: 1.2,
-      colorIdx: 1
-    })
-    return clusters
-  }, [trunkHeight, leafSize])
+  const trunkWidth = 0.18 * foliageScale
+  const r = foliageScale * 0.52   // canopy sphere radius base
+
+  // Four green shades for variety
+  const greens = ['#2d7a2f', '#3a9c3c', '#4db84f', '#56cc58', '#3f8f3d']
+  const g = (i) => greens[i % greens.length]
 
   return (
     <group position={position} rotation={[0, randomRotation, 0]}>
-      {/* Blocky trunk */}
-      <mesh castShadow receiveShadow position={[0, trunkHeight / 2, 0]} scale={[1, 1.1, 1]}>
-        <boxGeometry args={[trunkWidth * 1.2, trunkHeight, trunkWidth * 1.2]} />
-        <meshStandardMaterial color="#9b6a3a" roughness={0.65} metalness={0.08} />
+      {/* Trunk */}
+      <mesh castShadow receiveShadow position={[0, trunkHeight / 2, 0]}>
+        <cylinderGeometry args={[trunkWidth * 0.6, trunkWidth, trunkHeight, 7]} />
+        <meshStandardMaterial color="#7a4f28" roughness={0.85} metalness={0.0} />
       </mesh>
-      <mesh castShadow receiveShadow position={[0, trunkHeight + leafSize * 0.45, 0]}>
-        <boxGeometry args={[leafSize * 2.1, leafSize * 1.25, leafSize * 2.1]} />
-        <meshStandardMaterial color="#417a36" roughness={0.4} metalness={0.05} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[0, trunkHeight + leafSize * 1.05, 0]}>
-        <boxGeometry args={[leafSize * 1.65, leafSize * 1.1, leafSize * 1.65]} />
-        <meshStandardMaterial color="#3a8f3c" roughness={0.35} metalness={0.05} />
-      </mesh>
-      <mesh castShadow receiveShadow position={[0, trunkHeight + leafSize * 1.55, 0]}>
-        <boxGeometry args={[leafSize * 1.25, leafSize * 1.05, leafSize * 1.25]} />
-        <meshStandardMaterial color="#48a24a" roughness={0.32} metalness={0.05} />
+
+      {/* Canopy — 5 overlapping spheres for a full, rounded crown */}
+      <group ref={canopyRef} position={[0, trunkHeight + r * 0.6, 0]}>
+        {/* Main central sphere */}
+        <mesh castShadow position={[0, 0, 0]}>
+          <sphereGeometry args={[r * 1.05, 7, 6]} />
+          <meshStandardMaterial color={g(1)} roughness={0.82} metalness={0.0} />
+        </mesh>
+        {/* Four offset side lobes for a lush, irregular silhouette */}
+        {[0, 1, 2, 3].map((i) => {
+          const a = (i / 4) * Math.PI * 2
+          return (
+            <mesh key={i} castShadow position={[Math.cos(a) * r * 0.55, -r * 0.15, Math.sin(a) * r * 0.55]}>
+              <sphereGeometry args={[r * 0.82, 6, 5]} />
+              <meshStandardMaterial color={g(i)} roughness={0.85} metalness={0.0} />
+            </mesh>
+          )
+        })}
+        {/* Top highlight lobe — slightly lighter */}
+        <mesh castShadow position={[0, r * 0.65, 0]}>
+          <sphereGeometry args={[r * 0.6, 6, 5]} />
+          <meshStandardMaterial color={g(4)} roughness={0.78} metalness={0.0} />
+        </mesh>
+      </group>
+
+      {/* Grass tuft at base */}
+      <mesh receiveShadow position={[0, 0.04, 0]}>
+        <cylinderGeometry args={[trunkWidth * 3.5, trunkWidth * 4, 0.08, 7]} />
+        <meshStandardMaterial color="#3d7a32" roughness={0.95} metalness={0.0} />
       </mesh>
     </group>
   )
@@ -98,41 +80,33 @@ Tree.propTypes = {
   windSpeed: PropTypes.number
 }
 
+// Lush rounded bush — sphere clusters instead of boxes
 function Bush({ position, scale }) {
-  const blockCount = Math.max(4, Math.round(scale * 2.2))
-  const blockIndices = new Array(blockCount).fill(0)
+  const greens = ['#2e7d32', '#388e3c', '#43a047', '#4caf50', '#66bb6a']
+  const lobeCount = Math.max(5, Math.round(scale * 3))
 
   return (
     <group position={position}>
-      {blockIndices.map((_, index) => {
-        const angle = (index / blockCount) * Math.PI * 2
-        const radius = scale * 0.35 + Math.random() * scale * 0.18
-        const x = Math.cos(angle) * radius + (Math.random() - 0.5) * scale * 0.2
-        const z = Math.sin(angle) * radius + (Math.random() - 0.5) * scale * 0.2
-        const y = Math.random() * scale * 0.2
-        const blockScale = 0.45 + Math.random() * 0.25
-        const colors = ['#3f8f3d', '#357b34', '#4aa347']
-
+      {/* Central body */}
+      <mesh castShadow receiveShadow position={[0, scale * 0.32, 0]}>
+        <sphereGeometry args={[scale * 0.38, 7, 6]} />
+        <meshStandardMaterial color={greens[1]} roughness={0.88} metalness={0.0} />
+      </mesh>
+      {/* Outer lobes */}
+      {[...Array(lobeCount)].map((_, i) => {
+        const a = (i / lobeCount) * Math.PI * 2
+        const r = scale * 0.28 + (i % 2) * scale * 0.06
         return (
-          <mesh
-            key={`bush-block-${index}`}
-            position={[x, y, z]}
-            castShadow
-            receiveShadow
-            scale={[blockScale, blockScale, blockScale]}
-          >
-            <boxGeometry args={[scale * 0.7, scale * 0.7, scale * 0.7]} />
-            <meshStandardMaterial
-              color={colors[index % colors.length]}
-              roughness={0.55}
-              metalness={0.05}
-            />
+          <mesh key={i} castShadow position={[Math.cos(a) * r, scale * 0.22, Math.sin(a) * r]}>
+            <sphereGeometry args={[scale * 0.26, 6, 5]} />
+            <meshStandardMaterial color={greens[i % greens.length]} roughness={0.9} metalness={0.0} />
           </mesh>
         )
       })}
-      <mesh position={[0, scale * 0.15, 0]} castShadow receiveShadow>
-        <boxGeometry args={[scale * 0.9, scale * 0.4, scale * 0.9]} />
-        <meshStandardMaterial color="#4aa347" roughness={0.5} metalness={0.05} />
+      {/* Ground disc */}
+      <mesh receiveShadow position={[0, 0.03, 0]}>
+        <cylinderGeometry args={[scale * 0.55, scale * 0.55, 0.06, 7]} />
+        <meshStandardMaterial color="#3d7a32" roughness={0.95} metalness={0.0} />
       </mesh>
     </group>
   )
@@ -184,4 +158,3 @@ VegetationRing.propTypes = {
 }
 
 export default VegetationRing
-
