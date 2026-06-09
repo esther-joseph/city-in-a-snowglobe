@@ -359,6 +359,7 @@ const cityProfiles = {
     accentPalette: ['#d9e1f2', '#b8c4d7', '#93a4c0'],
     centralClearance: 3,
     shapeOptions: ['box', 'box', 'tapered', 'spire'],
+    materialStyle: { metalness: 0.45, roughness: 0.25, glassChance: 0.40 },
     maxCityRadius: 48,
     bridges: [
       {
@@ -411,6 +412,7 @@ const cityProfiles = {
     accentPalette: ['#e0e5ec', '#cfd8df'],
     centralClearance: 3,
     shapeOptions: ['box', 'tapered', 'cylinder', 'box'],
+    materialStyle: { metalness: 0.15, roughness: 0.75, glassChance: 0.20 },
     maxCityRadius: 48,
     bridges: [
       {
@@ -463,6 +465,7 @@ const cityProfiles = {
     accentPalette: ['#f2e6cf', '#e4d2ad'],
     centralClearance: 3,
     shapeOptions: ['box', 'box', 'tapered'],
+    materialStyle: { metalness: 0.08, roughness: 0.82, glassChance: 0.10 },
     maxCityRadius: 46,
     bridges: [
       {
@@ -514,6 +517,7 @@ const cityProfiles = {
     accentPalette: ['#f0f5fa', '#d5e0ee', '#c0cee2'],
     centralClearance: 3,
     shapeOptions: ['box', 'box', 'tapered', 'spire', 'cylinder'],
+    materialStyle: { metalness: 0.55, roughness: 0.18, glassChance: 0.50 },
     maxCityRadius: 48,
     bridges: [
       {
@@ -566,6 +570,7 @@ const cityProfiles = {
     accentPalette: ['#f5faff', '#e0ecf5', '#b7d4f2'],
     centralClearance: 3,
     shapeOptions: ['spire', 'tapered', 'box', 'spire', 'cylinder'],
+    materialStyle: { metalness: 0.70, roughness: 0.08, glassChance: 0.65 },
     maxCityRadius: 49,
     bridges: [
       {
@@ -622,7 +627,8 @@ const defaultCityProfile = {
   shapeOptions: ['box', 'box', 'tapered', 'cylinder'],
   landmarks: [],
   bridges: [],
-  maxCityRadius: 45
+  maxCityRadius: 45,
+  materialStyle: { metalness: 0.20, roughness: 0.60, glassChance: 0.25 }
 }
 
 function normalizeCityName(name) {
@@ -1042,6 +1048,7 @@ function App() {
           colorSky={auraGradient[0]}
           colorAura={auraGradient[1]}
           colorGround={auraGradient[2]}
+          isNight={celestialData.isNight}
         />
       )}
       <ambientLight
@@ -1081,6 +1088,7 @@ function App() {
         windSpeed={weatherData?.wind?.speed || 0}
         weatherType={weatherType}
         glassTint={glassTint}
+
       />
     </>
   )
@@ -1242,9 +1250,24 @@ function App() {
             <Suspense fallback={null}>
               <XR referenceSpace={/iPhone|iPad|iPod/i.test(navigator.userAgent) ? "local" : "local-floor"}>
                 <Controllers />
-                <group position={[0, 0, 0]}>
-                  <ShakeableScene includeSky={false} />
-                </group>
+                {/* XR origin — spawn the user a few feet back from the fountain, standing in
+                    the central park looking toward the city centre. The whole scene is shifted
+                    down so the park ground meets the user's floor, and pushed forward (−Z) so
+                    the fountain sits ~1.4 m (a few feet) directly ahead.
+                    iOS 'local' reference space origins at head height (~1.6 m); Android
+                    'local-floor' origins at the floor — so the vertical drop differs.
+                    Tweak XR_VIEW_DISTANCE / the Y offsets to taste. */}
+                {(() => {
+                  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+                  const XR_VIEW_DISTANCE = 1.4   // metres in front of the user (~4.5 ft)
+                  // Park ground sits a touch above the scene origin; drop it to the floor.
+                  const XR_FLOOR_DROP = isIOS ? -1.73 : -0.23
+                  return (
+                    <group position={[0, XR_FLOOR_DROP, -XR_VIEW_DISTANCE]}>
+                      <ShakeableScene includeSky={false} />
+                    </group>
+                  )
+                })()}
               </XR>
             </Suspense>
       </Canvas>
