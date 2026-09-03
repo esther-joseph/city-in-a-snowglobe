@@ -10,13 +10,35 @@
  * Follows CRUD principles:
  * - Read: getCurrentWeather, getForecast
  */
+const SERVICE_UNAVAILABLE = 'Weather service is unavailable right now. Please try again later.'
+
 class WeatherService {
-  constructor(apiKey) {
-    if (!apiKey) {
-      throw new Error('API key is required for WeatherService')
-    }
-    this.apiKey = apiKey
-    this.baseUrl = 'https://api.openweathermap.org/data/2.5'
+  /**
+   * @param {string} [baseUrl] - Origin that serves /api/openweather. Empty
+   *   means "same origin", which is what the web build uses. The Android build
+   *   passes the deployed site because its own origin is the local webview.
+   */
+  constructor(baseUrl = '') {
+    this.endpoint = `${String(baseUrl).replace(/\/$/, '')}/api/openweather`
+  }
+
+  /**
+   * Build a proxy URL. The API key lives on the server, so nothing secret is
+   * ever part of these requests.
+   * @param {string} path - Allow-listed upstream path, e.g. 'data/2.5/weather'
+   * @param {Object} params - Query parameters to forward
+   * @returns {string} Absolute request URL
+   */
+  buildUrl(path, params = {}) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://localhost'
+    const url = new URL(this.endpoint, origin)
+    url.searchParams.set('path', path)
+    Object.entries(params).forEach(([name, value]) => {
+      if (value !== undefined && value !== null) {
+        url.searchParams.set(name, String(value))
+      }
+    })
+    return url.toString()
   }
 
   /**
@@ -29,14 +51,14 @@ class WeatherService {
       throw new Error('City name must be a non-empty string')
     }
 
-    const url = `${this.baseUrl}/weather?q=${encodeURIComponent(cityName)}&appid=${this.apiKey}&units=imperial`
+    const url = this.buildUrl('data/2.5/weather', { q: cityName, units: 'imperial' })
     
     try {
       const response = await fetch(url)
       
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid API key. Please check your OPENWEATHER_API_KEY.')
+        if (response.status === 401 || response.status === 500) {
+          throw new Error(SERVICE_UNAVAILABLE)
         }
         if (response.status === 404) {
           throw new Error(`City "${cityName}" not found. Please check the spelling.`)
@@ -46,7 +68,7 @@ class WeatherService {
       
       return await response.json()
     } catch (error) {
-      if (error.message.includes('Invalid API key') || error.message.includes('not found')) {
+      if (error.message === SERVICE_UNAVAILABLE || error.message.includes('not found')) {
         throw error
       }
       throw new Error(`Network error: ${error.message}`)
@@ -65,14 +87,14 @@ class WeatherService {
       throw new Error('Latitude and longitude must be numbers')
     }
 
-    const url = `${this.baseUrl}/forecast?lat=${lat}&lon=${lon}&units=imperial&appid=${this.apiKey}`
+    const url = this.buildUrl('data/2.5/forecast', { lat, lon, units: 'imperial' })
     
     try {
       const response = await fetch(url)
       
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid API key. Please check your OPENWEATHER_API_KEY.')
+        if (response.status === 401 || response.status === 500) {
+          throw new Error(SERVICE_UNAVAILABLE)
         }
         throw new Error(`Failed to fetch forecast data: ${response.statusText}`)
       }
@@ -146,7 +168,7 @@ class WeatherService {
         weekly: weeklyData
       }
     } catch (error) {
-      if (error.message.includes('Invalid API key')) {
+      if (error.message === SERVICE_UNAVAILABLE) {
         throw error
       }
       // Return null for forecast if it fails, but don't break the app
@@ -166,14 +188,14 @@ class WeatherService {
       return []
     }
 
-    const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=${limit}&appid=${this.apiKey}`
+    const url = this.buildUrl('geo/1.0/direct', { q: query, limit })
     
     try {
       const response = await fetch(url)
       
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid API key. Please check your OPENWEATHER_API_KEY.')
+        if (response.status === 401 || response.status === 500) {
+          throw new Error(SERVICE_UNAVAILABLE)
         }
         return []
       }
@@ -197,7 +219,7 @@ class WeatherService {
       return null
     }
 
-    const url = `${this.baseUrl}/uvi?lat=${lat}&lon=${lon}&appid=${this.apiKey}`
+    const url = this.buildUrl('data/2.5/uvi', { lat, lon })
     
     try {
       const response = await fetch(url)
