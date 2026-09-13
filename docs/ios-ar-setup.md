@@ -1,173 +1,92 @@
-# iOS AR Mode Setup Guide
+# AR on Apple platforms
 
-Complete guide for ensuring AR mode works on iOS devices.
+## What Safari actually supports
 
-## Prerequisites
+| Platform | `immersive-ar` WebXR session | What the app does |
+| --- | --- | --- |
+| iPhone / iPad (any iOS version) | **No** | USDZ export → AR Quick Look, or the camera fallback |
+| Safari on visionOS | **Yes** (default from visionOS 2; flag in 1.x) | Same WebXR path as Android |
+| Android Chrome (ARCore) | Yes | WebXR |
+| Android XR headsets | Yes | WebXR |
+| Capacitor WKWebView (iOS app) | **No** | Quick Look or camera fallback |
 
-### iOS Version Requirements
-- **iOS 17+** for WebXR support in Safari
-- iOS 11+ for ARKit (native AR, requires Capacitor plugin)
+Earlier revisions of this document claimed iOS 17+ Safari supports WebXR. It
+does not, and never has. Apple shipped the WebXR Device API on visionOS only;
+the feature flags in iOS Safari's advanced settings do not produce a working
+`immersive-ar` session. `navigator.xr.isSessionSupported('immersive-ar')`
+resolves false on iPhone and iPad, which is why the app stopped asking about
+iOS versions and now asks the device what it can do.
 
-### Device Requirements
-- iPhone 6s or later
-- iPad (2017) or later
-- iPad Pro (all models)
+## The three paths
 
-### Browser Requirements
-- **Safari** (iOS 17+): Full WebXR support
-- **Chrome/Firefox on iOS**: Limited WebXR support (uses Safari WebKit under the hood)
+`src/utils/arSupport.js` resolves one of four modes, capability-first:
 
-## Current Implementation
+- **`webxr`** — an immersive session through `@react-three/xr`. ARCore phones,
+  Android XR headsets, and Safari on visionOS all land here.
+- **`quicklook`** — iPhone and iPad. `src/utils/usdzExport.js` converts the
+  globe to USDZ and hands it to Apple's AR Quick Look, which does real plane
+  detection and placement. The app itself stays in 3D mode.
+- **`camera`** — rear camera feed plus device orientation. No world tracking:
+  the globe follows the device rather than staying on a surface.
+- **`none`** — desktops. The AR button is disabled with an explanation.
 
-The app uses **WebXR** via `@react-three/xr` for AR mode. This works on:
-- ✅ iOS 17+ (Safari)
-- ✅ Android (Chrome/Firefox)
-- ⚠️ iOS 16 and earlier: Limited/no support (would need native ARKit plugin)
+## USDZ export limits
 
-## Automatic Detection
+USDZ stores its payload uncompressed, so every vertex costs roughly a hundred
+bytes of ASCII in the archive. The full city is ~220k vertices across ~3,700
+meshes, which exports at about 30 MB — too heavy for Quick Look on a phone.
 
-The app now includes automatic AR capability detection (`src/utils/arSupport.js`):
+The exporter therefore:
 
-1. **Detects iOS devices**
-2. **Checks iOS version**
-3. **Checks WebXR availability**
-4. **Requests camera permission**
-5. **Falls back gracefully** if AR is not supported
+- ranks meshes by world-space volume and keeps the largest until a 60k vertex
+  budget is spent, which preserves the dome, base and towers while dropping
+  window trim and small props;
+- merges the survivors by material appearance rather than material identity
+  (the city gives almost every mesh its own material instance);
+- keeps only position and normal attributes, since no material samples a
+  texture;
+- approximates custom shaders — including the fresnel glass dome — with
+  `MeshStandardMaterial`, and drops particle systems and Troika text outright,
+  because USD has no equivalent for any of them.
 
-## Configuration Files
+Result: roughly 5-6 MB and under half a second to build on a modern phone.
+The exported globe is recognisably the same object, minus falling snow and the
+engraved city name.
 
-### 1. index.html
-Added iOS-specific meta tags:
-- `viewport-fit=cover` - Ensures fullscreen on devices with notches
-- `apple-mobile-web-app-capable` - Allows fullscreen mode
-- `apple-mobile-web-app-status-bar-style` - Transparent status bar
+## visionOS
 
-### 2. capacitor.config.js
-Added iOS configuration:
-```javascript
-ios: {
-  permissions: {
-    camera: 'AR mode requires access to the camera...'
-  }
-}
+The WebXR path should work as-is in Safari on visionOS, but two things differ
+from Android and want testing on a real device:
+
+- **No DOM overlay.** `dom-overlay` is an ARCore extension; headset browsers do
+  not composite HTML into an immersive session. Without in-scene UI the session
+  has no controls at all, which is why `src/components/ar/ARSceneControls.jsx`
+  renders Shake and Exit as 3D objects inside the scene.
+- **Gaze and pinch, not taps.** visionOS reports a `transient-pointer` input
+  source. `@react-three/xr` v6 models it, but the interaction wiring has not
+  been verified on hardware.
+
+There is no visionOS simulator on the current build machine; testing needs the
+visionOS platform installed in Xcode, or a device.
+
+## Shipping to iOS
+
+The iOS Capacitor platform has not been added yet:
+
+```bash
+npx cap add ios
+npm run build && npx cap sync ios
+npx cap open ios
 ```
 
-### 3. App.jsx
-Enhanced AR mode detection:
-- Checks for iOS and adjusts reference space (`local` for iOS, `local-floor` for Android)
-- Requests camera permission before starting AR session
-- Shows user-friendly error messages
+Distribution needs an Apple Developer account. Note that the Capacitor build
+gets no WebXR even on visionOS — a "Designed for iPad" app runs as a flat
+window. The headset path is the deployed web app opened in Safari.
 
-### 4. src/utils/arSupport.js (NEW)
-Utility functions for AR capability detection:
-- `isIOS()` - Check if device is iOS
-- `getIOSVersion()` - Get iOS version number
-- `isWebXRARSupported()` - Check WebXR AR support
-- `getARCapability()` - Comprehensive capability check
-- `requestCameraPermission()` - Request camera permission
+## Requirements recap
 
-## Testing on iOS
-
-### Testing Steps
-
-1. **Deploy to iOS device** (not simulator - AR requires real camera)
-   ```bash
-   npm run build
-   npx cap sync ios
-   npx cap open ios
-   ```
-
-2. **Build and install** via Xcode to physical device
-
-3. **Grant camera permission** when prompted
-
-4. **Test AR mode:**
-   - Open app
-   - Tap "Open Weather Info"
-   - Switch to AR mode
-   - Point device at a flat surface
-   - Snow globe should appear in AR space
-
-### Troubleshooting
-
-#### "AR mode requires iOS 17 or later"
-- **Cause**: Device running iOS 16 or earlier
-- **Solution**: Update device to iOS 17+ OR implement native ARKit plugin
-
-#### "Camera permission denied"
-- **Cause**: User denied camera permission
-- **Solution**: 
-  1. Go to Settings > [App Name] > Camera
-  2. Enable camera permission
-  3. Restart app
-
-#### "AR not supported on this device"
-- **Cause**: WebXR not available or device too old
-- **Solution**: Check iOS version (must be 17+ for WebXR)
-- **Fallback**: Use 3D mode
-
-#### AR session fails to start
-- **Cause**: Multiple possible issues
-- **Solutions**:
-  1. Ensure device is running iOS 17+
-  2. Try in Safari (not Chrome/Firefox)
-  3. Ensure camera permission is granted
-  4. Ensure device has sufficient lighting
-  5. Try in a well-lit, open area
-
-## Native ARKit Plugin (Optional)
-
-If you need AR support on iOS 16 and earlier, you would need to implement a native ARKit plugin. This is beyond the current WebXR implementation.
-
-### Steps for Native Plugin:
-1. Create Capacitor plugin in `ios/App/Plugin/ARBridge.swift`
-2. Add ARKit.framework to Xcode project
-3. Expose ARKit session to JavaScript
-4. Update App.jsx to use native plugin when WebXR unavailable
-
-**Note**: This is not currently implemented. The current implementation focuses on WebXR for iOS 17+.
-
-## Reference Space Differences
-
-- **iOS**: Uses `local` reference space (better compatibility)
-- **Android**: Uses `local-floor` reference space (includes floor tracking)
-
-The app automatically selects the appropriate reference space based on device detection.
-
-## Permissions
-
-### Required Permissions
-
-**Info.plist** (auto-generated by Capacitor, but can be customized):
-```xml
-<key>NSCameraUsageDescription</key>
-<string>AR mode requires access to the camera to display and track the snow globe in your space.</string>
-```
-
-This is configured in `capacitor.config.js` under `ios.permissions.camera`.
-
-## Performance Considerations
-
-- **iOS AR mode**: Disabled shadows, reduced particle count
-- **Pixel ratio**: Limited to 1.2 for performance
-- **Antialiasing**: Disabled for AR mode
-- **Background**: Transparent (required for AR)
-
-## Accessibility
-
-- AR mode automatically falls back to 3D mode if not supported
-- Clear error messages guide users
-- Camera permission is requested before AR session starts
-
-## Future Improvements
-
-1. **Native ARKit Plugin**: Support iOS 16 and earlier
-2. **Hit Testing**: Improve surface detection
-3. **Lighting Estimation**: Adjust scene lighting based on real-world lighting
-4. **Occlusion**: Hide virtual objects behind real objects
-
----
-
-**Last Updated**: 2024
-**Tested On**: iOS 17.0+ (Safari)
-
+- **Camera permission** for the fallback path (`NSCameraUsageDescription` is
+  already set in `capacitor.config.json`).
+- **Motion permission** — iOS 13+ gates `deviceorientation` behind a prompt
+  that must follow a user gesture; `requestOrientationPermission()` handles it.
+- **A physical device.** Neither AR path works in the iOS Simulator.
