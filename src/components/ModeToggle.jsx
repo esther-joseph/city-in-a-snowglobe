@@ -18,6 +18,9 @@ const VIEW_OPTIONS = [
 function ModeToggle({ mode = '3d', onChange }) {
   const [arSupported, setArSupported] = useState(true)
   const [arMessage, setArMessage] = useState(null)
+  // What AR looks like here differs by device: a walk-around session, Apple's
+  // Quick Look viewer, or the camera fallback. The button says which.
+  const [arLabel, setArLabel] = useState(null)
 
   useEffect(() => {
     // Check AR support
@@ -25,6 +28,7 @@ function ModeToggle({ mode = '3d', onChange }) {
       getARCapability().then((capability) => {
         setArSupported(capability.supported)
         setArMessage(capability.message)
+        setArLabel(capability.label)
       }).catch(() => {
         setArSupported(true) // Assume supported if check fails
       })
@@ -65,7 +69,9 @@ function ModeToggle({ mode = '3d', onChange }) {
               onClick={() => handleModeChange(option.id)}
             >
               <span className="mode-toggle__label">{option.label}</span>
-              <span className="mode-toggle__description">{option.description}</span>
+              <span className="mode-toggle__description">
+                {option.id === 'ar' && arLabel ? arLabel : option.description}
+              </span>
               {isARDisabled && (
                 <span className="mode-toggle__unsupported">(Not available on this device)</span>
               )}
@@ -74,9 +80,9 @@ function ModeToggle({ mode = '3d', onChange }) {
         })}
       </div>
       <footer className="mode-toggle__footnote">
-        {arSupported 
-          ? 'AR mode requires camera permission and works best in a well-lit, open area.'
-          : 'AR mode is not supported on this device. Please use 3D mode.'}
+        {arSupported
+          ? arMessage || 'AR mode requires camera permission and works best in a well-lit, open area.'
+          : arMessage || 'AR mode is not supported on this device. Please use 3D mode.'}
       </footer>
     </section>
   )
