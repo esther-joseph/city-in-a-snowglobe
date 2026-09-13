@@ -668,19 +668,14 @@ function App() {
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
   // Initialize weather service (Dependency Inversion Principle)
-  // Single Responsibility: WeatherService handles all API operations
-  const weatherService = useMemo(() => {
-    const apiKey = import.meta.env.OPENWEATHER_API_KEY
-    if (!apiKey) {
-      return null
-    }
-    try {
-      return new WeatherService(apiKey)
-    } catch (error) {
-      console.error('Failed to initialize weather service:', error)
-      return null
-    }
-  }, [])
+  // Single Responsibility: WeatherService handles all API operations.
+  // Requests go through the /api/openweather proxy, which holds the API key
+  // server-side. The web build talks to its own origin; the native build needs
+  // VITE_WEATHER_API_BASE_URL because its origin is the local webview.
+  const weatherService = useMemo(
+    () => new WeatherService(import.meta.env.VITE_WEATHER_API_BASE_URL || ''),
+    []
+  )
 
   const projectToGlobe = (sourcePosition, desiredActualRadius) => {
     if (
@@ -708,12 +703,6 @@ function App() {
    * - Dependency Inversion: Depends on WeatherService abstraction
    */
   const fetchWeather = async (cityName) => {
-    if (!weatherService) {
-      setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
-      setLoading(false)
-      return
-    }
-
     try {
       setLoading(true)
       setError(null)
@@ -761,12 +750,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (weatherService) {
-      fetchWeather(city)
-    } else {
-      setError('OPENWEATHER_API_KEY environment variable is not set. Please configure it in Vercel.')
-      setLoading(false)
-    }
+    fetchWeather(city)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weatherService])
 

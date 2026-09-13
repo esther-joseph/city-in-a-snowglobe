@@ -56,3 +56,6 @@ upload_certificate.pem
 .env.local
 .env.production
 
+
+# Intermediate renders for the Play Store artwork
+assets/play-store/_work/
