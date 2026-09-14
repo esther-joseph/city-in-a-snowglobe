@@ -13,6 +13,7 @@ import StarField from './components/environment/StarField'
 import LiquidChromeBackground from './components/environment/LiquidChromeBackground'
 // import AuraSky from './components/environment/AuraSky'
 import WeatherService from './services/WeatherService'
+import { getSeason } from './utils/seasons'
 import './App.css'
 
 // Single WebXR store for the whole app (xr v6 API). Created once at module
@@ -21,6 +22,8 @@ import './App.css'
 // so the session still starts on devices that lack some of them — which is
 // what makes it work on both ARCore (Android) and ARKit (iOS 17+ Safari).
 const xrStore = createXRStore()
+
+const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn']
 
 function hexToRgb(hex) {
   if (!hex) return { r: 255, g: 255, b: 255 }
@@ -871,6 +874,15 @@ function App() {
     [weatherData, city]
   )
 
+  // Season comes from the city's own local date and hemisphere, so a July
+  // Sydney is in winter while a July Oslo is in summer. ?season=spring (and
+  // the other three) forces a season for demos and screenshots.
+  const season = useMemo(() => {
+    const override = new URLSearchParams(window.location.search).get('season')
+    if (override && SEASON_NAMES.includes(override)) return override
+    return getSeason(weatherData)
+  }, [weatherData])
+
   const celestialData = useMemo(
     () =>
       computeCelestialData(
@@ -1067,6 +1079,7 @@ function App() {
         windSpeed={weatherData?.wind?.speed || 0}
         weatherType={weatherType}
         glassTint={glassTint}
+        season={season}
 
       />
     </>
