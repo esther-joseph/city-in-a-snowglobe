@@ -1,146 +1,73 @@
 # E2E Testing with Playwright
 
-This directory contains end-to-end (E2E) tests for the 3D Weather City application using Playwright.
+End-to-end tests for City In A Snowglobe.
 
-## Test Structure
+## Structure
 
 ```
-tests/
-└── e2e/
-    ├── smoke.spec.js           # Basic smoke tests
-    ├── search.spec.js          # Search functionality tests
-    ├── ui-components.spec.js    # UI component tests
-    ├── mobile-responsive.spec.js # Mobile responsiveness tests
-    ├── accessibility.spec.js   # Accessibility tests
-    └── performance.spec.js     # Performance tests
+tests/e2e/
+├── smoke.spec.js              # Loading, initial weather, basic navigation
+├── search.spec.js             # Search input, autocomplete, clear, submit
+├── ui-components.spec.js      # Drawer, view modes, charts, mode toggle
+├── mobile-responsive.spec.js  # Pixel 5 profile
+├── tablet-responsive.spec.js  # Galaxy Tab S4 profile
+├── accessibility.spec.js      # Headings, labels, keyboard, ARIA
+├── performance.spec.js        # Load time, interaction, canvas
+└── support/
+    ├── app.js                 # gotoApp / openDrawer and shared locators
+    └── weatherFixture.js      # Canned /api/openweather responses
 ```
 
-## Running Tests
+## Running
 
-### Run all tests
 ```bash
-npm run test:e2e
+npx playwright install chromium   # once
+npm test                          # whole suite
+npm run test:ui                   # interactive runner
+npm run test:report               # last HTML report
+npm test -- tests/e2e/smoke.spec.js
+npm test -- --project="Mobile Chrome"
 ```
 
-### Run tests with UI mode (interactive)
+The dev server starts automatically (`webServer` in `playwright.config.js`) and
+an already-running one on port 3000 is reused.
+
+## How the suite is set up
+
+**Always start through `gotoApp(page)`.** It does two things a plain
+`page.goto('/')` cannot:
+
+- Seeds `sessionStorage['app-has-reloaded']` before navigation. The app reloads
+  itself once per session on first launch, and anything clicked before that
+  lands dies with "Target page, context or browser has been closed".
+- Stubs `/api/openweather` from `support/weatherFixture.js`, so runs are
+  deterministic, spend no OpenWeather quota, and can assert autocomplete
+  results instead of skipping when the network is slow.
+
+**The suite runs serially** with a 90s per-test budget and a 15s expect
+timeout. Every test renders a full WebGL scene; parallel contexts starve each
+other, and mobile emulation renders the scene on the CPU. A full run takes
+about six minutes — that is expected, not a hang.
+
+**Projects**: `chromium` and `Mobile Chrome`. Firefox, WebKit and the iPhone 12
+profile are commented out in the config because they need browsers that
+`npx playwright install chromium` does not fetch. To enable them:
+
 ```bash
-npm run test:e2e:ui
+npx playwright install firefox webkit
 ```
 
-### Run tests in headed mode (see browser)
-```bash
-npm run test:e2e:headed
-```
+then uncomment the matching project blocks.
 
-### Debug tests
-```bash
-npm run test:e2e:debug
-```
+## Writing new tests
 
-### View test report
-```bash
-npm run test:e2e:report
-```
-
-## Test Coverage
-
-### Smoke Tests (`smoke.spec.js`)
-- Application loading
-- Initial weather data display
-- Basic navigation
-
-### Search Tests (`search.spec.js`)
-- Search input functionality
-- Autocomplete suggestions
-- Clear button
-- Form submission
-- Search with autocomplete selection
-
-### UI Component Tests (`ui-components.spec.js`)
-- Weather drawer toggle
-- View mode switching (Minimal, Compact, Informational)
-- Time slider
-- Mode toggle (3D/AR)
-- Component visibility and styling
-
-### Mobile Responsiveness Tests (`mobile-responsive.spec.js`)
-- Mobile viewport rendering
-- Touch-friendly button sizes
-- Drawer accessibility on mobile
-- Search button positioning
-- Tablet viewport support
-
-### Accessibility Tests (`accessibility.spec.js`)
-- Heading hierarchy
-- Button labels and ARIA attributes
-- Keyboard navigation
-- Color contrast
-- Focus management
-
-### Performance Tests (`performance.spec.js`)
-- Load time
-- Time to Interactive
-- Rapid user interactions
-- Memory leak detection
-- Canvas rendering efficiency
-
-## Configuration
-
-Tests are configured in `playwright.config.js` at the root of the project. The configuration includes:
-
-- **Browsers**: Chromium, Firefox, WebKit
-- **Mobile devices**: iPhone 12, Pixel 5
-- **Base URL**: `http://localhost:3000`
-- **Auto-start dev server**: Tests automatically start the dev server
-- **Retries**: 2 retries on CI, 0 locally
-- **Screenshots**: On failure
-- **Videos**: Retained on failure
-- **Traces**: On first retry
-
-## Writing New Tests
-
-1. Create a new test file in `tests/e2e/`
-2. Import Playwright test utilities:
-   ```javascript
-   import { test, expect } from '@playwright/test'
-   ```
-3. Use `test.describe()` to group related tests
-4. Use `test.beforeEach()` for setup
-5. Use `await page.goto('/')` to navigate
-6. Use Playwright's auto-waiting features (no manual timeouts needed when possible)
-
-## Best Practices
-
-- Use semantic selectors (getByRole, getByText, getByPlaceholder)
-- Avoid hard-coded timeouts when possible (use Playwright's auto-waiting)
-- Test user interactions, not implementation details
-- Keep tests independent and isolated
-- Use descriptive test names
-- Group related tests in describe blocks
-
-## CI/CD Integration
-
-The tests are configured to run in CI environments:
-- Retries: 2 attempts on failure
-- Workers: 1 (sequential execution)
-- Trace collection: Enabled for debugging
-
-## Troubleshooting
-
-### Tests fail with "Navigation timeout"
-- Ensure the dev server is running on port 3000
-- Check that `OPENWEATHER_API_KEY` is set (tests may need mock data)
-
-### Tests fail with "Element not visible"
-- Increase timeout if needed: `await expect(element).toBeVisible({ timeout: 10000 })`
-- Check if element is in a drawer that needs to be opened first
-
-### Browser not found
-- Run `npx playwright install` to install browsers
-
-## Resources
-
-- [Playwright Documentation](https://playwright.dev/)
-- [Playwright Best Practices](https://playwright.dev/docs/best-practices)
-- [Playwright API Reference](https://playwright.dev/docs/api/class-test)
-
+- Use the locators exported from `support/app.js` rather than re-deriving them.
+  `getByRole('button', { name: /search/i })` matches the "Clear search" button
+  too, which is why `searchButton` targets `.search-button`.
+- Avoid comma selectors in assertions unless you add `.first()`; several
+  components render both a wrapper and an inner element with related class
+  names, and strict mode fails on the ambiguity.
+- Prefer waiting on a condition over `waitForTimeout`. The autocomplete has a
+  300ms debounce, so `expect(suggestions).toBeVisible()` is enough.
+- Add fixture data to `support/weatherFixture.js` rather than hitting the live
+  API.
