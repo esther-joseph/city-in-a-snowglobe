@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import './WeatherUI.css'
 import SunPositionDiagram from './SunPositionDiagram'
+import WeeklyForecast from './WeeklyForecast'
 import MeteoconIcon from './MeteoconIcon'
 
 // Legacy function for backward compatibility - now returns icon name for MeteoconIcon
@@ -824,6 +825,21 @@ function WeatherUI({
                 </div>
               </div>
 
+              {viewMode === 'informational' && hourlyTrend && (
+                <div className="temperature-card">
+                  <div className="temperature-card-header">
+                    <h3>12-Hour Temperature</h3>
+                    <span>
+                      {`${Math.round(hourlyTrend.min)}°F / ${Math.round(hourlyTrend.max)}°F`}
+                    </span>
+                  </div>
+                  <TemperatureTrend data={hourlyTrend} />
+                </div>
+              )}
+
+              {(viewMode === 'informational' || viewMode === 'compact') && weeklyForecast?.length > 0 && (
+                <WeeklyForecast days={weeklyForecast} isNight={celestialData?.isNight} />
+              )}
               {viewMode === 'informational' && (
                 <div className="time-card">
                   <div className="time-card-header">
@@ -872,18 +888,6 @@ function WeatherUI({
           </div>
         </div>
       )}
-
-              {viewMode === 'informational' && hourlyTrend && (
-                <div className="temperature-card">
-                  <div className="temperature-card-header">
-                    <h3>12-Hour Temperature</h3>
-                    <span>
-                      {`${Math.round(hourlyTrend.min)}°F / ${Math.round(hourlyTrend.max)}°F`}
-                    </span>
-                  </div>
-                  <TemperatureTrend data={hourlyTrend} />
-                </div>
-              )}
 
             </>
           )

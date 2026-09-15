@@ -1,8 +1,12 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react'
-import { useFrame, useLoader } from '@react-three/fiber'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
+import { buildHeightField } from '../utils/surfaceHeightField'
+import { USDZ_ROOT_NAME } from '../utils/usdzExport'
+
+const DOWN_VECTOR = new THREE.Vector3(0, -1, 0)
 
 function RainParticles({ performanceScale = 1 }) {
   const instancedMeshRef = useRef()
@@ -176,64 +180,203 @@ function RainParticles({ performanceScale = 1 }) {
   )
 }
 
+/**
+ * Falling snow that settles on whatever is beneath it.
+ *
+ * Two point clouds: flakes in flight, and snow already lying on a surface.
+ * When a falling flake reaches the surface height for its column — roof,
+ * canopy, bush or grass — its position is copied into the settled cloud and
+ * the flake recycles to the top. The settled cloud is a ring buffer, so the
+ * blanket builds up, holds, and slowly refreshes instead of growing forever.
+ *
+ * Surface heights come from a grid sampled once (utils/surfaceHeightField),
+ * because raycasting thousands of flakes every frame is not affordable. The
+ * grid is nearest-neighbour, so beside a tall building it can report the roof
+ * height for a column that is actually open air; a short confirming raycast at
+ * the moment of landing (budgeted per frame) keeps snow off thin air.
+ */
+const MAX_LANDING_RAYS_PER_FRAME = 8
+const LANDING_RAY_REACH = 12
+
 function SnowParticles({ performanceScale = 1 }) {
   const points = useRef()
+  const settledPoints = useRef()
+  const scene = useThree((state) => state.scene)
   const count = Math.max(900, Math.round(2600 * performanceScale))
+  const settledCapacity = Math.max(600, Math.round(1600 * performanceScale))
+  const heightField = useRef(null)
+  const surfaceTarget = useRef(null)
+  const landingRay = useMemo(() => new THREE.Raycaster(), [])
+  const rayOrigin = useMemo(() => new THREE.Vector3(), [])
+  const rayHit = useMemo(() => new THREE.Vector3(), [])
 
   const particles = useMemo(() => {
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count)
     const horizontalSpan = 80
     const verticalSpan = 45
-    
+
     for (let i = 0; i < count; i++) {
       positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
       positions[i * 3 + 1] = Math.random() * verticalSpan + 5
       positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
       velocities[i] = Math.random() * 0.18 + 0.06
     }
-    
+
     return { positions, velocities, horizontalSpan, verticalSpan }
-  }, [])
+  }, [count])
+
+  const settled = useMemo(() => {
+    const positions = new Float32Array(settledCapacity * 3)
+    // Park unused slots far below the globe: until a flake lands in one, an
+    // untouched slot would otherwise sit at the origin, right on the fountain.
+    for (let i = 0; i < settledCapacity; i += 1) positions[i * 3 + 1] = -9999
+    return { positions, next: 0, filled: 0 }
+  }, [settledCapacity])
+
+  // Nothing has landed yet, so draw nothing.
+  const attachSettled = (node) => {
+    settledPoints.current = node
+    node?.geometry.setDrawRange(0, 0)
+  }
+
+  // Sample the city once the scene has settled. The city group is named for the
+  // USDZ exporter; falling back to the whole scene still works, just slower.
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(() => {
+      const target = scene.getObjectByName(USDZ_ROOT_NAME) || scene
+      if (cancelled || !points.current) return
+      surfaceTarget.current = target
+      heightField.current = buildHeightField(points.current, target, {
+        span: particles.horizontalSpan,
+        resolution: performanceScale < 1 ? 32 : 44
+      })
+    }, 1200)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [scene, particles.horizontalSpan, performanceScale])
+
+  const recycle = (positions, index) => {
+    positions[index * 3] = (Math.random() - 0.5) * particles.horizontalSpan
+    positions[index * 3 + 1] = particles.verticalSpan + 5
+    positions[index * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
+  }
+
+  /**
+   * Exact height of whatever is under this flake, or null when the column is
+   * actually open air and the grid was wrong.
+   */
+  const confirmLanding = (x, y, z) => {
+    const target = surfaceTarget.current
+    if (!target || !points.current) return null
+
+    rayOrigin.set(x, y + 0.5, z)
+    points.current.localToWorld(rayOrigin)
+    landingRay.set(rayOrigin, DOWN_VECTOR)
+    landingRay.far = LANDING_RAY_REACH
+
+    const hits = landingRay.intersectObject(target, true)
+    if (hits.length === 0) return null
+
+    rayHit.copy(hits[0].point)
+    points.current.worldToLocal(rayHit)
+    return rayHit.y
+  }
 
   useFrame((state) => {
     if (!points.current) return
-    
+
     const positions = points.current.geometry.attributes.position.array
     const time = state.clock.elapsedTime
-    
+    const field = heightField.current
+    let settledChanged = false
+    let raysLeft = MAX_LANDING_RAYS_PER_FRAME
+
     for (let i = 0; i < count; i++) {
       positions[i * 3 + 1] -= particles.velocities[i]
       positions[i * 3] += Math.sin(time + i) * 0.01
-      
-      if (positions[i * 3 + 1] < -5) {
-        positions[i * 3 + 1] = particles.verticalSpan + 5
-        positions[i * 3] = (Math.random() - 0.5) * particles.horizontalSpan
-        positions[i * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
+
+      if (field) {
+        const gridY = field.sample(positions[i * 3], positions[i * 3 + 2])
+        if (positions[i * 3 + 1] <= gridY) {
+          let surfaceY = gridY
+
+          // A ray is only worth spending where the grid is ambiguous: a roof
+          // edge or a wall. Over a flat roof or open grass the sampled height
+          // is already right.
+          if (field.isEdge(positions[i * 3], positions[i * 3 + 2])) {
+            // Out of budget this frame: keep falling and try again next frame
+            // rather than risk resting on thin air beside a roof.
+            if (raysLeft === 0) continue
+            raysLeft -= 1
+            const exactY = confirmLanding(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+            // Nothing under this flake after all — it really is open air.
+            if (exactY === null) continue
+            surfaceY = exactY
+          }
+
+          const slot = settled.next * 3
+          settled.positions[slot] = positions[i * 3]
+          // Sit just proud of the surface so the flake is not z-fought away.
+          settled.positions[slot + 1] = surfaceY + 0.06
+          settled.positions[slot + 2] = positions[i * 3 + 2]
+          settled.next = (settled.next + 1) % settledCapacity
+          settled.filled = Math.min(settled.filled + 1, settledCapacity)
+          settledChanged = true
+          recycle(positions, i)
+          continue
+        }
       }
+
+      if (positions[i * 3 + 1] < -5) recycle(positions, i)
     }
-    
+
     points.current.geometry.attributes.position.needsUpdate = true
+
+    if (settledChanged && settledPoints.current) {
+      settledPoints.current.geometry.attributes.position.needsUpdate = true
+      settledPoints.current.geometry.setDrawRange(0, settled.filled)
+    }
   })
 
   return (
-    <points ref={points}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={count}
-          array={particles.positions}
-          itemSize={3}
+    <group>
+      <points ref={points}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={count}
+            array={particles.positions}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          size={0.18}
+          color="#FFFFFF"
+          transparent
+          opacity={0.8}
+          sizeAttenuation
         />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.18}
-        color="#FFFFFF"
-        transparent
-        opacity={0.8}
-        sizeAttenuation
-      />
-    </points>
+      </points>
+
+      {/* Snow already lying on something: larger and brighter than a flake in
+          flight, so a covered roof reads as a patch rather than a speck. */}
+      <points ref={attachSettled} frustumCulled={false}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={settledCapacity}
+            array={settled.positions}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <pointsMaterial size={0.52} color="#FFFFFF" opacity={0.95} transparent sizeAttenuation />
+      </points>
+    </group>
   )
 }
 
@@ -423,6 +566,16 @@ function CloudLayer({
     return Math.max(0.2, Math.min(1.0, combinedDensity))
   }, [weatherType, weatherData])
 
+  // White unless something is falling out of them. Rain and thunder darken the
+  // cloud, snow only dulls it slightly.
+  const cloudTone = useMemo(() => {
+    const condition = `${weatherType || ''} ${weatherData?.weather?.[0]?.description || ''}`.toLowerCase()
+    if (condition.includes('thunder') || condition.includes('storm')) return '#5f6674'
+    if (condition.includes('rain') || condition.includes('drizzle')) return '#949cab'
+    if (condition.includes('snow') || condition.includes('sleet')) return '#c8cedb'
+    return '#ffffff'
+  }, [weatherType, weatherData])
+
   const windVector = useMemo(() => {
     if (!windDirection && windDirection !== 0) return { x: 0.05, z: 0.03 }
     const radians = (windDirection * Math.PI) / 180
@@ -476,7 +629,6 @@ function CloudLayer({
         key: `cloud-${index}`,
         position: [Math.cos(angle) * radius, height, Math.sin(angle) * radius],
         scale: baseScale,
-        opacity: 0.28 + density * 0.22 + Math.random() * 0.08,
         speed: 0.35 + Math.random() * 0.25,
         wobble: {
           x: Math.random() * Math.PI * 2,
@@ -558,33 +710,15 @@ function CloudLayer({
           scale={[cloud.scale * 2.6, cloud.scale * 1.9, cloud.scale * 2.6]}
         >
           <Icosahedron args={[0.95, 1]}>
-            <meshStandardMaterial
-              color="#ffffff"
-              transparent
-              opacity={cloud.opacity}
-              roughness={0.22}
-              metalness={0.02}
-            />
+            <meshStandardMaterial color={cloudTone} roughness={1} metalness={0} />
           </Icosahedron>
           {cloud.puffs.map((puff) => (
             <group key={puff.key} position={puff.offset} scale={puff.scale}>
               <Sphere args={[0.6, 16, 16]}>
-                <meshStandardMaterial
-                  color="#fefeff"
-                  transparent
-                  opacity={cloud.opacity * 0.95}
-                  roughness={0.3}
-                  metalness={0.02}
-                />
+                <meshStandardMaterial color={cloudTone} roughness={1} metalness={0} />
               </Sphere>
               <Icosahedron args={[0.45, 1]}>
-          <meshStandardMaterial
-                  color="#ffffff"
-            transparent
-                  opacity={cloud.opacity * 0.85}
-                  roughness={0.25}
-                  metalness={0.015}
-          />
+                <meshStandardMaterial color={cloudTone} roughness={1} metalness={0} />
               </Icosahedron>
             </group>
           ))}
