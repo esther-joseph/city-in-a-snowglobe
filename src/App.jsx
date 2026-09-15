@@ -15,6 +15,11 @@ import LiquidChromeBackground from './components/environment/LiquidChromeBackgro
 // import AuraSky from './components/environment/AuraSky'
 import WeatherService from './services/WeatherService'
 import { getSeason } from './utils/seasons'
+import {
+  sunPosition as solarPosition,
+  moonPosition as lunarPosition,
+  toScenePosition
+} from './utils/celestialPosition'
 import CameraFeedBackground from './components/ar/CameraFeedBackground'
 import DeviceOrientationCamera from './components/ar/DeviceOrientationCamera'
 import ARSceneControls from './components/ar/ARSceneControls'
@@ -229,17 +234,41 @@ function computeCelestialData(weatherData, currentTimestamp, manualHourOverride)
     daylightProgress = Math.min(Math.max(daylightProgress, 0), 1)
 
     const radius = 95
-    const sunAngle = daylightProgress * Math.PI
-    const azimuth = -Math.PI / 2 + daylightProgress * Math.PI
-    let sunY = Math.sin(sunAngle) * radius * 0.6
-    if (isNight) {
-      sunY = Math.min(-10, sunY * -0.35)
-    }
-    const sunPosition = [
-      Math.cos(azimuth) * radius,
-      sunY,
-      Math.sin(azimuth) * radius
-    ]
+
+    // Real horizontal coordinates for this city and moment, rather than a
+    // fixed arc: azimuth and altitude vary with latitude and season the way
+    // they do outside, which is what the compass ring on the base reads from.
+    const latitude = weatherData.coord?.lat ?? 0
+    const longitude = weatherData.coord?.lon ?? 0
+
+    const observedAtMs =
+      overrideHour !== null
+        ? (() => {
+            // Keep the city's current date, move to the chosen local hour.
+            const cityNow = new Date(Date.now() + timezone * 1000)
+            const cityMidnightUtc = Date.UTC(
+              cityNow.getUTCFullYear(),
+              cityNow.getUTCMonth(),
+              cityNow.getUTCDate()
+            )
+            return cityMidnightUtc + overrideHour * 3600000 - timezone * 1000
+          })()
+        : timestampMs
+
+    const observedAt = new Date(observedAtMs)
+    const sunHorizontal = solarPosition(observedAt, latitude, longitude)
+    const moonHorizontal = lunarPosition(observedAt, latitude, longitude)
+
+    result.sunAzimuth = sunHorizontal.azimuth
+    result.sunAltitude = sunHorizontal.altitude
+    result.moonAzimuth = moonHorizontal.azimuth
+    result.moonAltitude = moonHorizontal.altitude
+
+    // Standard sunset definition: the disc is gone once its centre is a little
+    // below the horizon.
+    isNight = sunHorizontal.altitude < -0.833
+
+    const sunPosition = toScenePosition(sunHorizontal, radius)
 
     let nightProgress = daylightProgress
     if (sunriseSeconds !== null && sunsetSeconds !== null && nightSpan > 0) {
@@ -257,17 +286,14 @@ function computeCelestialData(weatherData, currentTimestamp, manualHourOverride)
     }
     nightProgress = ((nightProgress % 1) + 1) % 1
 
-    const moonAzimuth = Math.PI / 2 + nightProgress * Math.PI
-    const moonElevation = Math.sin(nightProgress * Math.PI) * radius * 0.45 + 12
-    const moonPosition = [
-      Math.cos(moonAzimuth) * radius * 0.75,
-      moonElevation,
-      Math.sin(moonAzimuth) * radius * 0.75
-    ]
+    // The moon keeps a minimum height so it stays inside the dome's view even
+    // when it is low; its bearing is the real one.
+    const moonScene = toScenePosition(moonHorizontal, radius * 0.75)
+    const moonPosition = [moonScene[0], Math.max(moonScene[1], 12), moonScene[2]]
 
     const cloudCover = weatherData.clouds?.all ?? 35
     const overcastFactor = 1 - Math.min(Math.max(cloudCover / 100, 0), 1)
-    const sunHeightRatio = Math.max(0, sunPosition[1] / (radius * 0.6))
+    const sunHeightRatio = Math.max(0, sunHorizontal.altitude / 90)
 
     const backgroundColor = isNight
       ? cloudCover > 60
@@ -360,6 +386,11 @@ function computeCelestialData(weatherData, currentTimestamp, manualHourOverride)
     return {
       sunPosition,
       moonPosition,
+      // True horizontal coordinates, for the compass ring on the base.
+      sunAzimuth: sunHorizontal.azimuth,
+      sunAltitude: sunHorizontal.altitude,
+      moonAzimuth: moonHorizontal.azimuth,
+      moonAltitude: moonHorizontal.altitude,
       isNight,
       backgroundColor,
       skySettings,
@@ -1078,6 +1109,10 @@ function App() {
           sunPosition={sunOuterPosition}
           moonPosition={moonOuterPosition}
           isNight={celestialData.isNight}
+          sunAzimuth={celestialData.sunAzimuth ?? null}
+          sunAltitude={celestialData.sunAltitude ?? null}
+          moonAzimuth={celestialData.moonAzimuth ?? null}
+          moonAltitude={celestialData.moonAltitude ?? null}
           scale={Math.max(1, contentScale * 3.5)}
         />
 
