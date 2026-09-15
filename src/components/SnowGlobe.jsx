@@ -2,6 +2,7 @@ import React, { useMemo, useRef } from 'react'
 import { Text, shaderMaterial } from '@react-three/drei'
 import * as THREE from 'three'
 import { useFrame, extend } from '@react-three/fiber'
+import { createHammeredMaps } from '../utils/hammeredMetal'
 
 export const SNOW_GLOBE_CONTENT_SCALE = 0.28
 const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
@@ -15,6 +16,23 @@ const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
  * toggle. At 150 flutes that was enough to push the rapid-interaction test
  * past its budget. Keyed by its parameters, so a remount reuses the buffer.
  */
+// Built once and shared: the dent field is the same for every globe.
+let hammeredMaps = null
+const getHammeredMaps = () => {
+  if (!hammeredMaps) {
+    // The ring is about 100 units around and a fraction of a unit thick, so
+    // the map has to repeat hard along its length to keep the hammer marks
+    // roughly square rather than smeared into streaks.
+    hammeredMaps = createHammeredMaps({
+      repeat: [40, 1],
+      dents: 420,
+      minRadius: 14,
+      maxRadius: 34
+    })
+  }
+  return hammeredMaps
+}
+
 const flutedGeometryCache = new Map()
 
 function getFlutedGeometry(params) {
@@ -154,11 +172,16 @@ function SnowGlobe({
         topRadius: baseRadius * 1.15,
         bottomRadius: baseRadius * 1.3,
         height: baseHeight,
-        flutes: 150,
+        flutes: 200,
         depth: 0.03
       }),
     [baseRadius, baseHeight]
   )
+
+  const hammered = useMemo(() => getHammeredMaps(), [])
+
+  // Clear of the lettering, which sits above it.
+  const ringY = labelY - 1.45
 
   const fresnelBaseColor = useMemo(() => new THREE.Color(glassColor), [glassColor])
   const fresnelRimColor = useMemo(() => new THREE.Color('#b8d8ff'), [])
@@ -216,20 +239,24 @@ function SnowGlobe({
         />
       </mesh>
 
-      {/* Amber gold ring — brushed rather than mirrored, with a soft halo
-          sitting just outside it so the edge glows rather than glints */}
-      <mesh position={[0, labelY - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[baseRadius * 1.18, 0.07, 12, 128]} />
+      {/* Amber gold ring — forged rather than mirrored: a hammered normal map
+          breaks the highlight into facets, with a soft halo just outside it so
+          the edge glows rather than glints */}
+      <mesh position={[0, ringY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[baseRadius * 1.18, 0.17, 20, 320]} />
         <meshStandardMaterial
           color={AMBER_GOLD}
           emissive={AMBER_GLOW}
-          emissiveIntensity={0.42}
-          roughness={0.34}
-          metalness={0.78}
+          emissiveIntensity={0.3}
+          roughness={0.42}
+          metalness={0.9}
+          normalMap={hammered.normalMap}
+          normalScale={new THREE.Vector2(2.2, 2.2)}
+          roughnessMap={hammered.roughnessMap}
         />
       </mesh>
-      <mesh position={[0, labelY - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[baseRadius * 1.18, 0.2, 10, 96]} />
+      <mesh position={[0, ringY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[baseRadius * 1.18, 0.34, 10, 96]} />
         {/* Normal blending, not additive: added over a bright daytime sky the
             amber saturates to white and the halo stops looking warm. */}
         <meshBasicMaterial color={AMBER_GLOW} transparent opacity={0.3} depthWrite={false} />
