@@ -70,6 +70,12 @@ function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }
   return geometry
 }
 
+// Amber-yellow gold: warmer and softer than the near-white gold the ring and
+// lettering used to carry.
+const AMBER_GOLD = '#f0bf55'
+const AMBER_GLOW = '#e09a2b'
+const AMBER_DEEP = '#4a3208'
+
 const FresnelGlassMaterial = shaderMaterial(
   {
     rimColor: new THREE.Color('#b8d8ff'),
@@ -124,6 +130,8 @@ function SnowGlobe({
     [cityName]
   )
 
+  // Plain collar and foot that cap the fluting, sized to the reed circumference.
+  const plateHeight = Math.max(0.3, baseHeight * 0.13)
   const cityYOffset = Math.max(0.22, baseHeight * 0.07)
   const domeCenterY = cityYOffset + 9.8
   const labelY = baseHeight / 2 + upperBaseHeight * 0.4
@@ -157,6 +165,12 @@ function SnowGlobe({
 
   return (
     <group position={position} rotation={rotation}>
+      {/* Plain collar above the fluting, matching the top of the reeds */}
+      <mesh position={[0, -plateHeight / 2, 0]} receiveShadow castShadow>
+        <cylinderGeometry args={[baseRadius * 1.16, baseRadius * 1.16, plateHeight, 96]} />
+        <meshStandardMaterial color="#6f4b2a" roughness={0.55} metalness={0.18} />
+      </mesh>
+
       {/* Base — warm brown, fluted like a reeded plinth */}
       <mesh
         position={[0, -baseHeight / 2, 0]}
@@ -165,6 +179,12 @@ function SnowGlobe({
         castShadow
       >
         <meshStandardMaterial color="#6f4b2a" roughness={0.62} metalness={0.15} />
+      </mesh>
+
+      {/* Plain foot below it, matching the widest point of the reeds */}
+      <mesh position={[0, -baseHeight - plateHeight / 2, 0]} receiveShadow castShadow>
+        <cylinderGeometry args={[baseRadius * 1.31, baseRadius * 1.31, plateHeight, 96]} />
+        <meshStandardMaterial color="#6f4b2a" roughness={0.55} metalness={0.18} />
       </mesh>
 
       {/* City contents */}
@@ -196,16 +216,23 @@ function SnowGlobe({
         />
       </mesh>
 
-      {/* Golden thread torus — delicate sparkling ring */}
+      {/* Amber gold ring — brushed rather than mirrored, with a soft halo
+          sitting just outside it so the edge glows rather than glints */}
       <mesh position={[0, labelY - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[baseRadius * 1.18, 0.07, 12, 128]} />
         <meshStandardMaterial
-          color="#ffe084"
-          emissive="#ffd54f"
-          emissiveIntensity={0.6}
-          roughness={0.0}
-          metalness={1.0}
+          color={AMBER_GOLD}
+          emissive={AMBER_GLOW}
+          emissiveIntensity={0.42}
+          roughness={0.34}
+          metalness={0.78}
         />
+      </mesh>
+      <mesh position={[0, labelY - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[baseRadius * 1.18, 0.2, 10, 96]} />
+        {/* Normal blending, not additive: added over a bright daytime sky the
+            amber saturates to white and the halo stops looking warm. */}
+        <meshBasicMaterial color={AMBER_GLOW} transparent opacity={0.3} depthWrite={false} />
       </mesh>
 
       {/* Plaque — gold label */}
@@ -250,7 +277,7 @@ function RotatingPlaque({ radius, labelY, text }) {
                 Math.cos(angle) * (radius - 0.12)
               ]}
               rotation={[0, angle, 0]}
-              color="#3a2800"
+              color={AMBER_DEEP}
               fontSize={2.18}
               anchorX="center"
               anchorY="middle"
@@ -263,11 +290,16 @@ function RotatingPlaque({ radius, labelY, text }) {
               {decorated}
             </Text>
 
-            {/* Gold top layer */}
+            {/* Amber gold face, with a soft amber halo bleeding off the
+                letter edges */}
             <Text
               position={[x, labelY + 0.12, z]}
               rotation={[0, angle, 0]}
-              color="#f5d87a"
+              color={AMBER_GOLD}
+              outlineWidth={0.055}
+              outlineColor={AMBER_GLOW}
+              outlineOpacity={0.5}
+              outlineBlur={0.12}
               fontSize={2.18}
               anchorX="center"
               anchorY="middle"
