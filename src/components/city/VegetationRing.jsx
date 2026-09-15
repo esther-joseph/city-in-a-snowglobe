@@ -1,9 +1,17 @@
 import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import PropTypes from 'prop-types'
+import { getSeasonPalette, SEASONS } from '../../utils/seasons'
 
 // Richer, multi-layer tree with rounded canopy tiers
-function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpeed = 0 }) {
+function Tree({
+  position,
+  trunkHeight,
+  foliageScale,
+  windDirection = 0,
+  windSpeed = 0,
+  season = SEASONS.SUMMER
+}) {
   const canopyRef = useRef()
   const randomRotation = useMemo(() => Math.random() * Math.PI * 2, [])
 
@@ -27,20 +35,63 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
   const trunkWidth = 0.18 * foliageScale
   const r = foliageScale * 0.52   // canopy sphere radius base
 
-  // Four green shades for variety
-  const greens = ['#2d7a2f', '#3a9c3c', '#4db84f', '#56cc58', '#3f8f3d']
-  const g = (i) => greens[i % greens.length]
+  const palette = getSeasonPalette(season)
+  const g = (i) => palette.canopy[i % palette.canopy.length]
+
+  // Blossom clusters, spring only. Seeded per tree so they don't jump around
+  // between renders.
+  const blossoms = useMemo(() => {
+    if (!palette.blossom) return []
+    return [...Array(7)].map((_, i) => {
+      const a = (i / 7) * Math.PI * 2 + Math.random() * 0.6
+      const lift = (Math.random() - 0.35) * r
+      return {
+        key: `blossom-${i}`,
+        position: [Math.cos(a) * r * 0.82, lift, Math.sin(a) * r * 0.82],
+        size: r * (0.16 + Math.random() * 0.12),
+        color: palette.blossom[i % palette.blossom.length]
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [season, r])
+
+  // Winter: a handful of bare limbs where the canopy would be.
+  const branches = useMemo(() => {
+    if (!palette.bareTrees) return []
+    return [...Array(6)].map((_, i) => {
+      const a = (i / 6) * Math.PI * 2 + 0.3
+      const lean = 0.5 + Math.random() * 0.35
+      return {
+        key: `branch-${i}`,
+        rotation: [lean * Math.cos(a), a, lean * Math.sin(a)],
+        length: r * (1.1 + Math.random() * 0.5)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [season, r])
 
   return (
     <group position={position} rotation={[0, randomRotation, 0]}>
       {/* Trunk */}
       <mesh castShadow receiveShadow position={[0, trunkHeight / 2, 0]}>
         <cylinderGeometry args={[trunkWidth * 0.6, trunkWidth, trunkHeight, 7]} />
-        <meshStandardMaterial color="#7a4f28" roughness={0.85} metalness={0.0} />
+        <meshStandardMaterial color={palette.trunk} roughness={0.85} metalness={0.0} />
       </mesh>
 
-      {/* Canopy — 5 overlapping spheres for a full, rounded crown */}
+      {/* Canopy — 5 overlapping spheres for a full, rounded crown. In winter
+          the crown is replaced by bare limbs. */}
       <group ref={canopyRef} position={[0, trunkHeight + r * 0.6, 0]}>
+        {palette.bareTrees ? (
+          branches.map((branch) => (
+            <group key={branch.key} rotation={branch.rotation}>
+              <mesh castShadow position={[0, branch.length / 2, 0]}>
+                <cylinderGeometry args={[trunkWidth * 0.12, trunkWidth * 0.34, branch.length, 5]} />
+                <meshStandardMaterial color={palette.trunk} roughness={0.9} metalness={0.0} />
+              </mesh>
+            </group>
+          ))
+        ) : (
+          <>
         {/* Main central sphere */}
         <mesh castShadow position={[0, 0, 0]}>
           <sphereGeometry args={[r * 1.05, 7, 6]} />
@@ -61,12 +112,26 @@ function Tree({ position, trunkHeight, foliageScale, windDirection = 0, windSpee
           <sphereGeometry args={[r * 0.6, 6, 5]} />
           <meshStandardMaterial color={g(4)} roughness={0.78} metalness={0.0} />
         </mesh>
+        {/* Spring blossom clusters dotted over the crown */}
+        {blossoms.map((blossom) => (
+          <mesh key={blossom.key} position={blossom.position}>
+            <sphereGeometry args={[blossom.size, 5, 4]} />
+            <meshStandardMaterial
+              color={blossom.color}
+              roughness={0.6}
+              emissive={blossom.color}
+              emissiveIntensity={0.18}
+            />
+          </mesh>
+        ))}
+          </>
+        )}
       </group>
 
       {/* Grass tuft at base */}
       <mesh receiveShadow position={[0, 0.04, 0]}>
         <cylinderGeometry args={[trunkWidth * 3.5, trunkWidth * 4, 0.08, 7]} />
-        <meshStandardMaterial color="#3d7a32" roughness={0.95} metalness={0.0} />
+        <meshStandardMaterial color={palette.grassTuft} roughness={0.95} metalness={0.0} />
       </mesh>
     </group>
   )
@@ -77,12 +142,14 @@ Tree.propTypes = {
   trunkHeight: PropTypes.number.isRequired,
   foliageScale: PropTypes.number.isRequired,
   windDirection: PropTypes.number,
-  windSpeed: PropTypes.number
+  windSpeed: PropTypes.number,
+  season: PropTypes.string
 }
 
 // Lush rounded bush — sphere clusters instead of boxes
-function Bush({ position, scale }) {
-  const greens = ['#2e7d32', '#388e3c', '#43a047', '#4caf50', '#66bb6a']
+function Bush({ position, scale, season = SEASONS.SUMMER }) {
+  const palette = getSeasonPalette(season)
+  const greens = palette.bush
   const lobeCount = Math.max(5, Math.round(scale * 3))
 
   return (
@@ -106,7 +173,7 @@ function Bush({ position, scale }) {
       {/* Ground disc */}
       <mesh receiveShadow position={[0, 0.03, 0]}>
         <cylinderGeometry args={[scale * 0.55, scale * 0.55, 0.06, 7]} />
-        <meshStandardMaterial color="#3d7a32" roughness={0.95} metalness={0.0} />
+        <meshStandardMaterial color={palette.grassTuft} roughness={0.95} metalness={0.0} />
       </mesh>
     </group>
   )
@@ -114,10 +181,17 @@ function Bush({ position, scale }) {
 
 Bush.propTypes = {
   position: PropTypes.arrayOf(PropTypes.number).isRequired,
-  scale: PropTypes.number.isRequired
+  scale: PropTypes.number.isRequired,
+  season: PropTypes.string
 }
 
-function VegetationRing({ trees = [], bushes = [], windDirection = 0, windSpeed = 0 }) {
+function VegetationRing({
+  trees = [],
+  bushes = [],
+  windDirection = 0,
+  windSpeed = 0,
+  season = SEASONS.SUMMER
+}) {
   return (
     <group>
       {trees.map((tree) => (
@@ -128,10 +202,11 @@ function VegetationRing({ trees = [], bushes = [], windDirection = 0, windSpeed 
           foliageScale={tree.foliageScale}
           windDirection={windDirection}
           windSpeed={windSpeed}
+          season={season}
         />
       ))}
       {bushes.map((bush) => (
-        <Bush key={bush.key} position={bush.position} scale={bush.scale} />
+        <Bush key={bush.key} position={bush.position} scale={bush.scale} season={season} />
       ))}
     </group>
   )
@@ -154,7 +229,8 @@ VegetationRing.propTypes = {
     })
   ),
   windDirection: PropTypes.number,
-  windSpeed: PropTypes.number
+  windSpeed: PropTypes.number,
+  season: PropTypes.string
 }
 
 export default VegetationRing

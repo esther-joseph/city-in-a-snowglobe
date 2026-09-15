@@ -3,6 +3,8 @@ import * as THREE from 'three'
 import SnowGlobe from './SnowGlobe'
 import Fountain from './city/Fountain'
 import VegetationRing from './city/VegetationRing'
+import SeasonalFall from './city/SeasonalFall'
+import { getSeasonPalette, SEASONS } from '../utils/seasons'
 
 const WINDOW_DAY_COLOR = '#4a90e2' // Reflective blue for daytime
 const WINDOW_NIGHT_COLOR = '#0b1623'
@@ -1009,9 +1011,11 @@ function City({
   windDirection = 0,
   windSpeed = 0,
   weatherType = '',
-  glassTint = '#eef8ff'
+  glassTint = '#eef8ff',
+  season = SEASONS.SUMMER
 
 }) {
+  const seasonPalette = getSeasonPalette(season)
   const cityLayout = useMemo(() => generateCityLayout(profile), [profile, citySeed])
 
   const generatedBuildings = cityLayout.buildings || []
@@ -1086,6 +1090,17 @@ function City({
 
     return treeArray
   }, [generatedBuildings])
+
+  // Where petals and leaves come from: roughly the middle of each canopy.
+  const fallSources = useMemo(
+    () =>
+      trees.map((tree) => ({
+        position: tree.position,
+        radius: tree.foliageScale * 0.7,
+        height: tree.trunkHeight + tree.foliageScale * 0.9
+      })),
+    [trees]
+  )
 
   const bushes = useMemo(() => {
     const bushArray = []
@@ -1165,10 +1180,11 @@ function City({
         <meshStandardMaterial color="#3e3b38" roughness={0.90} metalness={0.04} />
       </mesh>
 
-      {/* Grass ground — lush green base for the park */}
+      {/* Grass ground — colour follows the season: lush in summer, dull and
+          grey-green in winter, gold in autumn */}
       <mesh position={[0, 0.05, 0]} receiveShadow>
         <cylinderGeometry args={[20, 20, 0.18, 48]} />
-        <meshStandardMaterial color="#4a8c3f" roughness={0.95} metalness={0.0} />
+        <meshStandardMaterial color={seasonPalette.grass} roughness={0.95} metalness={0.0} />
       </mesh>
 
       {/* Stone pathways — 4 radiating, spanning from inner fountain ring to outer walkway ring */}
@@ -1201,8 +1217,8 @@ function City({
         <meshStandardMaterial color="#c0b7a4" roughness={0.85} metalness={0.05} side={2} />
       </mesh>
 
-      {/* Flower beds — two rings, more variety */}
-      {[...Array(48)].map((_, i) => {
+      {/* Flower beds — two rings, more variety. Hidden in winter. */}
+      {(seasonPalette.showFlowers ? [...Array(48)] : []).map((_, i) => {
         const isOuter = i >= 24
         const j = isOuter ? i - 24 : i
         const total = 24
@@ -1210,7 +1226,7 @@ function City({
         const r = isOuter
           ? 14.2 + (j % 3) * 0.7
           : 12.8 + (j % 3) * 0.6
-        const flowerColors = ['#ff6b8a', '#ffcd3c', '#ff8c42', '#c084fc', '#f472b6', '#86efac', '#ff9fcc', '#a5f3fc']
+        const flowerColors = seasonPalette.flowers
         return (
           <mesh key={`flower-${i}`}
             position={[Math.sin(angle) * r, 0.14, Math.cos(angle) * r]}
@@ -1235,7 +1251,27 @@ function City({
         ))}
 
         {/* Vegetation */}
-        <VegetationRing trees={trees} bushes={bushes} windDirection={windDirection} windSpeed={windSpeed} />
+        <VegetationRing
+          trees={trees}
+          bushes={bushes}
+          windDirection={windDirection}
+          windSpeed={windSpeed}
+          season={season}
+        />
+
+        {/* Petals in spring, leaves in autumn — they drift off the canopies and
+            settle on the grass */}
+        {seasonPalette.fall && (
+          <SeasonalFall
+            sources={fallSources}
+            count={seasonPalette.fall.count}
+            colors={seasonPalette.fall.colors}
+            size={seasonPalette.fall.size}
+            speed={seasonPalette.fall.speed}
+            windDirection={windDirection}
+            windSpeed={windSpeed}
+          />
+        )}
 
         {/* Light posts — 4 total, one beside each bench end (not blocking the view) */}
         {[
