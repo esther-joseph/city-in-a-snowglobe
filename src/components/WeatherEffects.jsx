@@ -710,15 +710,15 @@ function CloudLayer({
           scale={[cloud.scale * 2.6, cloud.scale * 1.9, cloud.scale * 2.6]}
         >
           <Icosahedron args={[0.95, 1]}>
-            <meshStandardMaterial color={cloudTone} roughness={0.22} metalness={0.02} />
+            <meshStandardMaterial color={cloudTone} roughness={1} metalness={0} />
           </Icosahedron>
           {cloud.puffs.map((puff) => (
             <group key={puff.key} position={puff.offset} scale={puff.scale}>
               <Sphere args={[0.6, 16, 16]}>
-                <meshStandardMaterial color={cloudTone} roughness={0.3} metalness={0.02} />
+                <meshStandardMaterial color={cloudTone} roughness={1} metalness={0} />
               </Sphere>
               <Icosahedron args={[0.45, 1]}>
-                <meshStandardMaterial color={cloudTone} roughness={0.25} metalness={0.015} />
+                <meshStandardMaterial color={cloudTone} roughness={1} metalness={0} />
               </Icosahedron>
             </group>
           ))}
