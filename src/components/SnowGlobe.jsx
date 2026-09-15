@@ -3,6 +3,7 @@ import { Text, shaderMaterial } from '@react-three/drei'
 import * as THREE from 'three'
 import { useFrame, extend } from '@react-three/fiber'
 import { createHammeredMaps } from '../utils/hammeredMetal'
+import { createWoodGrainMaps } from '../utils/woodGrain'
 
 export const SNOW_GLOBE_CONTENT_SCALE = 0.28
 const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
@@ -31,6 +32,13 @@ const getHammeredMaps = () => {
     })
   }
   return hammeredMaps
+}
+
+// One grain tile, shared by the fluted body and the plates that cap it.
+let woodGrainMaps = null
+const getWoodGrainMaps = () => {
+  if (!woodGrainMaps) woodGrainMaps = createWoodGrainMaps({ repeat: [3, 1] })
+  return woodGrainMaps
 }
 
 const flutedGeometryCache = new Map()
@@ -179,6 +187,7 @@ function SnowGlobe({
   )
 
   const hammered = useMemo(() => getHammeredMaps(), [])
+  const wood = useMemo(() => getWoodGrainMaps(), [])
 
   // Clear of the lettering, which sits above it.
   const ringY = labelY - 1.45
@@ -191,7 +200,13 @@ function SnowGlobe({
       {/* Plain collar above the fluting, matching the top of the reeds */}
       <mesh position={[0, -plateHeight / 2, 0]} receiveShadow castShadow>
         <cylinderGeometry args={[baseRadius * 1.16, baseRadius * 1.16, plateHeight, 96]} />
-        <meshStandardMaterial color="#6f4b2a" roughness={0.55} metalness={0.18} />
+        <meshStandardMaterial
+          color="#7c5530"
+          map={wood.map}
+          roughnessMap={wood.roughnessMap}
+          roughness={0.55}
+          metalness={0.18}
+        />
       </mesh>
 
       {/* Base — warm brown, fluted like a reeded plinth */}
@@ -201,13 +216,27 @@ function SnowGlobe({
         receiveShadow
         castShadow
       >
-        <meshStandardMaterial color="#6f4b2a" roughness={0.62} metalness={0.15} />
+        {/* The grain map is luminance only, so it modulates this colour rather
+            than replacing it — the chocolate brown stays as it was. */}
+        <meshStandardMaterial
+          color="#7c5530"
+          map={wood.map}
+          roughnessMap={wood.roughnessMap}
+          roughness={0.62}
+          metalness={0.15}
+        />
       </mesh>
 
       {/* Plain foot below it, matching the widest point of the reeds */}
       <mesh position={[0, -baseHeight - plateHeight / 2, 0]} receiveShadow castShadow>
         <cylinderGeometry args={[baseRadius * 1.31, baseRadius * 1.31, plateHeight, 96]} />
-        <meshStandardMaterial color="#6f4b2a" roughness={0.55} metalness={0.18} />
+        <meshStandardMaterial
+          color="#7c5530"
+          map={wood.map}
+          roughnessMap={wood.roughnessMap}
+          roughness={0.55}
+          metalness={0.18}
+        />
       </mesh>
 
       {/* City contents */}
