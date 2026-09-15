@@ -1,5 +1,10 @@
 import React, { useMemo, useRef } from 'react'
-import { Text, shaderMaterial } from '@react-three/drei'
+import PropTypes from 'prop-types'
+import { shaderMaterial } from '@react-three/drei'
+import typeface from 'three/examples/fonts/helvetiker_regular.typeface.json'
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import * as THREE from 'three'
 import { useFrame, extend } from '@react-three/fiber'
 import { createHammeredMaps } from '../utils/hammeredMetal'
@@ -189,6 +194,26 @@ function SnowGlobe({
   const hammered = useMemo(() => getHammeredMaps(), [])
   const wood = useMemo(() => getWoodGrainMaps(), [])
 
+  // The lettering wears the ring's forged finish, in the lighter yellow gold
+  // it has always been. Shared by every glyph so there is one material, not
+  // forty.
+  const letterMaterial = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#f7dd8c',
+        emissive: '#7a5c1c',
+        emissiveIntensity: 0.12,
+        // Mostly dielectric: with no environment map a high metalness has
+        // nothing to reflect and the light yellow sinks towards bronze.
+        metalness: 0.45,
+        roughness: 0.34,
+        normalMap: hammered.normalMap,
+        normalScale: new THREE.Vector2(0.8, 0.8),
+        roughnessMap: hammered.roughnessMap
+      }),
+    [hammered]
+  )
+
   // Clear of the lettering, which sits above it.
   const ringY = labelY - 1.45
 
@@ -289,6 +314,7 @@ function SnowGlobe({
         radius={labelRadius}
         labelY={labelY}
         text={normalizedName}
+        material={letterMaterial}
       />
     </group>
   )
@@ -296,7 +322,112 @@ function SnowGlobe({
 
 export default SnowGlobe
 
-function RotatingPlaque({ radius, labelY, text }) {
+/**
+ * The city name as extruded 3D lettering, curved around the globe.
+ *
+ * Text3D produces real geometry but only in a straight line, so each character
+ * is placed and rotated individually along the arc — the letters follow the
+ * plinth the way the old flat text did, but now they have depth and catch the
+ * light on their bevels.
+ *
+ * Spacing comes from the typeface's own horizontal advances, so the wider
+ * letters get the room they need instead of everything sitting on a fixed
+ * pitch.
+ */
+const GLYPH_SCALE = 1 / typeface.resolution
+const advanceFor = (character) =>
+  ((typeface.glyphs[character] ?? typeface.glyphs.n).ha ?? 700) * GLYPH_SCALE
+
+const parsedFont = new FontLoader().parse(typeface)
+
+/**
+ * The whole label is baked into one geometry.
+ *
+ * Laid out as individual meshes it came to thirty-nine draw calls — three
+ * copies of a dozen glyphs — and that was enough to put the rapid-interaction
+ * test back over its budget on mobile emulation. Each glyph is built once,
+ * transformed onto its place on the arc, and merged; the three copies then
+ * share the result and differ only by rotation.
+ */
+const labelGeometryCache = new Map()
+
+function glyphGeometry(character, size) {
+  const geometry = new TextGeometry(character, {
+    font: parsedFont,
+    size,
+    depth: size * 0.2,
+    // Kept deliberately coarse: the lettering is small on screen and every
+    // extra curve or bevel segment multiplies across a dozen glyphs.
+    curveSegments: 2,
+    bevelEnabled: true,
+    bevelThickness: size * 0.022,
+    bevelSize: size * 0.018,
+    bevelSegments: 1
+  })
+  geometry.computeBoundingBox()
+  const { min, max } = geometry.boundingBox
+  geometry.translate(-(min.x + max.x) / 2, -(min.y + max.y) / 2, -(min.z + max.z) / 2)
+  return geometry
+}
+
+/**
+ * The fisheye bullet, built rather than typeset — no typeface carries U+25C9.
+ *
+ * Returned non-indexed: TextGeometry is non-indexed and mergeGeometries
+ * refuses to mix the two, which silently yields a null geometry and an empty
+ * canvas.
+ */
+function bulletGeometries(size) {
+  return [
+    new THREE.TorusGeometry(size * 0.42, size * 0.1, 8, 20).toNonIndexed(),
+    new THREE.SphereGeometry(size * 0.2, 12, 8).toNonIndexed()
+  ]
+}
+
+function buildLabelGeometry(text, radius, size) {
+  const characters = [...`◉ ${text} ◉`]
+  const widths = characters.map((character) =>
+    character === '◉' ? size * 0.95 : advanceFor(character) * size
+  )
+  const total = widths.reduce((sum, width) => sum + width, 0)
+
+  const placed = []
+  const matrix = new THREE.Matrix4()
+  const rotation = new THREE.Euler()
+  let cursor = -total / 2
+
+  characters.forEach((character, index) => {
+    const centre = cursor + widths[index] / 2
+    cursor += widths[index]
+    if (character === ' ') return
+
+    const angle = centre / radius
+    rotation.set(0, angle, 0)
+    matrix.makeRotationFromEuler(rotation)
+    matrix.setPosition(Math.sin(angle) * radius, 0, Math.cos(angle) * radius)
+
+    const pieces =
+      character === '◉' ? bulletGeometries(size) : [glyphGeometry(character, size)]
+    pieces.forEach((piece) => {
+      piece.applyMatrix4(matrix)
+      placed.push(piece)
+    })
+  })
+
+  const merged = mergeGeometries(placed, false)
+  placed.forEach((piece) => piece.dispose())
+  return merged
+}
+
+function getLabelGeometry(text, radius, size) {
+  const key = `${text}|${radius}|${size}`
+  if (!labelGeometryCache.has(key)) {
+    labelGeometryCache.set(key, buildLabelGeometry(text, radius, size))
+  }
+  return labelGeometryCache.get(key)
+}
+
+function RotatingPlaque({ radius, labelY, text, material }) {
   const groupRef = useRef()
 
   useFrame((_, delta) => {
@@ -304,65 +435,26 @@ function RotatingPlaque({ radius, labelY, text }) {
     groupRef.current.rotation.y += delta * 0.15
   })
 
-  // Wrap the city name with fisheye bullets (U+25C9) for an engraved-plaque look
-  const decorated = `◉ ${text} ◉`
-  const arcSweep = Math.PI / 2.1
-  const textRadius = radius + 0.16
+  const size = 1.62
+  const geometry = useMemo(() => getLabelGeometry(text, radius, size), [text, radius, size])
 
   return (
-    <group ref={groupRef}>
-      {[0, 1, 2].map((index) => {
-        const angle = (index / 3) * Math.PI * 2
-        const x = Math.sin(angle) * radius
-        const z = Math.cos(angle) * radius
-
-        return (
-          <group key={`plaque-${index}`}>
-            {/* Shadow layer — dark engraved depth */}
-            <Text
-              position={[
-                Math.sin(angle) * (radius - 0.12),
-                labelY + 0.02,
-                Math.cos(angle) * (radius - 0.12)
-              ]}
-              rotation={[0, angle, 0]}
-              color={AMBER_DEEP}
-              fontSize={2.18}
-              anchorX="center"
-              anchorY="middle"
-              letterSpacing={0.13}
-              maxWidth={Math.abs(textRadius) * arcSweep}
-              textAlign="center"
-              curveRadius={-textRadius}
-              lineHeight={1}
-            >
-              {decorated}
-            </Text>
-
-            {/* Amber gold face, with a soft amber halo bleeding off the
-                letter edges */}
-            <Text
-              position={[x, labelY + 0.12, z]}
-              rotation={[0, angle, 0]}
-              color={AMBER_GOLD}
-              outlineWidth={0.055}
-              outlineColor={AMBER_GLOW}
-              outlineOpacity={0.5}
-              outlineBlur={0.12}
-              fontSize={2.18}
-              anchorX="center"
-              anchorY="middle"
-              letterSpacing={0.13}
-              maxWidth={Math.abs(textRadius) * arcSweep}
-              textAlign="center"
-              curveRadius={-textRadius}
-              lineHeight={1}
-            >
-              {decorated}
-            </Text>
-          </group>
-        )
-      })}
+    <group ref={groupRef} position={[0, labelY, 0]}>
+      {[0, 1, 2].map((copy) => (
+        <mesh
+          key={`plaque-${copy}`}
+          geometry={geometry}
+          material={material}
+          rotation={[0, (copy / 3) * Math.PI * 2, 0]}
+        />
+      ))}
     </group>
   )
+}
+
+RotatingPlaque.propTypes = {
+  radius: PropTypes.number.isRequired,
+  labelY: PropTypes.number.isRequired,
+  text: PropTypes.string.isRequired,
+  material: PropTypes.object.isRequired
 }

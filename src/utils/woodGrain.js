@@ -13,7 +13,8 @@
  */
 import * as THREE from 'three'
 
-const SIZE = 512
+// 256 is ample for grain this soft, and halves the upload.
+const SIZE = 256
 
 /** Cheap value noise: hashed lattice with smooth interpolation. */
 function makeNoise(seed = 1) {
