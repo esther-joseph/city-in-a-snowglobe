@@ -6,6 +6,47 @@ import { useFrame, extend } from '@react-three/fiber'
 export const SNOW_GLOBE_CONTENT_SCALE = 0.28
 const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
 
+/**
+ * A cylinder with vertical flutes cut around it, like a reeded plinth.
+ *
+ * Built by pushing each vertex in or out along its own radius by a sine of the
+ * angle: the ribs follow the taper, and recomputed normals make them catch
+ * light as rounded reeds rather than facets.
+ */
+function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }) {
+  // Ten or so segments per rib: fewer and the reeding steps into a cog.
+  const geometry = new THREE.CylinderGeometry(
+    topRadius,
+    bottomRadius,
+    height,
+    flutes * 10,
+    1,
+    false
+  )
+
+  const position = geometry.attributes.position
+  const vertex = new THREE.Vector3()
+
+  for (let i = 0; i < position.count; i += 1) {
+    vertex.fromBufferAttribute(position, i)
+    const radius = Math.hypot(vertex.x, vertex.z)
+    if (radius < 1e-4) continue
+
+    const angle = Math.atan2(vertex.z, vertex.x)
+    // Flat-bottomed grooves read better than a pure sine: bias the wave so the
+    // ribs stand proud and the valleys between them are shallow.
+    const wave = Math.cos(angle * flutes)
+    const scale = 1 + depth * (wave * 0.5 - 0.5)
+
+    position.setX(i, vertex.x * scale)
+    position.setZ(i, vertex.z * scale)
+  }
+
+  position.needsUpdate = true
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 const FresnelGlassMaterial = shaderMaterial(
   {
     rimColor: new THREE.Color('#b8d8ff'),
@@ -76,15 +117,31 @@ function SnowGlobe({
     return base.lerp(fog, 0.45).getStyle()
   }, [tintColor, isFoggy])
 
+  const flutedBase = useMemo(
+    () =>
+      createFlutedGeometry({
+        topRadius: baseRadius * 1.15,
+        bottomRadius: baseRadius * 1.3,
+        height: baseHeight,
+        flutes: 56,
+        depth: 0.022
+      }),
+    [baseRadius, baseHeight]
+  )
+
   const fresnelBaseColor = useMemo(() => new THREE.Color(glassColor), [glassColor])
   const fresnelRimColor = useMemo(() => new THREE.Color('#b8d8ff'), [])
 
   return (
     <group position={position} rotation={rotation}>
-      {/* Base — original warm brown */}
-      <mesh position={[0, -baseHeight / 2, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[baseRadius * 1.15, baseRadius * 1.3, baseHeight, 88]} />
-        <meshStandardMaterial color="#6f4b2a" roughness={0.5} metalness={0.35} />
+      {/* Base — warm brown, fluted like a reeded plinth */}
+      <mesh
+        position={[0, -baseHeight / 2, 0]}
+        geometry={flutedBase}
+        receiveShadow
+        castShadow
+      >
+        <meshStandardMaterial color="#6f4b2a" roughness={0.62} metalness={0.15} />
       </mesh>
 
       {/* City contents */}
