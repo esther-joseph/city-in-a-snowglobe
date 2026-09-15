@@ -14,12 +14,13 @@ const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
  * light as rounded reeds rather than facets.
  */
 function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }) {
-  // Ten or so segments per rib: fewer and the reeding steps into a cog.
+  // Twelve segments per rib keeps the curve smooth; fewer and the reeding
+  // steps into a cog.
   const geometry = new THREE.CylinderGeometry(
     topRadius,
     bottomRadius,
     height,
-    flutes * 10,
+    flutes * 12,
     1,
     false
   )
@@ -33,10 +34,13 @@ function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }
     if (radius < 1e-4) continue
 
     const angle = Math.atan2(vertex.z, vertex.x)
-    // Flat-bottomed grooves read better than a pure sine: bias the wave so the
-    // ribs stand proud and the valleys between them are shallow.
+    // A cosine alone gives ribs and grooves of equal width. Raising the valley
+    // term to a power keeps most of the circumference out at full radius and
+    // cuts only a narrow groove between ribs, which is how turned reeding
+    // actually looks.
     const wave = Math.cos(angle * flutes)
-    const scale = 1 + depth * (wave * 0.5 - 0.5)
+    const groove = Math.pow((1 - wave) / 2, 3)
+    const scale = 1 - depth * groove
 
     position.setX(i, vertex.x * scale)
     position.setZ(i, vertex.z * scale)
@@ -123,8 +127,8 @@ function SnowGlobe({
         topRadius: baseRadius * 1.15,
         bottomRadius: baseRadius * 1.3,
         height: baseHeight,
-        flutes: 56,
-        depth: 0.022
+        flutes: 76,
+        depth: 0.03
       }),
     [baseRadius, baseHeight]
   )
