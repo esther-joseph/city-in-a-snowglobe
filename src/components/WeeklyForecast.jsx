@@ -36,7 +36,10 @@ function WeeklyForecast({ days = [], isNight = false }) {
   return (
     <div className="weekly-card">
       <div className="weekly-card-header">
-        <h3>{MAX_DAYS}-Day Forecast</h3>
+        {/* The heading counts what is actually on screen: the free forecast
+            usually yields five or six days, and a card that claims seven while
+            showing six is worse than one that says six. */}
+        <h3>{`${shown.length}-Day Forecast`}</h3>
         <span>{`${Math.round(span.min)}°F / ${Math.round(span.max)}°F`}</span>
       </div>
 
