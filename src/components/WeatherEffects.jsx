@@ -566,6 +566,16 @@ function CloudLayer({
     return Math.max(0.2, Math.min(1.0, combinedDensity))
   }, [weatherType, weatherData])
 
+  // White unless something is falling out of them. Rain and thunder darken the
+  // cloud, snow only dulls it slightly.
+  const cloudTone = useMemo(() => {
+    const condition = `${weatherType || ''} ${weatherData?.weather?.[0]?.description || ''}`.toLowerCase()
+    if (condition.includes('thunder') || condition.includes('storm')) return '#5f6674'
+    if (condition.includes('rain') || condition.includes('drizzle')) return '#949cab'
+    if (condition.includes('snow') || condition.includes('sleet')) return '#c8cedb'
+    return '#ffffff'
+  }, [weatherType, weatherData])
+
   const windVector = useMemo(() => {
     if (!windDirection && windDirection !== 0) return { x: 0.05, z: 0.03 }
     const radians = (windDirection * Math.PI) / 180
@@ -619,7 +629,6 @@ function CloudLayer({
         key: `cloud-${index}`,
         position: [Math.cos(angle) * radius, height, Math.sin(angle) * radius],
         scale: baseScale,
-        opacity: 0.28 + density * 0.22 + Math.random() * 0.08,
         speed: 0.35 + Math.random() * 0.25,
         wobble: {
           x: Math.random() * Math.PI * 2,
@@ -701,33 +710,15 @@ function CloudLayer({
           scale={[cloud.scale * 2.6, cloud.scale * 1.9, cloud.scale * 2.6]}
         >
           <Icosahedron args={[0.95, 1]}>
-            <meshStandardMaterial
-              color="#ffffff"
-              transparent
-              opacity={cloud.opacity}
-              roughness={0.22}
-              metalness={0.02}
-            />
+            <meshStandardMaterial color={cloudTone} roughness={0.22} metalness={0.02} />
           </Icosahedron>
           {cloud.puffs.map((puff) => (
             <group key={puff.key} position={puff.offset} scale={puff.scale}>
               <Sphere args={[0.6, 16, 16]}>
-                <meshStandardMaterial
-                  color="#fefeff"
-                  transparent
-                  opacity={cloud.opacity * 0.95}
-                  roughness={0.3}
-                  metalness={0.02}
-                />
+                <meshStandardMaterial color={cloudTone} roughness={0.3} metalness={0.02} />
               </Sphere>
               <Icosahedron args={[0.45, 1]}>
-                <meshStandardMaterial
-                  color="#ffffff"
-                  transparent
-                  opacity={cloud.opacity * 0.85}
-                  roughness={0.25}
-                  metalness={0.015}
-                />
+                <meshStandardMaterial color={cloudTone} roughness={0.25} metalness={0.015} />
               </Icosahedron>
             </group>
           ))}
