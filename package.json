@@ -15,7 +15,10 @@
     "android:build": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
     "android:bundle": "npm run build && npx cap sync android && cd android && ./gradlew bundleRelease",
     "store:screenshots": "node scripts/capture-store-assets.mjs",
-    "store:brand": "node scripts/capture-brand-assets.mjs"
+    "store:brand": "node scripts/capture-brand-assets.mjs",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report"
   },
   "keywords": [],
   "author": "",
@@ -38,6 +41,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.2",
     "@capacitor/cli": "^6.1.2",
+    "@playwright/test": "^1.63.0",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.22",
     "playwright-core": "^1.62.1",
