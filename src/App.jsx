@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { XR, XROrigin, createXRStore } from '@react-three/xr'
 import City from './components/City'
@@ -13,6 +13,17 @@ import StarField from './components/environment/StarField'
 import LiquidChromeBackground from './components/environment/LiquidChromeBackground'
 // import AuraSky from './components/environment/AuraSky'
 import WeatherService from './services/WeatherService'
+import CameraFeedBackground from './components/ar/CameraFeedBackground'
+import DeviceOrientationCamera from './components/ar/DeviceOrientationCamera'
+import ARSceneControls from './components/ar/ARSceneControls'
+import FitToMeters from './components/ar/FitToMeters'
+import {
+  AR_MODES,
+  getARCapability,
+  requestCameraPermission,
+  requestOrientationPermission
+} from './utils/arSupport'
+import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 
 // Single WebXR store for the whole app (xr v6 API). Created once at module
@@ -21,6 +32,24 @@ import './App.css'
 // so the session still starts on devices that lack some of them — which is
 // what makes it work on both ARCore (Android) and ARKit (iOS 17+ Safari).
 const xrStore = createXRStore()
+
+/**
+ * Publishes the live three.js scene to a ref so the USDZ exporter can find the
+ * globe without reaching into React internals.
+ */
+function SceneBridge({ targetRef }) {
+  const scene = useThree((state) => state.scene)
+  useEffect(() => {
+    targetRef.current = scene
+    // Dev aid: lets the USDZ export be exercised from the console on a desktop
+    // browser, where no AR path is otherwise reachable.
+    if (import.meta.env.DEV) window.__snowGlobeScene = scene
+    return () => {
+      targetRef.current = null
+    }
+  }, [scene, targetRef])
+  return null
+}
 
 function hexToRgb(hex) {
   if (!hex) return { r: 255, g: 255, b: 255 }
@@ -649,6 +678,20 @@ function resolveCityProfile(cityName) {
   return cityProfiles[normalized] || defaultCityProfile
 }
 
+const arControlStyle = {
+  pointerEvents: 'auto',
+  padding: '12px 20px',
+  backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  color: '#fff',
+  border: '2px solid rgba(255, 255, 255, 0.25)',
+  borderRadius: '999px',
+  fontSize: '15px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  backdropFilter: 'blur(12px)',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.35)'
+}
+
 function App() {
   const [weatherData, setWeatherData] = useState(null)
   const [hourlyForecast, setHourlyForecast] = useState(null)
@@ -663,6 +706,14 @@ function App() {
   const [forceSnow, setForceSnow] = useState(false)
   const [forceRain, setForceRain] = useState(false)
   const [renderMode, setRenderMode] = useState('3d')
+  // Which AR implementation the current device resolved to: a WebXR session
+  // (ARCore, Android XR, visionOS Safari) or the camera fallback. Quick Look
+  // never sets this, since it hands off to the system viewer and the app stays
+  // in 3D mode.
+  const [arMode, setArMode] = useState(null)
+  const [arNotice, setArNotice] = useState(null)
+  const [arHeading, setArHeading] = useState(0)
+  const sceneRef = useRef(null)
   const [arSessionKey, setArSessionKey] = useState(0)
   const [shakeTrigger, setShakeTrigger] = useState(0)
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
@@ -738,6 +789,77 @@ function App() {
   const triggerShakeEffect = useCallback(() => {
     setShakeTrigger(Date.now())
   }, [])
+
+  /**
+   * iOS route: export the globe to USDZ and hand it to AR Quick Look, which
+   * does the plane detection Safari itself can't.
+   */
+  const launchQuickLook = useCallback(async () => {
+    const exportRoot = sceneRef.current?.getObjectByName(USDZ_ROOT_NAME)
+    if (!exportRoot) {
+      setArNotice('The globe is still loading. Try AR again in a moment.')
+      return
+    }
+
+    try {
+      setArNotice('Preparing the AR model…')
+      await openInQuickLook(exportRoot, {
+        fileName: `${normalizeCityName(city) || 'snow'}-globe.usdz`
+      })
+      setArNotice(null)
+    } catch (error) {
+      console.error('USDZ export failed:', error)
+      setArNotice('Could not build the AR model on this device.')
+    }
+  }, [city])
+
+  /**
+   * Resolves which AR path this device supports before switching modes. Each
+   * path is gated on a real capability check, so ARCore and Android XR keep
+   * the WebXR session while iOS gets Quick Look or the camera fallback.
+   */
+  const handleRenderModeChange = useCallback(
+    async (nextMode) => {
+      setArNotice(null)
+
+      if (nextMode !== 'ar') {
+        setRenderMode('3d')
+        setArMode(null)
+        return
+      }
+
+      const capability = await getARCapability()
+
+      if (capability.mode === AR_MODES.WEBXR) {
+        setArMode(AR_MODES.WEBXR)
+        setRenderMode('ar')
+        return
+      }
+
+      if (capability.mode === AR_MODES.QUICK_LOOK) {
+        await launchQuickLook()
+        return
+      }
+
+      if (capability.mode === AR_MODES.CAMERA) {
+        const cameraGranted = await requestCameraPermission()
+        if (!cameraGranted) {
+          setArNotice('AR mode needs camera access. Enable it in your browser settings and try again.')
+          return
+        }
+        const motionGranted = await requestOrientationPermission()
+        if (!motionGranted) {
+          setArNotice('Motion access was declined, so the view will not follow your device.')
+        }
+        setArMode(AR_MODES.CAMERA)
+        setRenderMode('ar')
+        return
+      }
+
+      setArNotice(capability.message)
+    },
+    [launchQuickLook]
+  )
 
   // Reload page on first launch
   useEffect(() => {
@@ -1057,7 +1179,8 @@ function App() {
             speed={celestialData.starSettings.speed}
           />
         ) : null)}
-      <City
+      <group name={USDZ_ROOT_NAME}>
+        <City
         profile={cityProfile}
         cityName={displayCityName}
         citySeed={normalizeCityName(displayCityName)}
@@ -1068,7 +1191,8 @@ function App() {
         weatherType={weatherType}
         glassTint={glassTint}
 
-      />
+        />
+      </group>
     </>
   )
 
@@ -1153,11 +1277,19 @@ function App() {
             onRainToggle={setForceRain}
             forceRain={forceRain}
         renderMode={renderMode}
-        onRenderModeChange={setRenderMode}
+        onRenderModeChange={handleRenderModeChange}
         weatherService={weatherService}
       />
 
       <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+        {renderMode === 'ar' && arMode === AR_MODES.CAMERA && (
+          <CameraFeedBackground
+            onError={() => {
+              setArNotice('Camera feed stopped. Returning to 3D mode.')
+              handleRenderModeChange('3d')
+            }}
+          />
+        )}
         {renderMode === '3d' ? (
       <Canvas
             camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}
@@ -1177,6 +1309,7 @@ function App() {
             style={{ background: 'transparent' }}
           >
             <Suspense fallback={null}>
+              <SceneBridge targetRef={sceneRef} />
               <ShakeableScene includeSky />
         <OrbitControls 
                 enablePan
@@ -1189,6 +1322,33 @@ function App() {
                 dampingFactor={0.05}
                 enableDamping
               />
+            </Suspense>
+          </Canvas>
+        ) : arMode === AR_MODES.CAMERA ? (
+          // iOS fallback: the scene floats in front of the camera feed and
+          // follows the device. No plane detection, so the globe is fitted to
+          // a fixed spot ahead of the viewer rather than anchored to a surface.
+          <Canvas
+            camera={{ position: [0, 0, 0], fov: 65, near: 0.05, far: 60 }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: true, alpha: true, powerPreference: 'default' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              background: 'transparent',
+              zIndex: 1
+            }}
+          >
+            <DeviceOrientationCamera onHeading={setArHeading} />
+            <Suspense fallback={null}>
+              <group position={[0, -0.3, -1.4]} rotation={[0, arHeading, 0]}>
+                <FitToMeters targetDiameter={0.45}>
+                  <ShakeableScene includeSky={false} />
+                </FitToMeters>
+              </group>
             </Suspense>
           </Canvas>
         ) : (
@@ -1236,6 +1396,10 @@ function App() {
               })()}
               <Suspense fallback={null}>
                 <ShakeableScene includeSky={false} />
+                <ARSceneControls
+                  onShake={triggerShakeEffect}
+                  onExit={() => handleRenderModeChange('3d')}
+                />
               </Suspense>
             </XR>
       </Canvas>
@@ -1277,6 +1441,62 @@ function App() {
             >
               ✨ Shake Snow Globe
             </button>
+          </div>
+        )}
+        {renderMode === 'ar' && arMode === AR_MODES.CAMERA && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: 'clamp(12px, 4vh, 28px)',
+              left: 0,
+              right: 0,
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              padding: '0 12px',
+              zIndex: 60
+            }}
+          >
+            <button onClick={triggerShakeEffect} style={arControlStyle}>
+              ✨ Shake
+            </button>
+            <button
+              onClick={() => setArHeading((heading) => heading + Math.PI / 12)}
+              style={arControlStyle}
+              aria-label="Rotate the globe into view"
+            >
+              ↻ Recenter
+            </button>
+            <button onClick={() => handleRenderModeChange('3d')} style={arControlStyle}>
+              ✕ Exit AR
+            </button>
+          </div>
+        )}
+        {arNotice && (
+          <div
+            role="status"
+            style={{
+              position: 'fixed',
+              top: 'clamp(70px, 12vh, 110px)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              maxWidth: 'min(420px, calc(100vw - 32px))',
+              padding: '12px 18px',
+              backgroundColor: 'rgba(0, 0, 0, 0.82)',
+              color: '#fff',
+              borderRadius: '14px',
+              border: '1px solid rgba(255,255,255,0.16)',
+              backdropFilter: 'blur(12px)',
+              fontSize: '14px',
+              lineHeight: 1.4,
+              textAlign: 'center',
+              zIndex: 120,
+              cursor: 'pointer'
+            }}
+            onClick={() => setArNotice(null)}
+          >
+            {arNotice}
           </div>
         )}
       </div>

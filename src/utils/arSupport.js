@@ -1,65 +1,63 @@
 /**
- * AR Support Detection Utilities
- * 
- * Handles device-specific AR capability detection, especially for iOS
- * which has limited WebXR support.
+ * AR capability detection.
+ *
+ * Detection is capability-first, not platform-first: whatever the device
+ * actually implements decides which AR path the app takes.
+ *
+ *   webxr      immersive-ar sessions. ARCore phones, Android XR headsets and
+ *              Safari on visionOS (WebXR is on by default from visionOS 2).
+ *   quicklook  iPhone/iPad. Safari has never shipped immersive-ar, so the
+ *              globe is exported to USDZ and handed to Apple's AR Quick Look.
+ *   camera     Camera feed plus device orientation. No world tracking, so the
+ *              globe follows the device instead of staying put.
+ *   none       No AR path available (most desktops).
  */
 
-/**
- * Check if device is iOS
- */
-export function isIOS() {
-  if (typeof window === 'undefined') return false
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+export const AR_MODES = {
+  WEBXR: 'webxr',
+  QUICK_LOOK: 'quicklook',
+  CAMERA: 'camera',
+  NONE: 'none'
 }
 
 /**
- * Check iOS version (returns major version number, e.g., 17)
+ * iPhone, iPod, and iPad — including iPadOS 13+, which reports a desktop
+ * Safari user agent and is only distinguishable by its touch points.
  */
+export function isIOSFamily() {
+  if (typeof navigator === 'undefined') return false
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return true
+  return /Macintosh/i.test(navigator.userAgent) && (navigator.maxTouchPoints || 0) > 1
+}
+
+/** Kept for callers that only care about the classic iOS user agents. */
+export function isIOS() {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
+/** Major iOS version, or null when it can't be read from the user agent. */
 export function getIOSVersion() {
-  if (!isIOS()) return null
+  if (typeof navigator === 'undefined') return null
   const match = navigator.userAgent.match(/OS (\d+)_(\d+)_?(\d+)?/)
   return match ? parseInt(match[1], 10) : null
 }
 
-/**
- * Check if device supports ARKit (iOS native AR)
- * Requires iOS 11+ and ARKit-compatible device
- */
-export function supportsARKit() {
-  if (!isIOS()) return false
-  const version = getIOSVersion()
-  if (!version || version < 11) return false
-  
-  // ARKit is supported on:
-  // - iPhone 6s and later
-  // - iPad (2017) and later
-  // - iPad Pro (all models)
-  // We can't precisely detect this without native code, so assume modern devices support it
-  // Real detection would require Capacitor plugin or User-Agent parsing
-  return version >= 11
-}
-
-/**
- * Check if WebXR is available (works on iOS 17+ in Safari, but limited)
- */
+/** Whether the browser exposes the WebXR Device API at all. */
 export function isWebXRAvailable() {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
-  return 'xr' in navigator
+  return typeof navigator !== 'undefined' && 'xr' in navigator
 }
 
 /**
- * Check if WebXR immersive-ar session is supported
- * Returns Promise<boolean>
+ * Whether an immersive-ar session can actually start. This is the only
+ * reliable signal — user agent sniffing cannot tell visionOS Safari (which
+ * supports it) from iOS Safari (which does not).
+ * @returns {Promise<boolean>}
  */
 export async function isWebXRARSupported() {
   if (!isWebXRAvailable()) return false
-  
   try {
-    if (navigator.xr && typeof navigator.xr.isSessionSupported === 'function') {
-      return await navigator.xr.isSessionSupported('immersive-ar')
-    }
-    return false
+    return await navigator.xr.isSessionSupported('immersive-ar')
   } catch (error) {
     console.warn('WebXR AR support check failed:', error)
     return false
@@ -67,50 +65,88 @@ export async function isWebXRARSupported() {
 }
 
 /**
- * Get AR capability status
- * Returns object with support information
+ * Whether Safari will hand a USDZ file to AR Quick Look. The relList check is
+ * Apple's documented feature test.
+ */
+export function supportsQuickLook() {
+  if (typeof document === 'undefined') return false
+  if (!isIOSFamily()) return false
+  const anchor = document.createElement('a')
+  return Boolean(anchor.relList && anchor.relList.supports && anchor.relList.supports('ar'))
+}
+
+/**
+ * Whether the camera fallback can run: a rear camera, motion sensors, and a
+ * secure context to ask for them.
+ */
+export function supportsCameraFallback() {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false
+  if (!window.isSecureContext) return false
+  if (!navigator.mediaDevices?.getUserMedia) return false
+  if (!('DeviceOrientationEvent' in window)) return false
+  return (navigator.maxTouchPoints || 0) > 0
+}
+
+const MESSAGES = {
+  [AR_MODES.WEBXR]: null,
+  [AR_MODES.QUICK_LOOK]:
+    "Opens the globe in Apple's AR Quick Look. Weather effects and the glass dome are simplified, since USDZ can't carry them.",
+  [AR_MODES.CAMERA]:
+    'Uses your camera and motion sensors. The globe follows your device rather than staying anchored to a surface.',
+  [AR_MODES.NONE]:
+    'AR mode needs a phone, tablet, or headset with a camera. Try opening the app on one of those.'
+}
+
+const LABELS = {
+  [AR_MODES.WEBXR]: 'Place the globe in your room and walk around it.',
+  [AR_MODES.QUICK_LOOK]: 'Place the globe on a surface with AR Quick Look.',
+  [AR_MODES.CAMERA]: 'Hold the globe up against your camera view.',
+  [AR_MODES.NONE]: 'Project the globe into your space using your device camera.'
+}
+
+/**
+ * Resolve which AR path this device should take.
+ * @returns {Promise<{mode: string, supported: boolean, message: string|null,
+ *   label: string, webXRARSupported: boolean, quickLookSupported: boolean,
+ *   cameraSupported: boolean, isIOSFamily: boolean, iosVersion: number|null}>}
  */
 export async function getARCapability() {
-  const ios = isIOS()
-  const iosVersion = getIOSVersion()
-  const webXRAvailable = isWebXRAvailable()
-  const webXRARSupported = webXRAvailable ? await isWebXRARSupported() : false
-  const arkitSupported = ios && supportsARKit()
-  
+  const webXRARSupported = await isWebXRARSupported()
+  const quickLookSupported = supportsQuickLook()
+  const cameraSupported = supportsCameraFallback()
+
+  let mode = AR_MODES.NONE
+  if (webXRARSupported) mode = AR_MODES.WEBXR
+  else if (quickLookSupported) mode = AR_MODES.QUICK_LOOK
+  else if (cameraSupported) mode = AR_MODES.CAMERA
+
   return {
-    isIOS: ios,
-    iosVersion,
-    webXRAvailable,
+    mode,
+    supported: mode !== AR_MODES.NONE,
+    message: MESSAGES[mode],
+    label: LABELS[mode],
     webXRARSupported,
-    arkitSupported,
-    // iOS 17+ has experimental WebXR support in Safari
-    // Older iOS versions would need native ARKit plugin
-    supported: webXRARSupported || (ios && iosVersion >= 17 && webXRAvailable),
-    fallbackAvailable: arkitSupported && !webXRARSupported,
-    message: ios && !webXRARSupported && iosVersion < 17
-      ? 'AR mode requires iOS 17 or later. Please update your device to use AR features.'
-      : ios && !webXRARSupported && iosVersion >= 17
-        ? 'AR mode may have limited support. Please ensure you are using Safari or a WebXR-compatible browser.'
-        : !webXRARSupported
-          ? 'AR mode is not supported on this device.'
-          : null
+    quickLookSupported,
+    cameraSupported,
+    isIOSFamily: isIOSFamily(),
+    iosVersion: getIOSVersion()
   }
 }
 
 /**
- * Request camera permission (for iOS, this may need native handling)
- * Returns Promise<boolean>
+ * Ask for the rear camera and release it again — the fallback only needs the
+ * permission grant at this point.
+ * @returns {Promise<boolean>}
  */
 export async function requestCameraPermission() {
-  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     return false
   }
-  
   try {
-    // This will trigger permission prompt
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-    // Immediately stop the stream (we just needed permission)
-    stream.getTracks().forEach(track => track.stop())
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    })
+    stream.getTracks().forEach((track) => track.stop())
     return true
   } catch (error) {
     console.warn('Camera permission denied:', error)
@@ -118,3 +154,19 @@ export async function requestCameraPermission() {
   }
 }
 
+/**
+ * iOS 13+ gates motion events behind a permission prompt that must be
+ * triggered by a user gesture. Everywhere else this resolves true.
+ * @returns {Promise<boolean>}
+ */
+export async function requestOrientationPermission() {
+  if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return false
+  const request = window.DeviceOrientationEvent.requestPermission
+  if (typeof request !== 'function') return true
+  try {
+    return (await request()) === 'granted'
+  } catch (error) {
+    console.warn('Motion permission denied:', error)
+    return false
+  }
+}
