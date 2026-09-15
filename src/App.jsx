@@ -9,6 +9,7 @@ import WeatherDrawer from './components/WeatherDrawer'
 import { SNOW_GLOBE_CONTENT_SCALE } from './components/SnowGlobe'
 import Sun from './components/environment/Sun'
 import Moon from './components/environment/Moon'
+import CelestialRings from './components/environment/CelestialRings'
 import StarField from './components/environment/StarField'
 import LiquidChromeBackground from './components/environment/LiquidChromeBackground'
 // import AuraSky from './components/environment/AuraSky'
@@ -1071,6 +1072,14 @@ function App() {
 
     elements.push(
       <group key="celestial">
+        {/* Golden bands carrying the sun and moon, so the globe reads as an
+            astronomical instrument */}
+        <CelestialRings
+          sunPosition={sunOuterPosition}
+          moonPosition={moonOuterPosition}
+          scale={Math.max(1, contentScale * 3.5)}
+        />
+
         {!celestialData.isNight && (
           <Sun
             position={sunOuterPosition}
