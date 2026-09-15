@@ -3,7 +3,8 @@ import PropTypes from 'prop-types'
 
 /**
  * MeteoconIcon — Meteocons line-style weather icons, served from /public (see postinstall).
- * Icon files come from @meteocons/svg-static (copied to public/weather-icons/line).
+ * Icon files come from @bybas/weather-icons (production/line/all — the animated
+ * set), copied to public/weather-icons/line.
  */
 function MeteoconIcon({ weatherMain, isNight = false, className = '', size = 24, ...props }) {
   // Map OpenWeatherMap weather conditions to Meteocons icon names
