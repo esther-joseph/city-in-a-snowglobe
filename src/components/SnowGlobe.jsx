@@ -240,8 +240,7 @@ function SnowGlobe({
       </mesh>
 
       {/* Amber gold ring — forged rather than mirrored: a hammered normal map
-          breaks the highlight into facets, with a soft halo just outside it so
-          the edge glows rather than glints */}
+          breaks the highlight into facets */}
       <mesh position={[0, ringY, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[baseRadius * 1.18, 0.17, 20, 320]} />
         <meshStandardMaterial
@@ -254,12 +253,6 @@ function SnowGlobe({
           normalScale={new THREE.Vector2(2.2, 2.2)}
           roughnessMap={hammered.roughnessMap}
         />
-      </mesh>
-      <mesh position={[0, ringY, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[baseRadius * 1.18, 0.34, 10, 96]} />
-        {/* Normal blending, not additive: added over a bright daytime sky the
-            amber saturates to white and the halo stops looking warm. */}
-        <meshBasicMaterial color={AMBER_GLOW} transparent opacity={0.3} depthWrite={false} />
       </mesh>
 
       {/* Plaque — gold label */}
@@ -282,8 +275,8 @@ function RotatingPlaque({ radius, labelY, text }) {
     groupRef.current.rotation.y += delta * 0.15
   })
 
-  // Wrap city name with decorative middle-dots for a premium engraved-plaque look
-  const decorated = `· ${text} ·`
+  // Wrap the city name with fisheye bullets (U+25C9) for an engraved-plaque look
+  const decorated = `◉ ${text} ◉`
   const arcSweep = Math.PI / 2.1
   const textRadius = radius + 0.16
 
