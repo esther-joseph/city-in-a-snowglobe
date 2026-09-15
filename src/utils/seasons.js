@@ -3,8 +3,10 @@
  *
  * Seasons follow the meteorological convention (three whole months each) and
  * flip below the equator, so a July city in Sydney is in winter while a July
- * city in Oslo is in summer. The date used is the city's local date, not the
- * viewer's.
+ * city in Oslo is in summer. The date used is the city's local date — derived
+ * from the observation time plus the city's UTC offset — not the viewer's, so
+ * a city that has already rolled into the next month gets the new season.
+ * Near the equator seasons are suppressed entirely.
  */
 
 export const SEASONS = {
@@ -29,12 +31,18 @@ const OPPOSITE = {
   [SEASONS.AUTUMN]: SEASONS.SPRING
 }
 
+// Within roughly ten degrees of the equator there is no seasonal swing to
+// show: the vegetation stays green all year, so Quito in December should not
+// be standing in bare winter trees the way Denver is.
+const TROPICAL_LATITUDE = 10
+
 /**
  * @param {number} month - 0-11
  * @param {number} latitude - degrees; negative is the southern hemisphere
  * @returns {string} one of SEASONS
  */
 export function seasonForMonth(month, latitude = 0) {
+  if (Math.abs(latitude) < TROPICAL_LATITUDE) return SEASONS.SUMMER
   const northern = NORTHERN_BY_MONTH[((month % 12) + 12) % 12]
   return latitude < 0 ? OPPOSITE[northern] : northern
 }
