@@ -5,9 +5,9 @@ import * as THREE from 'three'
 /**
  * Golden armillary rings.
  *
- * One ring carries the sun and another the moon, each tilted so its body rides
- * on the band, with a horizon ring between them — the arrangement that makes a
- * globe read as an astronomical instrument rather than an ornament.
+ * A meridian ring carries whichever body is in the sky — the sun by day, the
+ * moon by night — with a level horizon ring below it, the arrangement that
+ * makes a globe read as an astronomical instrument rather than an ornament.
  *
  * A ring's plane is the one containing both the body's direction and world up,
  * which is what a meridian ring does on a real armillary sphere: the band runs
@@ -40,7 +40,7 @@ function Band({ target, tube, opacity, segments = 96 }) {
   const { radius, quaternion } = useMemo(() => ringTransform(target), [target])
 
   return (
-    <mesh quaternion={quaternion} castShadow={false} receiveShadow={false}>
+    <mesh name="celestial-ring" quaternion={quaternion} castShadow={false} receiveShadow={false}>
       <torusGeometry args={[radius, tube, 10, segments]} />
       <meshStandardMaterial
         color={GOLD}
@@ -64,7 +64,7 @@ Band.propTypes = {
 
 Band.defaultProps = { opacity: 1, segments: 96 }
 
-function CelestialRings({ sunPosition, moonPosition, scale = 1 }) {
+function CelestialRings({ sunPosition, moonPosition, isNight = false, scale = 1 }) {
   const tube = 0.55 * scale
 
   // The horizon band sits between the two orbits and stays level.
@@ -76,12 +76,14 @@ function CelestialRings({ sunPosition, moonPosition, scale = 1 }) {
 
   return (
     <group>
-      {/* Sun ring */}
-      <Band target={sunPosition} tube={tube} />
-      {/* Moon ring */}
-      <Band target={moonPosition} tube={tube * 0.85} />
+      {/* Only the band belonging to the body currently in the sky */}
+      {isNight ? (
+        <Band target={moonPosition} tube={tube * 0.85} />
+      ) : (
+        <Band target={sunPosition} tube={tube} />
+      )}
       {/* Horizon ring — level, so it reads as the instrument's base circle */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh name="celestial-ring-horizon" rotation={[-Math.PI / 2, 0, 0]}>
         <torusGeometry args={[horizonTarget[0], tube * 0.7, 10, 120]} />
         <meshStandardMaterial
           color={GOLD}
@@ -100,6 +102,8 @@ function CelestialRings({ sunPosition, moonPosition, scale = 1 }) {
 CelestialRings.propTypes = {
   sunPosition: PropTypes.arrayOf(PropTypes.number).isRequired,
   moonPosition: PropTypes.arrayOf(PropTypes.number).isRequired,
+  /** Which band to show: the moon's after dark, the sun's otherwise. */
+  isNight: PropTypes.bool,
   scale: PropTypes.number
 }
 

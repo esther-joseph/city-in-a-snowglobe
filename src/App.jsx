@@ -1077,6 +1077,7 @@ function App() {
         <CelestialRings
           sunPosition={sunOuterPosition}
           moonPosition={moonOuterPosition}
+          isNight={celestialData.isNight}
           scale={Math.max(1, contentScale * 3.5)}
         />
 
