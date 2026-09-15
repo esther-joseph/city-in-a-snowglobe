@@ -7,6 +7,25 @@ export const SNOW_GLOBE_CONTENT_SCALE = 0.28
 const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
 
 /**
+ * Fluted geometries are shared across mounts.
+ *
+ * BaseScene and ShakeableScene are declared inside App, so every App render
+ * creates new component types and React remounts the whole 3D subtree — which
+ * threw away the useMemo below and rebuilt this geometry on every drawer
+ * toggle. At 150 flutes that was enough to push the rapid-interaction test
+ * past its budget. Keyed by its parameters, so a remount reuses the buffer.
+ */
+const flutedGeometryCache = new Map()
+
+function getFlutedGeometry(params) {
+  const key = Object.values(params).join('|')
+  if (!flutedGeometryCache.has(key)) {
+    flutedGeometryCache.set(key, createFlutedGeometry(params))
+  }
+  return flutedGeometryCache.get(key)
+}
+
+/**
  * A cylinder with vertical flutes cut around it, like a reeded plinth.
  *
  * Built by pushing each vertex in or out along its own radius by a sine of the
@@ -14,13 +33,13 @@ const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
  * light as rounded reeds rather than facets.
  */
 function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }) {
-  // Twelve segments per rib keeps the curve smooth; fewer and the reeding
-  // steps into a cog.
+  // Eight segments per rib keeps the curve smooth. Narrow ribs need fewer
+  // than wide ones; below about six the reeding steps into a cog.
   const geometry = new THREE.CylinderGeometry(
     topRadius,
     bottomRadius,
     height,
-    flutes * 12,
+    flutes * 8,
     1,
     false
   )
@@ -123,11 +142,11 @@ function SnowGlobe({
 
   const flutedBase = useMemo(
     () =>
-      createFlutedGeometry({
+      getFlutedGeometry({
         topRadius: baseRadius * 1.15,
         bottomRadius: baseRadius * 1.3,
         height: baseHeight,
-        flutes: 76,
+        flutes: 150,
         depth: 0.03
       }),
     [baseRadius, baseHeight]
