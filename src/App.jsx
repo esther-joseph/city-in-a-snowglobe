@@ -41,6 +41,10 @@ const xrStore = createXRStore()
 
 const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn']
 
+// How long the globe spins after a shake. Shared by the effect that starts the
+// spin and the frame loop that drives it.
+const SHAKE_SPIN_DURATION = 1400
+
 /**
  * Publishes the live three.js scene to a ref so the USDZ exporter can find the
  * globe without reaching into React internals.
@@ -1246,10 +1250,24 @@ function App() {
 
     useEffect(() => {
       if (!shakeTrigger) return
+      // The trigger is a wall-clock stamp, and the animation is timed from it
+      // rather than from now.
+      //
+      // BaseScene and ShakeableScene are declared inside App, so every App
+      // render creates a new component type and React remounts the whole 3D
+      // subtree. This effect then runs again on a shakeTrigger that has not
+      // changed — which used to start the spin over from the top, so the globe
+      // would lurch on its own whenever anything re-rendered App (a time-slider
+      // move, a weather refresh) long after the button was pressed.
+      //
+      // Timing from the stamp makes a remount harmless: a spin still in flight
+      // picks up at the phase it had reached, and one that has already finished
+      // is left alone.
+      if (Date.now() - shakeTrigger >= SHAKE_SPIN_DURATION) return
       animationRef.current = {
         active: true,
-        start: performance.now(),
-        duration: 1400,
+        start: shakeTrigger,
+        duration: SHAKE_SPIN_DURATION,
         keyframes: [
           { start: 0, end: 350, from: 0, to: Math.PI * 1.5 },
           { start: 350, end: 700, from: Math.PI * 1.5, to: -Math.PI * 1.5 },
@@ -1262,8 +1280,7 @@ function App() {
       const anim = animationRef.current
       const group = groupRef.current
       if (!group || !anim.active) return
-      const now = performance.now()
-      const elapsed = now - anim.start
+      const elapsed = Date.now() - anim.start
 
       if (elapsed >= anim.duration) {
         anim.active = false
