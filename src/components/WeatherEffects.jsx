@@ -8,6 +8,9 @@ import { USDZ_ROOT_NAME } from '../utils/usdzExport'
 
 const DOWN_VECTOR = new THREE.Vector3(0, -1, 0)
 
+// How long the snow tumbles after a shake.
+const SHAKE_TUMBLE_DURATION = 3200
+
 function RainParticles({ performanceScale = 1 }) {
   const instancedMeshRef = useRef()
   const rippleRefs = useRef([])
@@ -971,10 +974,14 @@ function WeatherEffects({
 
   useEffect(() => {
     if (!shakeTrigger) return
+    // Timed from the trigger stamp, not from now: the scene remounts on every
+    // App render, and restarting the tumble on an unchanged trigger is what
+    // made the globe spin at random long after the button was pressed.
+    if (Date.now() - shakeTrigger >= SHAKE_TUMBLE_DURATION) return
     shakeStateRef.current = {
       active: true,
-      start: performance.now(),
-      duration: 3200
+      start: shakeTrigger,
+      duration: SHAKE_TUMBLE_DURATION
     }
   }, [shakeTrigger])
 
@@ -982,7 +989,7 @@ function WeatherEffects({
     const group = shakeGroupRef.current
     const shakeState = shakeStateRef.current
     if (!group || !shakeState.active) return
-    const elapsed = performance.now() - shakeState.start
+    const elapsed = Date.now() - shakeState.start
     if (elapsed >= shakeState.duration) {
       shakeState.active = false
       group.rotation.set(0, 0, 0)
