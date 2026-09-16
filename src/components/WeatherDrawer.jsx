@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import WeatherUI from './WeatherUI'
 import ModeToggle from './ModeToggle'
+import AdSlot from './ads/AdSlot'
 
 function WeatherDrawer({
   weatherData,
@@ -23,9 +24,11 @@ function WeatherDrawer({
   forceRain,
   renderMode,
   onRenderModeChange,
-  weatherService
+  weatherService,
+  initiallyOpen = false
 }) {
-  const [isOpen, setIsOpen] = useState(false)
+  // The manifest's "Change city" shortcut launches with ?panel=open.
+  const [isOpen, setIsOpen] = useState(initiallyOpen)
 
   return (
     <>
@@ -87,6 +90,7 @@ function WeatherDrawer({
           onRainToggle={onRainToggle}
           forceRain={forceRain}
             weatherService={weatherService}
+            renderMode={renderMode}
           />
           <ModeToggle 
             mode={renderMode} 
@@ -95,6 +99,8 @@ function WeatherDrawer({
               setIsOpen(false)
             }} 
           />
+          {/* Foot of the scroll: nothing below it to be pushed out of reach. */}
+          <AdSlot name="drawer-footer" renderMode={renderMode} />
         </div>
       </div>
     </>

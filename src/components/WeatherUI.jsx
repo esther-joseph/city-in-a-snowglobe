@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import './WeatherUI.css'
 import SunPositionDiagram from './SunPositionDiagram'
 import WeeklyForecast from './WeeklyForecast'
+import AdSlot from './ads/AdSlot'
 import MeteoconIcon from './MeteoconIcon'
 
 // Legacy function for backward compatibility - now returns icon name for MeteoconIcon
@@ -239,7 +240,8 @@ function WeatherUI({
   forceSnow = false,
   onRainToggle,
   forceRain = false,
-  weatherService = null
+  weatherService = null,
+  renderMode = '3d'
 }) {
   const [city, setCity] = useState(currentCity)
   const [viewMode, setViewMode] = useState('informational')
@@ -888,6 +890,10 @@ function WeatherUI({
           </div>
         </div>
       )}
+
+              {/* Under the numbers and the timeline, where the reader has
+                  already stopped to read. Never over the globe. */}
+              <AdSlot name="drawer-banner" renderMode={renderMode} />
 
             </>
           )

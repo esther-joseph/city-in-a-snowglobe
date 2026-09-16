@@ -1,0 +1,3 @@
+# Authorized Digital Sellers for cityinasnowglobe — https://iabtechlab.com/ads-txt/
+# Google AdSense is the only network authorized to sell this site's inventory.
+google.com, pub-4752576373489354, DIRECT, f08c47fec0942fa0
