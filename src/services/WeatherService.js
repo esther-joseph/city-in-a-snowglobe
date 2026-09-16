@@ -10,16 +10,27 @@
  * Follows CRUD principles:
  * - Read: getCurrentWeather, getForecast
  */
+import { CACHE_TTL, cacheKey, readFresh, readStale, writeEntry } from './weatherCache'
+
 const SERVICE_UNAVAILABLE = 'Weather service is unavailable right now. Please try again later.'
+
+const UNITS = 'imperial'
 
 class WeatherService {
   /**
    * @param {string} [baseUrl] - Origin that serves /api/openweather. Empty
    *   means "same origin", which is what the web build uses. The Android build
    *   passes the deployed site because its own origin is the local webview.
+   * @param {Object} [options]
+   * @param {boolean} [options.cache=true] - Read and write the localStorage
+   *   cache. Off in tests that need every call to reach the network.
+   * @param {number} [options.cacheTtl] - How long a cached payload counts as
+   *   fresh, in milliseconds.
    */
-  constructor(baseUrl = '') {
+  constructor(baseUrl = '', { cache = true, cacheTtl = CACHE_TTL } = {}) {
     this.endpoint = `${String(baseUrl).replace(/\/$/, '')}/api/openweather`
+    this.cacheEnabled = cache
+    this.cacheTtl = cacheTtl
   }
 
   /**
@@ -51,7 +62,7 @@ class WeatherService {
       throw new Error('City name must be a non-empty string')
     }
 
-    const url = this.buildUrl('data/2.5/weather', { q: cityName, units: 'imperial' })
+    const url = this.buildUrl('data/2.5/weather', { q: cityName, units: UNITS })
     
     try {
       const response = await fetch(url)
@@ -87,7 +98,7 @@ class WeatherService {
       throw new Error('Latitude and longitude must be numbers')
     }
 
-    const url = this.buildUrl('data/2.5/forecast', { lat, lon, units: 'imperial' })
+    const url = this.buildUrl('data/2.5/forecast', { lat, lon, units: UNITS })
     
     try {
       const response = await fetch(url)
@@ -238,11 +249,49 @@ class WeatherService {
 
   /**
    * CRUD: Read - Get complete weather data (current + forecast)
-   * Convenience method that combines getCurrentWeather and getForecast
+   *
+   * This is the only method the app calls for a city, and it is three upstream
+   * requests deep, so it is the one worth caching. A hit inside the TTL costs
+   * nothing; a network failure falls back to an expired entry rather than an
+   * error screen.
+   *
    * @param {string} cityName - Name of the city
+   * @param {Object} [options]
+   * @param {boolean} [options.refresh=false] - Skip the cache on the way in.
    * @returns {Promise<Object>} Complete weather data with current, hourly, and weekly forecast
    */
-  async getCompleteWeatherData(cityName) {
+  async getCompleteWeatherData(cityName, { refresh = false } = {}) {
+    const key = cacheKey(cityName, UNITS)
+
+    if (this.cacheEnabled && !refresh) {
+      const cached = readFresh(key, this.cacheTtl)
+      if (cached) return cached
+    }
+
+    try {
+      return await this.fetchCompleteWeatherData(cityName, key)
+    } catch (error) {
+      // A misspelled city will never have a cache entry, and serving one under
+      // a name the user did not ask for would be worse than the error.
+      if (this.cacheEnabled && !/not found/i.test(error.message)) {
+        const stale = readStale(key)
+        if (stale) {
+          console.warn('Weather request failed; serving cached data:', error.message)
+          return { ...stale, stale: true }
+        }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * The uncached path: current conditions, then forecast and UV index, which
+   * are both optional.
+   * @param {string} cityName
+   * @param {string} [key] - Cache key to write the result under.
+   * @returns {Promise<Object>}
+   */
+  async fetchCompleteWeatherData(cityName, key = null) {
     const currentWeather = await this.getCurrentWeather(cityName)
     
     const lat = currentWeather?.coord?.lat
@@ -268,12 +317,16 @@ class WeatherService {
       }
     }
 
-    return {
+    const payload = {
       current: currentWeather,
       hourly: forecast.hourly,
       weekly: forecast.weekly,
       uvIndex: uvIndex
     }
+
+    if (this.cacheEnabled && key) writeEntry(key, payload)
+
+    return payload
   }
 }
 

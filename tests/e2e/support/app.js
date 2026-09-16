@@ -12,13 +12,14 @@ export const APP_TITLE = 'City In A Snowglobe'
  * here rather than papered over with sleeps.
  *
  * @param {import('@playwright/test').Page} page
+ * @param {string} [path] - Where to land, for the launch-parameter specs.
  */
-export async function gotoApp(page) {
+export async function gotoApp(page, path = '/') {
   await page.addInitScript(() => {
     window.sessionStorage.setItem('app-has-reloaded', 'true')
   })
   await stubWeatherApi(page)
-  await page.goto('/')
+  await page.goto(path)
   await expect(page.locator('canvas').first()).toBeAttached()
   await expect(temperature(page)).toBeVisible({ timeout: 20000 })
 }
