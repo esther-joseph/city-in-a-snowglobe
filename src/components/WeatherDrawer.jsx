@@ -52,12 +52,17 @@ function WeatherDrawer({
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 left-0 h-full w-full max-w-md bg-black/30 backdrop-blur-xl z-[90] transform transition-transform duration-300 ease-in-out overflow-y-auto ${
+        className={`fixed top-0 left-0 h-full w-full max-w-md bg-black/45 z-[90] transform transition-transform duration-300 ease-in-out overflow-y-auto ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
-          boxShadow: isOpen ? '4px 0 24px rgba(0, 0, 0, 0.5)' : 'none',
-          pointerEvents: isOpen ? 'auto' : 'none'
+          // The panel itself no longer blurs its backdrop. Every card inside
+          // already carries its own backdrop-filter, and stacking those inside
+          // one more full-height blur meant the compositor re-blurred the live
+          // WebGL canvas seventeen times per frame while the panel slid.
+          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.5)',
+          pointerEvents: isOpen ? 'auto' : 'none',
+          willChange: 'transform'
         }}
       >
         <div className="pt-20 px-6 pb-6 flex flex-col gap-5">
