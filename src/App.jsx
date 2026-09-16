@@ -31,6 +31,7 @@ import {
 } from './utils/arSupport'
 import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
+import { launchParams } from './utils/launchParams'
 
 // Single WebXR store for the whole app (xr v6 API). Created once at module
 // scope so the session survives re-renders. Defaults request hit-test,
@@ -737,7 +738,10 @@ function App() {
   const [uvIndex, setUvIndex] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [city, setCity] = useState('New York')
+  // Launched from the home-screen icon or one of its shortcuts, the URL says
+  // where to start.
+  const launch = useMemo(() => launchParams(), [])
+  const [city, setCity] = useState(launch.city || 'New York')
   const [timeTick, setTimeTick] = useState(Date.now())
   const [manualHour, setManualHour] = useState(null)
   const [forceThunder, setForceThunder] = useState(false)
@@ -791,7 +795,7 @@ function App() {
    * - Single Responsibility: Only handles state updates
    * - Dependency Inversion: Depends on WeatherService abstraction
    */
-  const fetchWeather = async (cityName) => {
+  const fetchWeather = async (cityName, { refresh = false } = {}) => {
     try {
       setLoading(true)
       setError(null)
@@ -800,7 +804,7 @@ function App() {
       setUvIndex(null)
       
       // Use service to get complete weather data (CRUD: Read)
-      const weatherData = await weatherService.getCompleteWeatherData(cityName)
+      const weatherData = await weatherService.getCompleteWeatherData(cityName, { refresh })
       
       setWeatherData(weatherData.current)
       setHourlyForecast(weatherData.hourly)
@@ -915,8 +919,11 @@ function App() {
   }, [weatherService])
 
   const handleSearch = (newCity) => {
+    // Searching for the city already on screen is a request for fresh data,
+    // so it goes past the cache rather than returning the same payload.
+    const refresh = newCity.trim().toLowerCase() === city.trim().toLowerCase()
     setCity(newCity)
-    fetchWeather(newCity)
+    fetchWeather(newCity, { refresh })
   }
 
   useEffect(() => {
@@ -1338,6 +1345,7 @@ function App() {
             onRainToggle={setForceRain}
             forceRain={forceRain}
         renderMode={renderMode}
+        initiallyOpen={launch.panelOpen}
         onRenderModeChange={handleRenderModeChange}
         weatherService={weatherService}
       />

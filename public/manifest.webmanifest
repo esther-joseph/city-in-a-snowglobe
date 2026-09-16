@@ -1,0 +1,33 @@
+{
+  "name": "City In A Snowglobe",
+  "short_name": "Snowglobe",
+  "description": "A city inside a snow globe, under its own live weather and sky.",
+  "id": "/",
+  "start_url": "/?view=3d&source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1026",
+  "theme_color": "#0b1026",
+  "categories": ["weather", "entertainment"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open the globe",
+      "short_name": "Globe",
+      "description": "Go straight to the 3D scene.",
+      "url": "/?view=3d&source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Change city",
+      "short_name": "City",
+      "description": "Open the weather panel with the search box ready.",
+      "url": "/?panel=open&source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
