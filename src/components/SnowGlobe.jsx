@@ -106,6 +106,9 @@ function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }
 const AMBER_GOLD = '#f0bf55'
 const AMBER_GLOW = '#e09a2b'
 const AMBER_DEEP = '#4a3208'
+// The light the lettering gives off — a shade brighter than the ring's amber
+// so the glow reads as a source rather than a reflection.
+const AMBER_LIGHT = '#ffb84a'
 
 const FresnelGlassMaterial = shaderMaterial(
   {
@@ -201,8 +204,10 @@ function SnowGlobe({
     () =>
       new THREE.MeshStandardMaterial({
         color: '#f7dd8c',
-        emissive: '#7a5c1c',
-        emissiveIntensity: 0.12,
+        // Lit from within: the amber emission is what makes the letters read
+        // as glowing rather than as gold that happens to catch the light.
+        emissive: AMBER_LIGHT,
+        emissiveIntensity: 0.55,
         // Mostly dielectric: with no environment map a high metalness has
         // nothing to reflect and the light yellow sinks towards bronze.
         metalness: 0.45,
@@ -427,6 +432,57 @@ function getLabelGeometry(text, radius, size) {
   return labelGeometryCache.get(key)
 }
 
+/**
+ * A soft amber aura around the lettering.
+ *
+ * The shell is the label geometry pushed out along its own vertex normals.
+ * Scaling it would not do: the glyphs are laid out around the globe axis
+ * rather than about their own centre, so a scale swings them outward along
+ * the arc instead of thickening them. Drawn back faces only, so it shows just
+ * where it clears the letter's silhouette, and in normal blending — additive
+ * washes amber to white against a bright sky.
+ */
+const glowShellCache = new Map()
+
+function getGlowShell(text, radius, size, amount) {
+  const key = `${text}|${radius}|${size}|${amount}`
+  if (!glowShellCache.has(key)) {
+    const shell = getLabelGeometry(text, radius, size).clone()
+    const position = shell.attributes.position
+    const normal = shell.attributes.normal
+    for (let i = 0; i < position.count; i += 1) {
+      position.setXYZ(
+        i,
+        position.getX(i) + normal.getX(i) * amount,
+        position.getY(i) + normal.getY(i) * amount,
+        position.getZ(i) + normal.getZ(i) * amount
+      )
+    }
+    position.needsUpdate = true
+    shell.computeBoundingSphere()
+    glowShellCache.set(key, shell)
+  }
+  return glowShellCache.get(key)
+}
+
+// Two shells, the outer one fainter, so the light falls off instead of
+// stopping at a single hard outline.
+const GLOW_SHELLS = [
+  { amount: 0.07, opacity: 0.3 },
+  { amount: 0.17, opacity: 0.13 }
+]
+
+const glowMaterials = GLOW_SHELLS.map(
+  ({ opacity }) =>
+    new THREE.MeshBasicMaterial({
+      color: AMBER_LIGHT,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      side: THREE.BackSide
+    })
+)
+
 function RotatingPlaque({ radius, labelY, text, material }) {
   const groupRef = useRef()
 
@@ -437,16 +493,24 @@ function RotatingPlaque({ radius, labelY, text, material }) {
 
   const size = 1.62
   const geometry = useMemo(() => getLabelGeometry(text, radius, size), [text, radius, size])
+  const shells = useMemo(
+    () => GLOW_SHELLS.map(({ amount }) => getGlowShell(text, radius, size, amount)),
+    [text, radius, size]
+  )
 
   return (
     <group ref={groupRef} position={[0, labelY, 0]}>
       {[0, 1, 2].map((copy) => (
-        <mesh
-          key={`plaque-${copy}`}
-          geometry={geometry}
-          material={material}
-          rotation={[0, (copy / 3) * Math.PI * 2, 0]}
-        />
+        <group key={`plaque-${copy}`} rotation={[0, (copy / 3) * Math.PI * 2, 0]}>
+          <mesh geometry={geometry} material={material} />
+          {shells.map((shell, index) => (
+            <mesh
+              key={`glow-${GLOW_SHELLS[index].amount}`}
+              geometry={shell}
+              material={glowMaterials[index]}
+            />
+          ))}
+        </group>
       ))}
     </group>
   )
