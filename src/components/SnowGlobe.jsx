@@ -63,14 +63,26 @@ function getFlutedGeometry(params) {
  * angle: the ribs follow the taper, and recomputed normals make them catch
  * light as rounded reeds rather than facets.
  */
-function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }) {
-  // Eight segments per rib keeps the curve smooth. Narrow ribs need fewer
-  // than wide ones; below about six the reeding steps into a cog.
+function createFlutedGeometry({
+  topRadius,
+  bottomRadius,
+  height,
+  flutes,
+  depth,
+  // How sharply the groove closes. The valley term is raised to this power, so
+  // a larger number keeps more of the circumference out at full radius and
+  // leaves a narrower line between ribs.
+  sharpness = 7,
+  // Segments per rib. This has to rise with sharpness: a groove narrower than
+  // the tessellation can resolve lands between samples and reads as noise
+  // along the base rather than as a cut.
+  segmentsPerFlute = 12
+}) {
   const geometry = new THREE.CylinderGeometry(
     topRadius,
     bottomRadius,
     height,
-    flutes * 8,
+    flutes * segmentsPerFlute,
     1,
     false
   )
@@ -87,9 +99,10 @@ function createFlutedGeometry({ topRadius, bottomRadius, height, flutes, depth }
     // A cosine alone gives ribs and grooves of equal width. Raising the valley
     // term to a power keeps most of the circumference out at full radius and
     // cuts only a narrow groove between ribs, which is how turned reeding
-    // actually looks.
+    // actually looks. The groove's width at half depth is 2*asin(0.5^(1/p))
+    // per rib: at p=3 about a third of the rib pitch, at p=6 about a fifth.
     const wave = Math.cos(angle * flutes)
-    const groove = Math.pow((1 - wave) / 2, 3)
+    const groove = Math.pow((1 - wave) / 2, sharpness)
     const scale = 1 - depth * groove
 
     position.setX(i, vertex.x * scale)
