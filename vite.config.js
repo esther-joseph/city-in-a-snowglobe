@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { proxyOpenWeather, cacheHeaderFor } from './api/openweather.mjs'
@@ -44,6 +45,35 @@ function openWeatherProxy(apiKey) {
 }
 
 /**
+ * Serves the standalone HTML pages in public/ at their extensionless URLs.
+ *
+ * Vercel does this itself with "cleanUrls": true, but Vite's dev server hands
+ * /privacy to the SPA fallback instead, so the link in the app would open the
+ * globe in development and the policy in production. Same trick as the weather
+ * proxy above: make dev behave like the deployment rather than remember the
+ * difference.
+ */
+function cleanUrlPages(pages) {
+  const mount = (server) => {
+    for (const [route, file] of Object.entries(pages)) {
+      server.middlewares.use(route, (req, res, next) => {
+        // Only the page itself; anything deeper is not ours.
+        if (req.url !== '/' && req.url !== '') return next()
+        res.statusCode = 200
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.end(readFileSync(file, 'utf8'))
+      })
+    }
+  }
+
+  return {
+    name: 'clean-url-pages',
+    configureServer: mount,
+    configurePreviewServer: mount
+  }
+}
+
+/**
  * Puts the AdSense loader in the built page — but only for the web build.
  *
  * AdSense is a website product: serving it inside the Play Store build would
@@ -83,6 +113,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       openWeatherProxy(apiKey),
+      cleanUrlPages({ '/privacy': 'public/privacy.html' }),
       adsenseTag({ client: adClient, enabled: platform !== 'native' })
     ],
     server: {

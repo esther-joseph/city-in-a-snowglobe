@@ -101,6 +101,15 @@ function WeatherDrawer({
           />
           {/* Foot of the scroll: nothing below it to be pushed out of reach. */}
           <AdSlot name="drawer-footer" renderMode={renderMode} />
+          {/* A new tab, so following it does not tear down the scene. */}
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-white/40 hover:text-white/70 transition-colors self-center pb-2"
+          >
+            Privacy Policy
+          </a>
         </div>
       </div>
     </>

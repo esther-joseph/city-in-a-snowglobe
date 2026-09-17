@@ -1,0 +1,8 @@
+# City In A Snowglobe
+User-agent: *
+Allow: /
+
+# The weather proxy answers requests, not pages. Nothing here to index.
+Disallow: /api/
+
+Sitemap: https://www.city-in-a-snowglobe.com/sitemap.xml
