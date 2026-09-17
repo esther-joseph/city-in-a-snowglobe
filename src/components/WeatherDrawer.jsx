@@ -63,7 +63,11 @@ function WeatherDrawer({
           // already carries its own backdrop-filter, and stacking those inside
           // one more full-height blur meant the compositor re-blurred the live
           // WebGL canvas seventeen times per frame while the panel slid.
-          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.5)',
+          // Only while it is out. Closed, the panel's right edge sits on x=0,
+          // so a 4px offset and a 24px blur spilled a dark band down the left
+          // of the scene — faint, but there in every frame and in every store
+          // screenshot.
+          boxShadow: isOpen ? '4px 0 24px rgba(0, 0, 0, 0.5)' : 'none',
           pointerEvents: isOpen ? 'auto' : 'none',
           willChange: 'transform'
         }}

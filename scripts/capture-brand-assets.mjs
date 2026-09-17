@@ -7,6 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
+import { simulateCondition } from './lib/simulateCondition.mjs'
 
 const BASE_URL = process.env.CAPTURE_URL || 'http://localhost:3000'
 const OUT_DIR = path.resolve('assets/play-store')
@@ -17,13 +18,17 @@ const HIDE_UI = `
   button, .controls-hint { display: none !important; }
 `
 
-async function renderScene(browser, { width, height, scale, hour, zoom, city }) {
+async function renderScene(browser, { width, height, scale, hour, zoom, city, simulate }) {
   const context = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: scale
   })
   const page = await context.newPage()
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' })
+  if (simulate) await simulateCondition(page, simulate)
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('app-has-reloaded', 'true')
+  })
+  await page.goto(`${BASE_URL}/?ads=off`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('canvas')
   await page.waitForSelector('.summary-temp, .temperature', { timeout: 30000 })
 
@@ -69,7 +74,8 @@ async function main() {
   // 1. Icon source: square night render, globe filling most of the frame.
   if (fresh || !has('icon-source.png')) {
     const { page, context } = await renderScene(browser, {
-      width: 512, height: 512, scale: 2, hour: 21, zoom: -13, city: 'New York'
+      // Clear: at icon size, cloud cover turns the city into a grey smudge.
+      width: 512, height: 512, scale: 2, hour: 21, zoom: -13, city: 'New York', simulate: 'clear'
     })
     await page.screenshot({ path: path.join(WORK_DIR, 'icon-source.png') })
     await context.close()
@@ -78,7 +84,7 @@ async function main() {
   // 2. Feature graphic source: wide night render used as the artwork plate.
   if (fresh || !has('feature-source.png')) {
     const { page, context } = await renderScene(browser, {
-      width: 1024, height: 500, scale: 2, hour: 21, zoom: -5, city: 'New York'
+      width: 1024, height: 500, scale: 2, hour: 21, zoom: -5, city: 'New York', simulate: 'clear'
     })
     await page.screenshot({ path: path.join(WORK_DIR, 'feature-source.png') })
     await context.close()
