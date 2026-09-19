@@ -3,7 +3,6 @@ import './WeatherUI.css'
 import SunPositionDiagram from './SunPositionDiagram'
 import WeeklyForecast from './WeeklyForecast'
 import AdSlot from './ads/AdSlot'
-import CityClock from './CityClock'
 import MeteoconIcon from './MeteoconIcon'
 
 // Legacy function for backward compatibility - now returns icon name for MeteoconIcon
@@ -242,8 +241,7 @@ function WeatherUI({
   onRainToggle,
   forceRain = false,
   weatherService = null,
-  renderMode = '3d',
-  season = 'summer'
+  renderMode = '3d'
 }) {
   const [city, setCity] = useState(currentCity)
   const [viewMode, setViewMode] = useState('informational')
@@ -718,14 +716,6 @@ function WeatherUI({
       )}
 
       <div className="weather-stack">
-        {/* Above the weather, in every mode: the time where the city is. */}
-        {weatherData && (
-          <CityClock
-            timezoneOffset={weatherData.timezone}
-            season={season}
-            variant="panel"
-          />
-        )}
         {weatherData && !loading ? (
           viewMode === 'minimal' ? (
             <div className="weather-summary">

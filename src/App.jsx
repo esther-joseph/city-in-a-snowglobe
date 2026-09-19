@@ -1364,7 +1364,7 @@ function App() {
       {renderMode === '3d' && weatherData && coverDone && (
         <CityClock
           timezoneOffset={weatherData.timezone}
-          season={season}
+          overrideHour={manualHour}
           variant="overlay"
         />
       )}
@@ -1403,7 +1403,6 @@ function App() {
             forceRain={forceRain}
         renderMode={renderMode}
         initiallyOpen={launch.panelOpen}
-        season={season}
         onRenderModeChange={handleRenderModeChange}
         weatherService={weatherService}
       />

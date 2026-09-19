@@ -25,8 +25,7 @@ function WeatherDrawer({
   renderMode,
   onRenderModeChange,
   weatherService,
-  initiallyOpen = false,
-  season
+  initiallyOpen = false
 }) {
   // The manifest's "Change city" shortcut launches with ?panel=open.
   const [isOpen, setIsOpen] = useState(initiallyOpen)
@@ -96,7 +95,6 @@ function WeatherDrawer({
           forceRain={forceRain}
             weatherService={weatherService}
             renderMode={renderMode}
-            season={season}
           />
           <ModeToggle 
             mode={renderMode} 

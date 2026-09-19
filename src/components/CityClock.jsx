@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
-import { SEASONS } from '../utils/seasons'
 import './CityClock.css'
 
 /**
@@ -17,24 +16,14 @@ import './CityClock.css'
  */
 
 /**
- * The hue laid over the letters, by season.
+ * The sheen laid over the letters.
  *
- * Summer is the plain iridescence the piece is named for — the full spread of
- * hues. The others tint it: the season should be readable from the clock
- * alone, without reading the date.
+ * Yellow through to a pale champagne and back — the ring's own gold rather
+ * than a colour of its own. No stop sits near white: the clock floats over a
+ * sky that is pale most of the day, and a thin white glyph on pale blue simply
+ * is not there.
  */
-const SEASON_SHEEN = {
-  // No stop is allowed near white. The clock floats over the sky, which is
-  // pale most of the day, and a thin white glyph on a pale blue ground is
-  // gone — the pinks and blues keep enough saturation to stay readable at
-  // noon without losing the season.
-  [SEASONS.SPRING]: ['#ffb3d4', '#ff7fb4', '#ffd9e8', '#f26aa4', '#ff9fcc'],
-  [SEASONS.SUMMER]: ['#67e8f9', '#c084fc', '#f472b6', '#4ade80', '#67e8f9'],
-  [SEASONS.AUTUMN]: ['#f0bf55', '#e0932f', '#ffd98a', '#c9682a', '#e0932f'],
-  [SEASONS.WINTER]: ['#bfe0ff', '#7fb5e8', '#dceeff', '#6fa8de', '#a8d0ff']
-}
-
-const FALLBACK_SHEEN = SEASON_SHEEN[SEASONS.SUMMER]
+const SHEEN = ['#ffe9a8', '#f0bf55', '#fff4cf', '#ffd97a', '#f5dea1']
 
 /**
  * The city's wall clock as an ordinary Date.
@@ -54,7 +43,7 @@ function cityDate(now, offsetSeconds) {
 const TIME_FORMAT = { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }
 const DATE_FORMAT = { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }
 
-function CityClock({ timezoneOffset = null, season = SEASONS.SUMMER, variant = 'panel' }) {
+function CityClock({ timezoneOffset = null, overrideHour = null, variant = 'overlay' }) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -68,20 +57,25 @@ function CityClock({ timezoneOffset = null, season = SEASONS.SUMMER, variant = '
       return { time: '--:--', date: '' }
     }
     const local = cityDate(now, timezoneOffset)
+    // While the Sun & Moon slider is held away from now, the clock reads the
+    // hour the sky is showing rather than the hour it is. The minutes keep
+    // running, so it still reads as a clock rather than a label.
+    if (overrideHour !== null && overrideHour !== undefined) {
+      local.setUTCHours(overrideHour)
+    }
     return {
       time: new Intl.DateTimeFormat(undefined, TIME_FORMAT).format(local),
       date: new Intl.DateTimeFormat(undefined, DATE_FORMAT).format(local)
     }
-  }, [now, timezoneOffset])
+  }, [now, timezoneOffset, overrideHour])
 
-  const sheen = SEASON_SHEEN[season] || FALLBACK_SHEEN
-  const gradient = `linear-gradient(100deg, ${sheen.join(', ')})`
+  const gradient = `linear-gradient(100deg, ${SHEEN.join(', ')})`
 
   return (
     <div
       className={`city-clock city-clock--${variant}`}
       data-testid={`city-clock-${variant}`}
-      data-season={season}
+      data-overridden={overrideHour !== null && overrideHour !== undefined ? 'true' : 'false'}
     >
       <span className="city-clock__time" style={{ backgroundImage: gradient }}>
         {time}
@@ -98,9 +92,9 @@ function CityClock({ timezoneOffset = null, season = SEASONS.SUMMER, variant = '
 CityClock.propTypes = {
   /** Seconds east of UTC, straight from the weather payload. */
   timezoneOffset: PropTypes.number,
-  season: PropTypes.string,
-  /** 'overlay' floats above the globe; 'panel' sits in the side menu. */
-  variant: PropTypes.oneOf(['overlay', 'panel'])
+  /** The hour the Sun & Moon slider is holding, or null for the real one. */
+  overrideHour: PropTypes.number,
+  variant: PropTypes.oneOf(['overlay'])
 }
 
 export default CityClock

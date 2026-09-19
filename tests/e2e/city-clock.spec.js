@@ -11,7 +11,20 @@ import { CURRENT_WEATHER } from './support/weatherFixture.js'
  */
 
 const overlay = (page) => page.getByTestId('city-clock-overlay')
-const panel = (page) => page.getByTestId('city-clock-panel')
+
+/** Drag the Sun & Moon slider to a given hour. */
+async function setHour(page, hour) {
+  await page.evaluate((value) => {
+    const slider = document.querySelector('.time-slider')
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    ).set
+    setter.call(slider, String(value))
+    slider.dispatchEvent(new Event('input', { bubbles: true }))
+    slider.dispatchEvent(new Event('change', { bubbles: true }))
+  }, hour)
+}
 
 /** What the fixture's city should be reading right now. */
 function expectedCityTime() {
@@ -46,37 +59,49 @@ test.describe('City clock', () => {
     await expect(overlay(page)).toContainText(new RegExp(expectedDate, 'i'))
   })
 
-  test('sits above the weather in every view mode', async ({ page }) => {
+  test('follows the Sun and Moon slider', async ({ page }) => {
     await gotoApp(page)
+    await expect(overlay(page)).toBeVisible()
+    await expect(overlay(page)).toHaveAttribute('data-overridden', 'false')
+
     await openDrawer(page)
+    await page.waitForSelector('.time-slider')
+    await setHour(page, 3)
 
-    for (const mode of ['Minimal', 'Compact', 'Informational']) {
-      await page.getByRole('button', { name: mode, exact: true }).click()
-      await expect(panel(page)).toBeVisible()
+    // The sky is showing 3am, so the clock reads 3-something rather than now.
+    await expect(overlay(page)).toHaveAttribute('data-overridden', 'true')
+    await expect(overlay(page).locator('.city-clock__time')).toHaveText(/^3:\d{2} AM$/)
 
-      // Above the weather, not below it.
-      const clockBox = await panel(page).boundingBox()
-      const weatherBox = await page.locator('.weather-info, .weather-summary').first().boundingBox()
-      expect(clockBox.y, `clock above the weather in ${mode}`).toBeLessThan(weatherBox.y)
-    }
+    await setHour(page, 21)
+    await expect(overlay(page).locator('.city-clock__time')).toHaveText(/^9:\d{2} PM$/)
   })
 
-  test('takes its hue from the season', async ({ page }) => {
-    const seen = {}
+  test('goes back to the real time when the slider is reset', async ({ page }) => {
+    await gotoApp(page)
+    await openDrawer(page)
+    await page.waitForSelector('.time-slider')
+    await setHour(page, 3)
+    await expect(overlay(page)).toHaveAttribute('data-overridden', 'true')
+
+    await page.getByRole('button', { name: /Reset to Current Time/i }).click()
+    await expect(overlay(page)).toHaveAttribute('data-overridden', 'false')
+    await expect(overlay(page)).toContainText(expectedCityTime())
+  })
+
+  test('wears one sheen whatever the season', async ({ page }) => {
+    const seen = new Set()
     for (const season of ['spring', 'summer', 'autumn', 'winter']) {
       await gotoApp(page, `/?season=${season}`)
-      await expect(overlay(page)).toHaveAttribute('data-season', season)
-      seen[season] = await overlay(page)
-        .locator('.city-clock__time')
-        .evaluate((node) => getComputedStyle(node).backgroundImage)
+      await expect(overlay(page)).toBeVisible()
+      seen.add(
+        await overlay(page)
+          .locator('.city-clock__time')
+          .evaluate((node) => getComputedStyle(node).backgroundImage)
+      )
     }
-
-    // Four seasons, four different sheens.
-    const distinct = new Set(Object.values(seen))
-    expect(distinct.size).toBe(4)
-    // Autumn is the amber one; summer the plain iridescence.
-    expect(seen.autumn).toContain('240, 191, 85')
-    expect(seen.summer).not.toBe(seen.autumn)
+    expect(seen.size, 'one gold, every season').toBe(1)
+    // Gold rather than a colour of its own: the ring's own amber is in it.
+    expect([...seen][0]).toContain('240, 191, 85')
   })
 
   test('ticks without rebuilding the scene once a second', async ({ page }) => {
