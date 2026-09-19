@@ -3,6 +3,13 @@ import * as THREE from 'three'
 import SnowGlobe from './SnowGlobe'
 import Fountain from './city/Fountain'
 import VegetationRing from './city/VegetationRing'
+import {
+  FOUNTAIN_RING,
+  PERIMETER_WALK,
+  RADIAL_PATH,
+  canopyRadius,
+  placeOnGrass
+} from '../utils/parkLayout'
 import SeasonalFall from './city/SeasonalFall'
 import { getSeasonPalette, SEASONS } from '../utils/seasons'
 
@@ -1032,58 +1039,47 @@ function City({
     []
   )
 
-  // Returns true if (x, z) falls within the width of any radial stone path.
-  // Paths run at 0°/90°/180°/270°, width 1.3, from radius 4.6 to 18.3.
-  const onStonePath = (x, z, margin = 0.9) => {
-    const pathAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5]
-    const pathInner = 4.6
-    const pathOuter = 18.3
-    return pathAngles.some((a) => {
-      const along = x * Math.sin(a) + z * Math.cos(a)   // distance along path direction
-      const perp  = Math.abs(x * Math.cos(a) - z * Math.sin(a)) // distance from path centre
-      return along > pathInner && along < pathOuter && perp < margin
-    })
-  }
-
   const trees = useMemo(() => {
     const treeArray = []
 
-    // Outer ring — full-size trees around the vegetation band
+    const clearOfBuildings = (x, z, radius) =>
+      !generatedBuildings.some((building) => {
+        const dx = x - building.basePosition[0]
+        const dz = z - building.basePosition[2]
+        const footprint =
+          (building.footprintRadius || Math.max(building.width, building.depth) * 0.5) + 1
+        return Math.hypot(dx, dz) < footprint + radius
+      })
+
+    // Outer ring — full-size trees around the vegetation band. The nominal
+    // radius is what the ring wants; placeOnGrass is what the paths allow.
     const outerCount = 28
-    const outerBaseR = 16
     for (let i = 0; i < outerCount; i++) {
       const angle = (i / outerCount) * Math.PI * 2
-      const radius = outerBaseR + (Math.random() - 0.5) * 2.2
-      const x = Math.cos(angle) * radius
-      const z = Math.sin(angle) * radius
-      const tooClose = generatedBuildings.some((b) => {
-        const dx = x - b.basePosition[0]
-        const dz = z - b.basePosition[2]
-        const fp = (b.footprintRadius || Math.max(b.width, b.depth) * 0.5) + 1
-        return Math.sqrt(dx * dx + dz * dz) < fp + 1.5
-      })
-      if (tooClose || onStonePath(x, z, 1.1)) continue
+      const foliageScale = 2.0 + Math.random() * 0.9
+      const radius = canopyRadius(foliageScale)
+      const spot = placeOnGrass(angle, 14.6 + (Math.random() - 0.5) * 1.6, radius)
+      if (!spot || !clearOfBuildings(spot[0], spot[1], radius)) continue
       treeArray.push({
-        position: [x, 0, z],
+        position: [spot[0], 0, spot[1]],
         trunkHeight: 2.4 + Math.random() * 1.4,
-        foliageScale: 2.0 + Math.random() * 0.9,
+        foliageScale,
         key: `tree-outer-${i}`
       })
     }
 
     // Inner cluster — smaller accent trees around the park interior
     const innerCount = 12
-    const innerBaseR = 10.5
     for (let i = 0; i < innerCount; i++) {
       const angle = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount
-      const radius = innerBaseR + (Math.random() - 0.5) * 1.0
-      const x = Math.cos(angle) * radius
-      const z = Math.sin(angle) * radius
-      if (onStonePath(x, z, 1.1)) continue
+      const foliageScale = 1.3 + Math.random() * 0.5
+      const radius = canopyRadius(foliageScale)
+      const spot = placeOnGrass(angle, 10.5 + (Math.random() - 0.5) * 1.0, radius)
+      if (!spot) continue
       treeArray.push({
-        position: [x, 0, z],
+        position: [spot[0], 0, spot[1]],
         trunkHeight: 1.5 + Math.random() * 0.8,
-        foliageScale: 1.3 + Math.random() * 0.5,
+        foliageScale,
         key: `tree-inner-${i}`
       })
     }
@@ -1105,24 +1101,28 @@ function City({
   const bushes = useMemo(() => {
     const bushArray = []
 
+    // A bush reaches about 0.6 of its scale: the lobes sit 0.34 out with 0.26
+    // of their own, and the grass disc at the foot reaches 0.55.
+    const bushRadius = (scale) => scale * 0.6
+
     // Outer bush ring (fringing the vegetation band)
     const outerCount = 32
-    const outerR = 13.5
     for (let i = 0; i < outerCount; i++) {
       const angle = (i / outerCount) * Math.PI * 2 + Math.random() * 0.18
-      const radius = outerR + (Math.random() - 0.5) * 1.2
-      const x = Math.cos(angle) * radius
-      const z = Math.sin(angle) * radius
-      const tooClose = generatedBuildings.some((b) => {
-        const dx = x - b.basePosition[0]
-        const dz = z - b.basePosition[2]
-        const fp = (b.footprintRadius || Math.max(b.width, b.depth) * 0.5) + 0.7
-        return Math.sqrt(dx * dx + dz * dz) < fp + 1.5
+      const scale = 0.9 + Math.random() * 0.6
+      const spot = placeOnGrass(angle, 13.5 + (Math.random() - 0.5) * 1.2, bushRadius(scale))
+      if (!spot) continue
+      const tooClose = generatedBuildings.some((building) => {
+        const dx = spot[0] - building.basePosition[0]
+        const dz = spot[1] - building.basePosition[2]
+        const footprint =
+          (building.footprintRadius || Math.max(building.width, building.depth) * 0.5) + 0.7
+        return Math.hypot(dx, dz) < footprint + 1.5
       })
-      if (tooClose || onStonePath(x, z, 1.0)) continue
+      if (tooClose) continue
       bushArray.push({
-        position: [x, 0.4, z],
-        scale: 0.9 + Math.random() * 0.6,
+        position: [spot[0], 0.4, spot[1]],
+        scale,
         key: `bush-outer-${i}`
       })
     }
@@ -1130,14 +1130,13 @@ function City({
     // Inner scattered bushes filling the park interior
     const innerCount = 16
     for (let i = 0; i < innerCount; i++) {
-      const angle = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount * 0.7
-      const radius = 8.5 + (Math.random() - 0.5) * 1.5
-      const x = Math.cos(angle) * radius
-      const z = Math.sin(angle) * radius
-      if (onStonePath(x, z, 1.0)) continue
+      const angle = (i / innerCount) * Math.PI * 2 + (Math.PI / innerCount) * 0.7
+      const scale = 0.6 + Math.random() * 0.4
+      const spot = placeOnGrass(angle, 8.5 + (Math.random() - 0.5) * 1.5, bushRadius(scale))
+      if (!spot) continue
       bushArray.push({
-        position: [x, 0.4, z],
-        scale: 0.6 + Math.random() * 0.4,
+        position: [spot[0], 0.4, spot[1]],
+        scale,
         key: `bush-inner-${i}`
       })
     }
@@ -1190,16 +1189,15 @@ function City({
       {/* Stone pathways — 4 radiating, spanning from inner fountain ring to outer walkway ring */}
       {[0, 1, 2, 3].map((i) => {
         const angle = (i / 4) * Math.PI * 2
-        // inner ring inner edge ≈ 4.6, outer ring outer edge ≈ 18.3
-        const pathStart = 4.6
-        const pathEnd   = 18.3
-        const pathLen   = pathEnd - pathStart          // 13.7
-        const pathCenterR = (pathStart + pathEnd) / 2  // 11.45
+        const pathStart = RADIAL_PATH.start
+        const pathEnd = RADIAL_PATH.end
+        const pathLen = pathEnd - pathStart
+        const pathCenterR = (pathStart + pathEnd) / 2
         return (
           <mesh key={`path-${i}`}
             position={[Math.sin(angle) * pathCenterR, 0.17, Math.cos(angle) * pathCenterR]}
             rotation={[0, angle, 0]} receiveShadow>
-            <boxGeometry args={[1.3, 0.06, pathLen]} />
+            <boxGeometry args={[RADIAL_PATH.width, 0.06, pathLen]} />
             <meshStandardMaterial color="#c8bfb0" roughness={0.88} metalness={0.05} />
           </mesh>
         )
@@ -1207,13 +1205,13 @@ function City({
 
       {/* Circular path ring — flat disc around fountain, raised above grass */}
       <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[4.6, 5.85, 64]} />
+        <ringGeometry args={[FOUNTAIN_RING.inner, FOUNTAIN_RING.outer, 64]} />
         <meshStandardMaterial color="#c8bfb0" roughness={0.85} metalness={0.05} side={2} />
       </mesh>
 
       {/* Outer walkway ring at park perimeter — flat disc, raised above grass */}
       <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <ringGeometry args={[16.8, 18.3, 80]} />
+        <ringGeometry args={[PERIMETER_WALK.inner, PERIMETER_WALK.outer, 80]} />
         <meshStandardMaterial color="#c0b7a4" roughness={0.85} metalness={0.05} side={2} />
       </mesh>
 

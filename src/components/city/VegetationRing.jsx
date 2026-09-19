@@ -36,7 +36,19 @@ function Tree({
   const r = foliageScale * 0.52   // canopy sphere radius base
 
   const palette = getSeasonPalette(season)
-  const g = (i) => palette.canopy[i % palette.canopy.length]
+
+  // In a season that turns, the whole crown is one colour and the variety is
+  // between trees rather than within them. Drawn once per tree and kept, so a
+  // re-render does not repaint the stand.
+  const solidCanopy = useMemo(
+    () =>
+      palette.solidCanopy
+        ? palette.canopy[Math.floor(Math.random() * palette.canopy.length)]
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [season]
+  )
+  const g = (i) => solidCanopy ?? palette.canopy[i % palette.canopy.length]
 
   // Blossom clusters, spring only. Seeded per tree so they don't jump around
   // between renders.

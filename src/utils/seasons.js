@@ -120,6 +120,10 @@ export const SEASON_PALETTES = {
   [SEASONS.AUTUMN]: {
     label: 'Autumn',
     bareTrees: false,
+    // One colour per tree rather than one per lobe. A turning canopy is the
+    // same leaf all over; mixing five shades within a crown read as a fruit
+    // salad. The variety moves to the stand: each tree draws its own.
+    solidCanopy: true,
     canopy: ['#c9682a', '#e0932f', '#b5471f', '#d98324', '#a85d22'],
     blossom: null,
     trunk: '#6b4526',
@@ -131,7 +135,9 @@ export const SEASON_PALETTES = {
     fall: {
       kind: 'leaf',
       colors: ['#c9682a', '#e0932f', '#b5471f', '#d98324'],
-      count: 110,
+      // Instanced, so the cost of more is a bigger buffer rather than more
+      // draw calls.
+      count: 260,
       size: 0.22,
       speed: 1.15
     }
