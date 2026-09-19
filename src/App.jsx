@@ -54,10 +54,10 @@ const SHAKE_SPIN_DURATION = 1400
  * A cached city answers in well under a second, so without a floor the cover
  * would flash past. The ceiling is the safety valve: past it the app is shown
  * regardless, error state and all, rather than leaving anyone watching a bar
- * that will never fill.
+ * that will never fill — so it has to sit above the floor, not below it.
  */
-const COVER_MINIMUM_MS = 15000
-const COVER_HAND_OVER_MS = 20000
+const COVER_MINIMUM_MS = 7000
+const COVER_HAND_OVER_MS = 12000
 
 /**
  * Publishes the live three.js scene to a ref so the USDZ exporter can find the

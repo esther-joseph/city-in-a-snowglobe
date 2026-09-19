@@ -41,7 +41,7 @@ test.describe('Loading screen', () => {
     await gotoSlow(page, { delayMs: 0 })
     await expect(cover(page)).toBeVisible()
 
-    await page.waitForTimeout(9000)
+    await page.waitForTimeout(4000)
     await expect(cover(page)).toBeVisible()
 
     await expect(cover(page)).toBeHidden({ timeout: 25000 })
