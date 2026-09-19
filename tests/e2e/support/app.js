@@ -15,11 +15,16 @@ export const APP_TITLE = 'City In A Snowglobe'
  * @param {string} [path] - Where to land, for the launch-parameter specs.
  */
 export async function gotoApp(page, path = '/') {
+  // Skip the loading cover's hold. Every spec that clicks would otherwise wait
+  // it out first, since the cover sits over the whole app for fifteen seconds.
+  const target = path.includes('cover=')
+    ? path
+    : `${path}${path.includes('?') ? '&' : '?'}cover=off`
   await page.addInitScript(() => {
     window.sessionStorage.setItem('app-has-reloaded', 'true')
   })
   await stubWeatherApi(page)
-  await page.goto(path)
+  await page.goto(target)
   await expect(page.locator('canvas').first()).toBeAttached()
   await expect(temperature(page)).toBeVisible({ timeout: 20000 })
 }

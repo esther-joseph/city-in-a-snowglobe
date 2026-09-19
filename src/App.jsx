@@ -1184,7 +1184,8 @@ function App() {
     // The cover is held for a fixed spell even when the weather is already
     // cached and answers instantly, so it reads as an opening rather than a
     // flash.
-    const held = setTimeout(() => setMinimumShown(true), COVER_MINIMUM_MS)
+    const hold = launch.skipCover ? 0 : COVER_MINIMUM_MS
+    const held = setTimeout(() => setMinimumShown(true), hold)
     // And it lets go regardless after that. If the network is gone and there
     // is no cached city to fall back on, the app itself says so better than a
     // loading bar that never fills.
@@ -1193,7 +1194,7 @@ function App() {
       clearTimeout(held)
       clearTimeout(giveUp)
     }
-  }, [])
+  }, [launch.skipCover])
 
   const sceneReady = Boolean(weatherData && celestialData)
   const coverDone =
