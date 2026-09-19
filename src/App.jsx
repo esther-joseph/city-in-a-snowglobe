@@ -33,6 +33,7 @@ import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
 import LoadingScreen from './components/LoadingScreen'
+import CityClock from './components/CityClock'
 
 // Single WebXR store for the whole app (xr v6 API). Created once at module
 // scope so the session survives re-renders. Defaults request hit-test,
@@ -1358,6 +1359,15 @@ function App() {
         background: '#000'
       }}
     >
+      {/* Above the globe itself. Not in AR: there the globe is in the room,
+          and a fixed overlay would sit on the camera feed rather than on it. */}
+      {renderMode === '3d' && weatherData && coverDone && (
+        <CityClock
+          timezoneOffset={weatherData.timezone}
+          season={season}
+          variant="overlay"
+        />
+      )}
       {coverMounted && (
         <LoadingScreen
           visible={!coverDone}
@@ -1393,6 +1403,7 @@ function App() {
             forceRain={forceRain}
         renderMode={renderMode}
         initiallyOpen={launch.panelOpen}
+        season={season}
         onRenderModeChange={handleRenderModeChange}
         weatherService={weatherService}
       />
