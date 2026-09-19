@@ -32,6 +32,7 @@ import {
 import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
+import LoadingScreen from './components/LoadingScreen'
 
 // Single WebXR store for the whole app (xr v6 API). Created once at module
 // scope so the session survives re-renders. Defaults request hit-test,
@@ -1155,6 +1156,45 @@ function App() {
     return elements
   }, [celestialData, weatherData, forceThunder, forceSnow, forceRain, shakeTrigger, renderMode])
 
+  /**
+   * The cover over a scene that is not ready to be looked at yet.
+   *
+   * Until the weather arrives the app knows no place and no timezone, so the
+   * globe would sit under a default sky showing the machine's own clock rather
+   * than the city's. That is wrong rather than merely early, so it stays
+   * hidden until the sky is the reader's own.
+   */
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false)
+  const [coverMounted, setCoverMounted] = useState(true)
+
+  useEffect(() => {
+    // Never trap anyone behind the cover. If the network is gone and there is
+    // no cached city to fall back on, the app itself says so better than a
+    // loading bar that never fills.
+    const id = setTimeout(() => setLoadingTimedOut(true), 12000)
+    return () => clearTimeout(id)
+  }, [])
+
+  const sceneReady = Boolean(weatherData && celestialData)
+  const coverDone = sceneReady || Boolean(error) || loadingTimedOut
+
+  useEffect(() => {
+    if (!coverDone) return undefined
+    // Long enough for the bar to reach the end and the cover to fade.
+    const id = setTimeout(() => setCoverMounted(false), 520)
+    return () => clearTimeout(id)
+  }, [coverDone])
+
+  const loadingStage = useMemo(() => {
+    if (coverDone) return { progress: 1, message: 'Ready' }
+    if (!weatherData) {
+      return loading
+        ? { progress: 0.55, message: `Reading the sky over ${city}…` }
+        : { progress: 0.2, message: 'Waking the globe…' }
+    }
+    return { progress: 0.85, message: 'Placing the sun and the moon…' }
+  }, [coverDone, weatherData, loading, city])
+
   const displayHour = useMemo(() => {
     if (manualHour !== null) return manualHour
     const localHour = celestialData?.localHour
@@ -1318,6 +1358,13 @@ function App() {
         background: '#000'
       }}
     >
+      {coverMounted && (
+        <LoadingScreen
+          visible={!coverDone}
+          message={loadingStage.message}
+          progress={loadingStage.progress}
+        />
+      )}
       <WeatherDrawer
         weatherData={weatherData}
         hourlyForecast={hourlyForecast}

@@ -1,0 +1,81 @@
+/*
+ * The loading cover. Painted in the app's own palette: the deep navy the sky
+ * settles to at night, and the amber the ring and lettering carry.
+ */
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  background:
+    radial-gradient(circle at 50% 38%, #1b2350 0%, #0b1026 58%, #070a1a 100%);
+  color: #e8ecf8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* It covers the scene, so nothing underneath should take a tap. */
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 420ms ease;
+}
+
+/* Faded out rather than cut, so the globe appears rather than snaps in. */
+.loading-screen--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-screen__stage {
+  width: min(58vw, 320px);
+  height: min(58vw, 320px);
+}
+
+.loading-screen__message {
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  color: #cdd5ee;
+  margin-top: -0.5rem;
+  min-height: 1.4em;
+  text-align: center;
+  padding: 0 1.5rem;
+}
+
+.loading-screen__bar {
+  position: relative;
+  width: min(62vw, 260px);
+  height: 6px;
+  margin-top: 1.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.loading-screen__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b8862f 0%, #f0bf55 52%, #ffe9a8 100%);
+  box-shadow: 0 0 12px rgba(240, 191, 85, 0.45);
+  transform-origin: left center;
+  /* Transformed rather than resized: the bar animates on the compositor
+     instead of laying out sixty times a second while the scene compiles. */
+  transition: transform 500ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+
+.loading-screen__hint {
+  margin-top: 1.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(240, 191, 85, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-screen__fill {
+    transition: none;
+  }
+}
