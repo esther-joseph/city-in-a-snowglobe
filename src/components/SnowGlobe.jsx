@@ -69,6 +69,10 @@ function createFlutedGeometry({
   height,
   flutes,
   depth,
+  // How full each reed is. 0.5 is a true semicircle; lower carries the radius
+  // further across the reed before it turns down, so neighbouring beads meet
+  // later and the dark line between them is thinner.
+  fullness = 0.3,
   // Samples across each reed. Twelve is smooth for a round section — the
   // curvature is spread over the whole reed rather than concentrated in a
   // narrow cut, so this does not need to be large. Sixteen measured 10%
@@ -98,14 +102,18 @@ function createFlutedGeometry({
     // stands the ribs proud as convex beads that meet in a line, with no flat
     // anywhere on the surface.
     //
-    // The section is a semicircle. `offset` is the angular distance from a
-    // reed's crown, normalised so 0 is the crown and 1 the valley between two
-    // reeds; sqrt(1 - offset^2) is then the circle that rides over it. The
-    // valley lands on a cusp, which is what gives reeding its crisp parting
-    // line rather than the soft trough a cosine would leave.
+    // `offset` is the angular distance from a reed's crown, normalised so 0 is
+    // the crown and 1 the valley between two reeds. (1 - offset^2) raised to a
+    // power is the section riding over it: at 0.5 exactly a semicircle, and
+    // below that a fuller bead that carries its radius further before turning
+    // down — which narrows the parting line without flattening the crown.
+    //
+    // The valley still lands on a cusp. That is what gives reeding its crisp
+    // parting line rather than the soft trough a cosine would leave; the
+    // fullness sets how wide that line reads, not whether it is there.
     const wave = Math.min(1, Math.max(-1, Math.cos(angle * flutes)))
     const offset = Math.acos(wave) / Math.PI
-    const bead = Math.sqrt(Math.max(0, 1 - offset * offset))
+    const bead = Math.pow(Math.max(0, 1 - offset * offset), fullness)
     const scale = 1 - depth * (1 - bead)
 
     position.setX(i, vertex.x * scale)
