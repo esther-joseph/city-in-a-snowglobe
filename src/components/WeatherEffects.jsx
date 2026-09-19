@@ -8,6 +8,34 @@ import { USDZ_ROOT_NAME } from '../utils/usdzExport'
 
 const DOWN_VECTOR = new THREE.Vector3(0, -1, 0)
 
+/**
+ * The longest frame the drifting sky will act on.
+ *
+ * requestAnimationFrame stops while a tab is hidden, so coming back delivers a
+ * single delta covering the whole absence — minutes, sometimes. Anything
+ * driven by delta then moves a minute's worth in one step. Clamping it means
+ * the sky resumes where it was rather than teleporting.
+ */
+export const MAX_FRAME_SECONDS = 1 / 20
+
+/**
+ * Wrap a coordinate into [-limit, limit], keeping the overshoot.
+ *
+ * Clamping to the boundary instead — `if (x > limit) x = -limit` — is what
+ * piled the whole sky into one clump: after a long frame every cloud is past
+ * the edge, and every one of them lands on exactly the same coordinate.
+ * Subtracting the span preserves the spacing between them however far they
+ * have travelled.
+ *
+ * @param {number} value
+ * @param {number} limit
+ * @returns {number}
+ */
+export function wrapCoordinate(value, limit) {
+  const span = limit * 2
+  return (((value + limit) % span) + span) % span - limit
+}
+
 // How long the snow tumbles after a shake.
 const SHAKE_TUMBLE_DURATION = 3200
 
@@ -542,7 +570,6 @@ function CloudLayer({
   windDirection,
   windSpeed,
   weatherData,
-  validateNightSpread = false,
   performanceScale = 1
 }) {
   const density = useMemo(() => {
@@ -650,24 +677,10 @@ function CloudLayer({
 
   const driftVector = useMemo(() => ({ x: windVector.x, z: windVector.z }), [windVector])
 
-  const cloudSpreadReloadRef = useRef(false)
-
-  useEffect(() => {
-    if (!validateNightSpread || cloudSpreadReloadRef.current) return
-    if (!cloudConfigs?.length) return
-    const radii = cloudConfigs.map((cloud) => Math.hypot(cloud.position[0], cloud.position[2]))
-    const spread = Math.max(...radii) - Math.min(...radii)
-    if (!Number.isFinite(spread) || spread < 5) {
-      cloudSpreadReloadRef.current = true
-      if (typeof window !== 'undefined') {
-        window.location.reload()
-      }
-    }
-  }, [validateNightSpread, cloudConfigs])
-
   useFrame((state, delta) => {
-    const moveX = driftVector.x * delta * 12
-    const moveZ = driftVector.z * delta * 12
+    const step = Math.min(delta, MAX_FRAME_SECONDS)
+    const moveX = driftVector.x * step * 12
+    const moveZ = driftVector.z * step * 12
     const wrapRadius = 52
     const time = state.clock.elapsedTime
 
@@ -676,9 +689,14 @@ function CloudLayer({
       if (!cloud) return
 
       const config = cloudConfigs[index]
-      cloud.position.x += moveX + config.speed * 0.03
+      // Per-cloud drift is a speed, so it is scaled by the frame like the
+      // wind is. Added raw, it ran three times faster at 60fps than at 20.
+      cloud.position.x += moveX + config.speed * step * 1.8
       cloud.position.z += moveZ
-      cloud.position.y += Math.sin(time * 0.25 + index) * 0.02
+      // An offset from the height the cloud was placed at, not an addition to
+      // wherever it has drifted to: `+=` integrated the sine and let clouds
+      // wander several units up or down over a minute.
+      cloud.position.y = config.position[1] + Math.sin(time * 0.25 + index) * 0.8
 
       const wobble = config.wobble
       cloud.children.forEach((child, childIndex) => {
@@ -695,10 +713,8 @@ function CloudLayer({
         child.rotation.y += delta * 0.12
       })
 
-      if (cloud.position.x > wrapRadius) cloud.position.x = -wrapRadius
-      if (cloud.position.x < -wrapRadius) cloud.position.x = wrapRadius
-      if (cloud.position.z > wrapRadius) cloud.position.z = -wrapRadius
-      if (cloud.position.z < -wrapRadius) cloud.position.z = wrapRadius
+      cloud.position.x = wrapCoordinate(cloud.position.x, wrapRadius)
+      cloud.position.z = wrapCoordinate(cloud.position.z, wrapRadius)
     })
   })
 
@@ -764,21 +780,6 @@ function StarLayer({ windDirection, windSpeed, performanceScale = 1 }) {
       }
     })
   }, [performanceScale])
-
-  const starSpreadReloadRef = useRef(false)
-
-  useEffect(() => {
-    if (starSpreadReloadRef.current) return
-    if (!starConfigs?.length) return
-    const radii = starConfigs.map((star) => Math.hypot(star.position[0], star.position[2]))
-    const spread = Math.max(...radii) - Math.min(...radii)
-    if (!Number.isFinite(spread) || spread < 5) {
-      starSpreadReloadRef.current = true
-      if (typeof window !== 'undefined') {
-        window.location.reload()
-      }
-    }
-  }, [starConfigs])
 
   return (
     <group>
@@ -894,18 +895,17 @@ function CuteStarInstance({ config, driftVector, wrapRadius }) {
   useFrame((state, delta) => {
     if (!starRef.current) return
     const { speed, baseScale, twinkleSpeed, twinklePhase } = config
-    starRef.current.position.x += driftVector.x * delta * 10 + speed * 0.02
-    starRef.current.position.z += driftVector.z * delta * 10
+    const step = Math.min(delta, MAX_FRAME_SECONDS)
+    starRef.current.position.x += driftVector.x * step * 10 + speed * step * 1.2
+    starRef.current.position.z += driftVector.z * step * 10
     const time = state.clock.elapsedTime
     const twinkle = 0.25 + Math.sin(time * twinkleSpeed + twinklePhase) * 0.18
     const scaleValue = baseScale + twinkle
     starRef.current.scale.set(scaleValue, scaleValue, scaleValue)
     starRef.current.rotation.z += delta * 0.35
 
-    if (starRef.current.position.x > wrapRadius) starRef.current.position.x = -wrapRadius
-    if (starRef.current.position.x < -wrapRadius) starRef.current.position.x = wrapRadius
-    if (starRef.current.position.z > wrapRadius) starRef.current.position.z = -wrapRadius
-    if (starRef.current.position.z < -wrapRadius) starRef.current.position.z = wrapRadius
+    starRef.current.position.x = wrapCoordinate(starRef.current.position.x, wrapRadius)
+    starRef.current.position.z = wrapCoordinate(starRef.current.position.z, wrapRadius)
   })
 
   return (
@@ -1013,7 +1013,6 @@ function WeatherEffects({
           windDirection={windDirection}
           windSpeed={windSpeed}
           weatherData={weatherData}
-          validateNightSpread={enableNightStars}
           performanceScale={performanceScale}
         />
       )}
