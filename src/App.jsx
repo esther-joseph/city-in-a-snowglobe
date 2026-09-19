@@ -48,6 +48,18 @@ const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn']
 const SHAKE_SPIN_DURATION = 1400
 
 /**
+ * How long the loading cover is held, and the point at which it lets go
+ * whatever has happened.
+ *
+ * A cached city answers in well under a second, so without a floor the cover
+ * would flash past. The ceiling is the safety valve: past it the app is shown
+ * regardless, error state and all, rather than leaving anyone watching a bar
+ * that will never fill.
+ */
+const COVER_MINIMUM_MS = 15000
+const COVER_HAND_OVER_MS = 20000
+
+/**
  * Publishes the live three.js scene to a ref so the USDZ exporter can find the
  * globe without reaching into React internals.
  */
@@ -1165,18 +1177,27 @@ function App() {
    * hidden until the sky is the reader's own.
    */
   const [loadingTimedOut, setLoadingTimedOut] = useState(false)
+  const [minimumShown, setMinimumShown] = useState(false)
   const [coverMounted, setCoverMounted] = useState(true)
 
   useEffect(() => {
-    // Never trap anyone behind the cover. If the network is gone and there is
-    // no cached city to fall back on, the app itself says so better than a
+    // The cover is held for a fixed spell even when the weather is already
+    // cached and answers instantly, so it reads as an opening rather than a
+    // flash.
+    const held = setTimeout(() => setMinimumShown(true), COVER_MINIMUM_MS)
+    // And it lets go regardless after that. If the network is gone and there
+    // is no cached city to fall back on, the app itself says so better than a
     // loading bar that never fills.
-    const id = setTimeout(() => setLoadingTimedOut(true), 12000)
-    return () => clearTimeout(id)
+    const giveUp = setTimeout(() => setLoadingTimedOut(true), COVER_HAND_OVER_MS)
+    return () => {
+      clearTimeout(held)
+      clearTimeout(giveUp)
+    }
   }, [])
 
   const sceneReady = Boolean(weatherData && celestialData)
-  const coverDone = sceneReady || Boolean(error) || loadingTimedOut
+  const coverDone =
+    (minimumShown && (sceneReady || Boolean(error))) || loadingTimedOut
 
   useEffect(() => {
     if (!coverDone) return undefined
@@ -1192,8 +1213,12 @@ function App() {
         ? { progress: 0.55, message: `Reading the sky over ${city}…` }
         : { progress: 0.2, message: 'Waking the globe…' }
     }
+    // The weather is in and the cover is simply being held. Saying "loading"
+    // now would be a lie, so it says what is true and the bar runs out the
+    // hold rather than stalling at some fraction.
+    if (sceneReady) return { progress: 1, message: 'Winding the globe up…' }
     return { progress: 0.85, message: 'Placing the sun and the moon…' }
-  }, [coverDone, weatherData, loading, city])
+  }, [coverDone, weatherData, loading, city, sceneReady])
 
   const displayHour = useMemo(() => {
     if (manualHour !== null) return manualHour
