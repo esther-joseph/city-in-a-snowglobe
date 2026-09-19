@@ -12,6 +12,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright-core'
+import { simulateCondition } from './lib/simulateCondition.mjs'
 
 const BASE_URL = process.env.CAPTURE_URL || 'http://localhost:3000'
 const OUT_DIR = path.resolve('assets/play-store')
@@ -30,37 +31,16 @@ const DEVICES = {
 // Each shot is a real app state: a city search, an optional time-of-day
 // override (the app's own Sun & Moon slider) and the drawer open or closed.
 const SHOTS = [
-  { id: '01-clear-day', city: 'New York', drawer: false, zoom: -3 },
+  // Clear is forced: the shot is named for the sky it shows, and New York is
+  // not obliging on any particular afternoon.
+  { id: '01-clear-day', city: 'New York', simulate: 'clear', hour: 13, drawer: false, zoom: -3 },
   { id: '02-night', city: 'New York', hour: 22, drawer: false, zoom: -3 },
   { id: '03-rain', city: 'Mumbai', drawer: false, zoom: -4 },
-  { id: '04-snow', city: 'Reykjavik', simulate: 'snow', hour: 13, drawer: false, zoom: -9 },
-  { id: '05-weather-panel', city: 'New York', drawer: true, landscapeScrollTo: '.weather-info' },
-  { id: '06-forecast', city: 'New York', drawer: true, scrollTo: '.temperature-card' }
+  { id: '04-snow', city: 'Reykjavik', simulate: 'snow', hour: 13, drawer: false, zoom: -6, shake: true },
+  { id: '05-weather-panel', city: 'New York', drawer: true, zoom: -1.5, landscapeScrollTo: '.weather-info' },
+  { id: '06-forecast', city: 'New York', drawer: true, zoom: -1.5, scrollTo: '.temperature-card' },
+  { id: '07-weekly', city: 'New York', drawer: true, zoom: -1.5, scrollTo: '.weekly-card' }
 ]
-
-// Reykjavik is not snowing today; this rewrites only the condition code in the
-// live API response so the shot shows the app's real snow rendering.
-const SNOW_PATCH = { id: 601, main: 'Snow', description: 'snow', icon: '13d' }
-
-async function simulateSnow(page) {
-  await page.route('**/data/2.5/weather*', async (route) => {
-    const res = await route.fetch()
-    const json = await res.json()
-    json.weather = [SNOW_PATCH]
-    json.main = { ...json.main, temp: 28, feels_like: 21 }
-    await route.fulfill({ response: res, json })
-  })
-  await page.route('**/data/2.5/forecast*', async (route) => {
-    const res = await route.fetch()
-    const json = await res.json()
-    json.list = (json.list || []).map((entry) => ({
-      ...entry,
-      weather: [SNOW_PATCH],
-      main: { ...entry.main, temp: Math.min(entry.main?.temp ?? 28, 30) }
-    }))
-    await route.fulfill({ response: res, json })
-  })
-}
 
 const HIDE_DESKTOP_CHROME = `
   .controls-hint { display: none !important; }
@@ -84,9 +64,18 @@ async function capture(browser, device, shot) {
     deviceScaleFactor: device.scale
   })
   const page = await context.newPage()
-  if (shot.simulate === 'snow') await simulateSnow(page)
+  if (shot.simulate) await simulateCondition(page, shot.simulate)
 
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' })
+  // The app reloads itself once per session on first launch, which would
+  // otherwise land in the middle of a capture.
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('app-has-reloaded', 'true')
+  })
+
+  // ?ads=off: store artwork should show the app, not an ad slot — and in a
+  // development build the slots render their "no ad unit configured"
+  // placeholder, which would end up in the listing.
+  await page.goto(`${BASE_URL}/?ads=off`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('canvas')
   await page.addStyleTag({ content: HIDE_DESKTOP_CHROME })
 
@@ -138,6 +127,14 @@ async function capture(browser, device, shot) {
   }
 
   await page.waitForTimeout(shot.settle ?? 6000) // let the 3D scene settle
+
+  // Snowfall alone is sparse in a still frame. A shake fills the globe, and
+  // by the time the spin has finished the snow is still tumbling — so the
+  // shot is the app's own flurry rather than a lucky frame of drizzle.
+  if (shot.shake) {
+    await page.click('button[aria-label="Shake the snow globe"]')
+    await page.waitForTimeout(shot.shakeSettle ?? 2100)
+  }
 
   const dir = path.join(OUT_DIR, device.dir)
   fs.mkdirSync(dir, { recursive: true })
