@@ -69,18 +69,10 @@ function createFlutedGeometry({
   height,
   flutes,
   depth,
-  // How sharply the groove closes. The valley term is raised to this power, so
-  // a larger number keeps more of the circumference out at full radius and
-  // leaves a narrower line between ribs.
-  sharpness = 12,
-  // Segments per rib. This has to rise with sharpness: a groove narrower than
-  // the tessellation can resolve lands between samples and reads as noise
-  // along the base rather than as a cut.
-  //
-  // 12 is the floor for the sharpness above — the groove spans about 1.8
-  // segments. 16 renders it crisper, and measured 10% slower on drawer
-  // toggling against 4% for this, which is not worth it for a difference only
-  // visible with the camera pushed right up to the base.
+  // Samples across each reed. Twelve is smooth for a round section — the
+  // curvature is spread over the whole reed rather than concentrated in a
+  // narrow cut, so this does not need to be large. Sixteen measured 10%
+  // slower on drawer toggling for no visible gain.
   segmentsPerFlute = 12
 }) {
   const geometry = new THREE.CylinderGeometry(
@@ -101,15 +93,20 @@ function createFlutedGeometry({
     if (radius < 1e-4) continue
 
     const angle = Math.atan2(vertex.z, vertex.x)
-    // A cosine alone gives ribs and grooves of equal width. Raising the valley
-    // term to a power keeps most of the circumference out at full radius and
-    // cuts only a narrow groove between ribs, which is how turned reeding
-    // actually looks. The groove's width at half depth is 2*asin(0.5^(1/p))
-    // per rib: at p=3 about a third of the rib pitch, at p=12 about a
-    // seventh.
-    const wave = Math.cos(angle * flutes)
-    const groove = Math.pow((1 - wave) / 2, sharpness)
-    const scale = 1 - depth * groove
+    // Reeding, not fluting: the two are inverses of one another. Fluting cuts
+    // grooves into a flat face and leaves the face between them; reeding
+    // stands the ribs proud as convex beads that meet in a line, with no flat
+    // anywhere on the surface.
+    //
+    // The section is a semicircle. `offset` is the angular distance from a
+    // reed's crown, normalised so 0 is the crown and 1 the valley between two
+    // reeds; sqrt(1 - offset^2) is then the circle that rides over it. The
+    // valley lands on a cusp, which is what gives reeding its crisp parting
+    // line rather than the soft trough a cosine would leave.
+    const wave = Math.min(1, Math.max(-1, Math.cos(angle * flutes)))
+    const offset = Math.acos(wave) / Math.PI
+    const bead = Math.sqrt(Math.max(0, 1 - offset * offset))
+    const scale = 1 - depth * (1 - bead)
 
     position.setX(i, vertex.x * scale)
     position.setZ(i, vertex.z * scale)
