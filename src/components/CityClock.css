@@ -39,10 +39,16 @@
   font-weight: 300;
 }
 
-/* Above the globe: floating, and never in the way of a drag. */
+/* Above the globe: floating, and never in the way of a drag.
+ *
+ * Placed against the top of the globe rather than the top of the window. The
+ * globe sits a little below centre at the starting camera, so a clock pinned
+ * to the viewport's edge was marooned up in the sky with a gulf beneath it.
+ * 22vh puts it just over the dome on initialisation while leaving the globe
+ * itself clear. */
 .city-clock--overlay {
   position: fixed;
-  top: max(1.25rem, env(safe-area-inset-top));
+  top: max(22vh, calc(env(safe-area-inset-top) + 3.5rem));
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
