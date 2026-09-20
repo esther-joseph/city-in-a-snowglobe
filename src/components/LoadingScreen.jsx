@@ -89,17 +89,27 @@ function CoreStar() {
 
 /** Three shells at different tilts — the atomic-model arrangement. */
 const SHELLS = [
-  { tilt: [0, 0, 0], radius: 1.35, speed: 1.15, phase: 0, scale: 0.42 },
-  { tilt: [Math.PI / 3, 0, Math.PI / 5], radius: 1.7, speed: -0.85, phase: 1.9, scale: 0.36 },
-  { tilt: [-Math.PI / 3.4, 0, -Math.PI / 4], radius: 2.05, speed: 0.62, phase: 3.6, scale: 0.3 }
+  { tilt: [0, 0, 0], radius: 1.15, speed: 1.15, phase: 0, scale: 0.38 },
+  { tilt: [Math.PI / 3, 0, Math.PI / 5], radius: 1.45, speed: -0.85, phase: 1.9, scale: 0.32 },
+  { tilt: [-Math.PI / 3.4, 0, -Math.PI / 4], radius: 1.72, speed: 0.62, phase: 3.6, scale: 0.28 }
 ]
+
+/**
+ * The frame has to hold the widest shell plus the star riding on it.
+ *
+ * At this field of view the visible half-height is z * tan(fov/2): the camera
+ * sits far enough back that 1.72 + a star clears it with room to spare. The
+ * first pass put the camera at y = 0.6 as well, which tilted the whole atom
+ * down in frame and clipped the top of the outer orbit.
+ */
+const CAMERA = { position: [0, 0, 6.6], fov: 40 }
 
 function LoadingScreen({ message = 'Waking the globe…', progress = 0, visible = true }) {
   const clamped = Math.max(0, Math.min(1, progress))
 
   // The canvas is deliberately small and cheap: this runs while the main scene
   // is still compiling its shaders, so it must not compete for the GPU.
-  const camera = useMemo(() => ({ position: [0, 0.6, 5.2], fov: 42 }), [])
+  const camera = useMemo(() => CAMERA, [])
 
   return (
     <div

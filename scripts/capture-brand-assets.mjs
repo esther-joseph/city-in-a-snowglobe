@@ -28,7 +28,7 @@ async function renderScene(browser, { width, height, scale, hour, zoom, city, si
   await page.addInitScript(() => {
     window.sessionStorage.setItem('app-has-reloaded', 'true')
   })
-  await page.goto(`${BASE_URL}/?ads=off`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE_URL}/?ads=off&cover=off`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('canvas')
   await page.waitForSelector('.summary-temp, .temperature', { timeout: 30000 })
 

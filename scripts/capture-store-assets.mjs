@@ -75,7 +75,7 @@ async function capture(browser, device, shot) {
   // ?ads=off: store artwork should show the app, not an ad slot — and in a
   // development build the slots render their "no ad unit configured"
   // placeholder, which would end up in the listing.
-  await page.goto(`${BASE_URL}/?ads=off`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE_URL}/?ads=off&cover=off`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('canvas')
   await page.addStyleTag({ content: HIDE_DESKTOP_CHROME })
 

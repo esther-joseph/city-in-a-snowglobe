@@ -1,0 +1,78 @@
+/*
+ * Thin iridescent lettering. The sheen is a gradient clipped to the glyphs,
+ * drifting slowly across them so the colour shifts the way an oil film does
+ * rather than sitting still.
+ */
+
+.city-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  text-align: center;
+}
+
+.city-clock__time,
+.city-clock__date {
+  background-size: 220% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: city-clock-sheen 9s ease-in-out infinite alternate;
+  /* The gradient is the ink, so the glyphs need weight taken out of them
+     rather than added: thin strokes, open spacing. */
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+}
+
+.city-clock__time {
+  font-size: 2.5rem;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+}
+
+.city-clock__date {
+  font-size: 0.78rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  font-weight: 300;
+}
+
+/* Above the globe: floating, and never in the way of a drag.
+ *
+ * Placed against the top of the globe rather than the top of the window. The
+ * globe sits a little below centre at the starting camera, so a clock pinned
+ * to the viewport's edge was marooned up in the sky with a gulf beneath it.
+ * 22vh puts it just over the dome on initialisation while leaving the globe
+ * itself clear. */
+.city-clock--overlay {
+  position: fixed;
+  top: max(22vh, calc(env(safe-area-inset-top) + 3.5rem));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  pointer-events: none;
+  /* Two shadows, not one: a tight dark edge that holds the thin strokes
+     against a pale noon sky, and a wide soft one that lifts the whole thing
+     off a night sky. */
+  filter:
+    drop-shadow(0 1px 1.5px rgba(10, 16, 40, 0.55))
+    drop-shadow(0 3px 16px rgba(0, 0, 0, 0.5));
+}
+
+.city-clock--overlay .city-clock__time {
+  font-size: clamp(2rem, 6vw, 3.1rem);
+}
+
+@keyframes city-clock-sheen {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .city-clock__time,
+  .city-clock__date {
+    animation: none;
+  }
+}

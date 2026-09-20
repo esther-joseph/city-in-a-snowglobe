@@ -1144,6 +1144,41 @@ function City({
     return bushArray
   }, [generatedBuildings])
 
+  /**
+   * Flower beds, laid out like everything else in the park: on the grass and
+   * clear of the paving.
+   *
+   * Three rings rather than two, and they reach further in — the band between
+   * the fountain ring and the trees was bare grass.
+   */
+  const flowerBeds = useMemo(() => {
+    if (!seasonPalette.showFlowers) return []
+    const colors = seasonPalette.flowers
+    const rings = [
+      { count: 26, distance: 8.0, radius: 0.26 },
+      { count: 32, distance: 12.7, radius: 0.3 },
+      { count: 34, distance: 14.6, radius: 0.28 }
+    ]
+
+    const beds = []
+    rings.forEach((ring, ringIndex) => {
+      for (let i = 0; i < ring.count; i += 1) {
+        const angle = (i / ring.count) * Math.PI * 2 + ringIndex * 0.11
+        const distance = ring.distance + ((i % 3) - 1) * 0.55
+        const spot = placeOnGrass(angle, distance, ring.radius)
+        if (!spot) continue
+        beds.push({
+          key: `flower-${ringIndex}-${i}`,
+          position: [spot[0], 0.14, spot[1]],
+          radius: ring.radius,
+          // Offset per ring so neighbouring rings do not line up in stripes.
+          color: colors[(i + ringIndex * 2) % colors.length]
+        })
+      }
+    })
+    return beds
+  }, [seasonPalette])
+
   return (
     <SnowGlobe cityName={cityName} weatherType={weatherType} tintColor={glassTint}>
       <group position={[0, 0.02, 0]}>
@@ -1215,30 +1250,18 @@ function City({
         <meshStandardMaterial color="#c0b7a4" roughness={0.85} metalness={0.05} side={2} />
       </mesh>
 
-      {/* Flower beds — two rings, more variety. Hidden in winter. */}
-      {(seasonPalette.showFlowers ? [...Array(48)] : []).map((_, i) => {
-        const isOuter = i >= 24
-        const j = isOuter ? i - 24 : i
-        const total = 24
-        const angle = (j / total) * Math.PI * 2 + (isOuter ? Math.PI / total : 0.08)
-        const r = isOuter
-          ? 14.2 + (j % 3) * 0.7
-          : 12.8 + (j % 3) * 0.6
-        const flowerColors = seasonPalette.flowers
-        return (
-          <mesh key={`flower-${i}`}
-            position={[Math.sin(angle) * r, 0.14, Math.cos(angle) * r]}
-            receiveShadow>
-            <cylinderGeometry args={[0.30, 0.30, 0.07, 6]} />
-            <meshStandardMaterial
-              color={flowerColors[i % flowerColors.length]}
-              roughness={0.7}
-              emissive={flowerColors[i % flowerColors.length]}
-              emissiveIntensity={0.14}
-            />
-          </mesh>
-        )
-      })}
+      {/* Flower beds. Hidden in winter. */}
+      {flowerBeds.map((bed) => (
+        <mesh key={bed.key} position={bed.position} receiveShadow>
+          <cylinderGeometry args={[bed.radius, bed.radius, 0.07, 6]} />
+          <meshStandardMaterial
+            color={bed.color}
+            roughness={0.7}
+            emissive={bed.color}
+            emissiveIntensity={0.14}
+          />
+        </mesh>
+      ))}
       
       {/* Fountain */}
         <Fountain />

@@ -86,19 +86,39 @@ export const SEASON_PALETTES = {
   [SEASONS.SPRING]: {
     label: 'Spring',
     bareTrees: false,
-    canopy: ['#4f9e43', '#5cb44e', '#6ec45f', '#7ed070', '#58a84c'],
-    // Blossom clusters dotted through the canopy.
-    blossom: ['#ffd9e8', '#ffffff', '#ffc2da', '#ffe8f2'],
+    // A tree in blossom is not a green tree with flowers stuck on it — the
+    // crown is the blossom, white on one tree and pink on the next. Same
+    // mechanism as autumn: one colour per tree, variety across the stand.
+    solidCanopy: true,
+    canopy: ['#ffffff', '#ffd9e8', '#ffc2da', '#fff5f9', '#ffb7d5'],
+    // Still dotted through the crown, which reads as depth now that the crown
+    // is pale rather than green.
+    blossom: ['#ffe8f2', '#ffffff', '#ffc2da', '#ffd9e8'],
     trunk: '#7a4f28',
     grass: '#5aa84a',
     grassTuft: '#48944a',
     bush: ['#5aa84a', '#6cba59', '#4f9e43'],
     showFlowers: true,
-    flowers: ['#ff9fcc', '#ffffff', '#ffc2da', '#ffd7ea', '#f7a8c4', '#fde2f0'],
+    // Spring beds are the mixed ones: pinks and whites of the blossom, and
+    // then the colours that come up underneath it.
+    flowers: [
+      '#ff9fcc',
+      '#ffffff',
+      '#ffc2da',
+      '#ffd24a',
+      '#c084fc',
+      '#7dd3fc',
+      '#f97362',
+      '#a3e635',
+      '#f7a8c4',
+      '#fde2f0'
+    ],
     fall: {
       kind: 'petal',
-      colors: ['#ffd9e8', '#ffffff', '#ffc2da'],
-      count: 90,
+      colors: ['#ffd9e8', '#ffffff', '#ffc2da', '#ffb7d5'],
+      // Instanced, so more petals cost a bigger buffer rather than more draw
+      // calls — the same trade autumn's leaves make.
+      count: 240,
       size: 0.16,
       speed: 0.9
     }
