@@ -35,6 +35,19 @@ async function gotoSlow(page, { delayMs = 3000, fail = false } = {}) {
 }
 
 test.describe('Loading screen', () => {
+  test('is held even when the weather answers at once', async ({ page }) => {
+    // A cached city answers in well under a second. Without a floor the cover
+    // would flash past, which is the thing the hold exists to prevent.
+    await gotoSlow(page, { delayMs: 0 })
+    await expect(cover(page)).toBeVisible()
+
+    await page.waitForTimeout(4000)
+    await expect(cover(page)).toBeVisible()
+
+    await expect(cover(page)).toBeHidden({ timeout: 25000 })
+    await expect(temperature(page)).toBeVisible()
+  })
+
   test('covers the scene until the weather is in', async ({ page }) => {
     await gotoSlow(page, { delayMs: 3000 })
 

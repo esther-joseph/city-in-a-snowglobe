@@ -29,8 +29,8 @@
 }
 
 .loading-screen__stage {
-  width: min(58vw, 320px);
-  height: min(58vw, 320px);
+  width: min(46vw, 240px);
+  height: min(46vw, 240px);
 }
 
 .loading-screen__message {
