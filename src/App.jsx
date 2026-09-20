@@ -33,7 +33,6 @@ import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
 import LoadingScreen from './components/LoadingScreen'
-import PropTypes from 'prop-types'
 import CityClock from './components/CityClock'
 
 // Single WebXR store for the whole app (xr v6 API). Created once at module
@@ -746,164 +745,6 @@ const arControlStyle = {
   boxShadow: '0 4px 12px rgba(0,0,0,0.35)'
 }
 
-/**
- * Everything inside the canvas: sky, lights, and the globe.
- *
- * Declared here rather than inside App, and that placement is the whole point.
- * A component declared inside another is a *new function* on every render, so
- * React sees a different type each time and unmounts the old tree to mount a
- * new one. The whole 3D scene — geometries, materials, the fluted base, every
- * tree — was being thrown away and rebuilt several times a minute.
- *
- * Props rather than closure is what buys that: the type is now stable, so a
- * new value re-renders the scene instead of replacing it.
- */
-function BaseScene({
-  includeSky = true,
-  auraGradient,
-  celestialData,
-  ambientLightIntensity,
-  weatherLightFactor,
-  directionalLightIntensity,
-  cityProfile,
-  cityName,
-  globeExtras,
-  weatherData,
-  weatherType,
-  glassTint,
-  season
-}) {
-  return (
-    <>
-      {includeSky && (
-        <LiquidChromeBackground
-          colorSky={auraGradient[0]}
-          colorAura={auraGradient[1]}
-          colorGround={auraGradient[2]}
-          isNight={celestialData.isNight}
-        />
-      )}
-      <ambientLight
-        color={celestialData.ambientSkyColor}
-        intensity={ambientLightIntensity}
-      />
-      <hemisphereLight
-        skyColor={celestialData.ambientSkyColor}
-        groundColor={celestialData.groundColor}
-        intensity={0.35 + weatherLightFactor * 0.25}
-      />
-      <directionalLight
-        position={celestialData.sunPosition}
-        intensity={directionalLightIntensity}
-        castShadow
-        color={celestialData.isNight ? '#4d5b78' : '#ffffff'}
-      />
-      {includeSky &&
-        (celestialData.isNight && celestialData.showStars ? (
-          <StarField
-            radius={celestialData.starSettings.radius}
-            depth={celestialData.starSettings.depth}
-            count={celestialData.starSettings.count}
-            factor={celestialData.starSettings.factor}
-            saturation={celestialData.starSettings.saturation}
-            fade={celestialData.starSettings.fade}
-            speed={celestialData.starSettings.speed}
-          />
-        ) : null)}
-      <group name={USDZ_ROOT_NAME}>
-        <City
-          profile={cityProfile}
-          cityName={cityName}
-          citySeed={normalizeCityName(cityName)}
-          extraElements={globeExtras}
-          isNight={celestialData.isNight}
-          windDirection={weatherData?.wind?.deg || 0}
-          windSpeed={weatherData?.wind?.speed || 0}
-          weatherType={weatherType}
-          glassTint={glassTint}
-          season={season}
-        />
-      </group>
-    </>
-  )
-}
-
-BaseScene.propTypes = {
-  includeSky: PropTypes.bool,
-  auraGradient: PropTypes.array.isRequired,
-  celestialData: PropTypes.object.isRequired,
-  ambientLightIntensity: PropTypes.number.isRequired,
-  weatherLightFactor: PropTypes.number.isRequired,
-  directionalLightIntensity: PropTypes.number.isRequired,
-  cityProfile: PropTypes.object,
-  cityName: PropTypes.string.isRequired,
-  globeExtras: PropTypes.any,
-  weatherData: PropTypes.object,
-  weatherType: PropTypes.string,
-  glassTint: PropTypes.string,
-  season: PropTypes.string
-}
-
-/**
- * The tumble the shake button sets off.
- *
- * A plain wrapper around whatever it is given, so the scene it spins is passed
- * in rather than closed over — same reason as above.
- */
-function ShakeableScene({ shakeTrigger, children }) {
-  const groupRef = useRef()
-  const animationRef = useRef({ active: false })
-
-  useEffect(() => {
-    if (!shakeTrigger) return
-    // The trigger is a wall-clock stamp and the animation is timed from it, so
-    // a remount cannot restart a spin that has already finished. That mattered
-    // more when the scene remounted constantly; it is kept because the stamp
-    // is the honest way to time this either way.
-    if (Date.now() - shakeTrigger >= SHAKE_SPIN_DURATION) return
-    animationRef.current = {
-      active: true,
-      start: shakeTrigger,
-      duration: SHAKE_SPIN_DURATION,
-      keyframes: [
-        { start: 0, end: 350, from: 0, to: Math.PI * 1.5 },
-        { start: 350, end: 700, from: Math.PI * 1.5, to: -Math.PI * 1.5 },
-        { start: 700, end: 1400, from: -Math.PI * 1.5, to: 0 }
-      ]
-    }
-  }, [shakeTrigger])
-
-  useFrame(() => {
-    const anim = animationRef.current
-    const group = groupRef.current
-    if (!group || !anim.active) return
-    const elapsed = Date.now() - anim.start
-
-    if (elapsed >= anim.duration) {
-      anim.active = false
-      group.rotation.set(0, 0, 0)
-      return
-    }
-
-    const frame =
-      anim.keyframes.find((kf) => elapsed <= kf.end) ||
-      anim.keyframes[anim.keyframes.length - 1]
-    const progress = Math.max(
-      0,
-      Math.min(1, (elapsed - frame.start) / Math.max(frame.end - frame.start, 1))
-    )
-    const eased = progress * (2 - progress)
-    group.rotation.y = frame.from + (frame.to - frame.from) * eased
-  })
-
-  return <group ref={groupRef}>{children}</group>
-}
-
-ShakeableScene.propTypes = {
-  shakeTrigger: PropTypes.number,
-  children: PropTypes.node
-}
-
 function App() {
   const [weatherData, setWeatherData] = useState(null)
   const [hourlyForecast, setHourlyForecast] = useState(null)
@@ -1422,38 +1263,118 @@ function App() {
 
   const displayCityName = weatherData?.name || city
 
-  // Gathered once so the scene's props are a stable object between renders
-  // that do not touch it.
-  const sceneProps = useMemo(
-    () => ({
-      auraGradient,
-      celestialData,
-      ambientLightIntensity,
-      weatherLightFactor,
-      directionalLightIntensity,
-      cityProfile,
-      cityName: displayCityName,
-      globeExtras,
-      weatherData,
-      weatherType,
-      glassTint,
-      season
-    }),
-    [
-      auraGradient,
-      celestialData,
-      ambientLightIntensity,
-      weatherLightFactor,
-      directionalLightIntensity,
-      cityProfile,
-      displayCityName,
-      globeExtras,
-      weatherData,
-      weatherType,
-      glassTint,
-      season
-    ]
+  const BaseScene = ({ includeSky = true }) => (
+    <>
+      {includeSky && (
+        <LiquidChromeBackground
+          colorSky={auraGradient[0]}
+          colorAura={auraGradient[1]}
+          colorGround={auraGradient[2]}
+          isNight={celestialData.isNight}
+        />
+      )}
+      <ambientLight
+        color={celestialData.ambientSkyColor}
+        intensity={ambientLightIntensity}
+      />
+      <hemisphereLight
+        skyColor={celestialData.ambientSkyColor}
+        groundColor={celestialData.groundColor}
+        intensity={0.35 + weatherLightFactor * 0.25}
+      />
+      <directionalLight
+        position={celestialData.sunPosition}
+        intensity={directionalLightIntensity}
+        castShadow
+        color={celestialData.isNight ? '#4d5b78' : '#ffffff'}
+      />
+      {includeSky &&
+        (celestialData.isNight && celestialData.showStars ? (
+          <StarField
+            radius={celestialData.starSettings.radius}
+            depth={celestialData.starSettings.depth}
+            count={celestialData.starSettings.count}
+            factor={celestialData.starSettings.factor}
+            saturation={celestialData.starSettings.saturation}
+            fade={celestialData.starSettings.fade}
+            speed={celestialData.starSettings.speed}
+          />
+        ) : null)}
+      <group name={USDZ_ROOT_NAME}>
+        <City
+        profile={cityProfile}
+        cityName={displayCityName}
+        citySeed={normalizeCityName(displayCityName)}
+        extraElements={globeExtras}
+        isNight={celestialData.isNight}
+        windDirection={weatherData?.wind?.deg || 0}
+        windSpeed={weatherData?.wind?.speed || 0}
+        weatherType={weatherType}
+        glassTint={glassTint}
+        season={season}
+
+        />
+      </group>
+    </>
   )
+
+  const ShakeableScene = ({ includeSky }) => {
+    const groupRef = useRef()
+    const animationRef = useRef({ active: false })
+
+    useEffect(() => {
+      if (!shakeTrigger) return
+      // The trigger is a wall-clock stamp, and the animation is timed from it
+      // rather than from now.
+      //
+      // BaseScene and ShakeableScene are declared inside App, so every App
+      // render creates a new component type and React remounts the whole 3D
+      // subtree. This effect then runs again on a shakeTrigger that has not
+      // changed — which used to start the spin over from the top, so the globe
+      // would lurch on its own whenever anything re-rendered App (a time-slider
+      // move, a weather refresh) long after the button was pressed.
+      //
+      // Timing from the stamp makes a remount harmless: a spin still in flight
+      // picks up at the phase it had reached, and one that has already finished
+      // is left alone.
+      if (Date.now() - shakeTrigger >= SHAKE_SPIN_DURATION) return
+      animationRef.current = {
+        active: true,
+        start: shakeTrigger,
+        duration: SHAKE_SPIN_DURATION,
+        keyframes: [
+          { start: 0, end: 350, from: 0, to: Math.PI * 1.5 },
+          { start: 350, end: 700, from: Math.PI * 1.5, to: -Math.PI * 1.5 },
+          { start: 700, end: 1400, from: -Math.PI * 1.5, to: 0 }
+        ]
+      }
+    }, [shakeTrigger])
+
+    useFrame(() => {
+      const anim = animationRef.current
+      const group = groupRef.current
+      if (!group || !anim.active) return
+      const elapsed = Date.now() - anim.start
+
+      if (elapsed >= anim.duration) {
+        anim.active = false
+        group.rotation.set(0, 0, 0)
+        return
+      }
+
+      const frame = anim.keyframes.find((kf) => elapsed <= kf.end) || anim.keyframes[anim.keyframes.length - 1]
+      const progress = Math.max(0, Math.min(1, (elapsed - frame.start) / Math.max(frame.end - frame.start, 1)))
+      const eased = progress * (2 - progress)
+      const angle = frame.from + (frame.to - frame.from) * eased
+      group.rotation.y = angle
+    })
+
+    return (
+      <group ref={groupRef}>
+        <BaseScene includeSky={includeSky} />
+      </group>
+    )
+  }
 
   return (
     <div
@@ -1541,9 +1462,7 @@ function App() {
           >
             <Suspense fallback={null}>
               <SceneBridge targetRef={sceneRef} />
-              <ShakeableScene shakeTrigger={shakeTrigger}>
-                <BaseScene includeSky {...sceneProps} />
-              </ShakeableScene>
+              <ShakeableScene includeSky />
         <OrbitControls 
                 enablePan
                 enableZoom
@@ -1579,9 +1498,7 @@ function App() {
             <Suspense fallback={null}>
               <group position={[0, -0.3, -1.4]} rotation={[0, arHeading, 0]}>
                 <FitToMeters targetDiameter={0.45}>
-                  <ShakeableScene shakeTrigger={shakeTrigger}>
-                    <BaseScene includeSky={false} {...sceneProps} />
-                  </ShakeableScene>
+                  <ShakeableScene includeSky={false} />
                 </FitToMeters>
               </group>
             </Suspense>
@@ -1630,9 +1547,7 @@ function App() {
                 return <XROrigin position={[0, XR_GROUND_OFFSET, XR_VIEW_DISTANCE]} />
               })()}
               <Suspense fallback={null}>
-                <ShakeableScene shakeTrigger={shakeTrigger}>
-                  <BaseScene includeSky={false} {...sceneProps} />
-                </ShakeableScene>
+                <ShakeableScene includeSky={false} />
                 <ARSceneControls
                   onShake={triggerShakeEffect}
                   onExit={() => handleRenderModeChange('3d')}
