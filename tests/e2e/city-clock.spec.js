@@ -12,7 +12,14 @@ import { CURRENT_WEATHER } from './support/weatherFixture.js'
 
 const overlay = (page) => page.getByTestId('city-clock-overlay')
 
-/** Drag the Sun & Moon slider to a given hour. */
+/**
+ * Drag the Sun & Moon slider to a given hour.
+ *
+ * React suppresses its change event when the value has not actually changed,
+ * and the slider starts on the city's current hour — so asking for that hour
+ * did nothing at all, and the test passed or failed depending on what time it
+ * was run. Moving away first makes the target land whatever the clock says.
+ */
 async function setHour(page, hour) {
   await page.evaluate((value) => {
     const slider = document.querySelector('.time-slider')
@@ -20,9 +27,13 @@ async function setHour(page, hour) {
       window.HTMLInputElement.prototype,
       'value'
     ).set
-    setter.call(slider, String(value))
-    slider.dispatchEvent(new Event('input', { bubbles: true }))
-    slider.dispatchEvent(new Event('change', { bubbles: true }))
+    const nudge = (next) => {
+      setter.call(slider, String(next))
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      slider.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    if (slider.value === String(value)) nudge((value + 12) % 24)
+    nudge(value)
   }, hour)
 }
 
