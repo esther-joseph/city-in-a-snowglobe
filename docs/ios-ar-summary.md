@@ -1,6 +1,6 @@
-# iOS AR Mode - Quick Summary
+# iOS AR mode, in short
 
-## The short version
+## How it picks a route
 
 Safari on iPhone and iPad has no WebXR `immersive-ar` session, so the Android
 AR path cannot run there. The app detects what each device supports and picks
@@ -15,14 +15,14 @@ one of three routes:
 
 ## Where it lives
 
-- `src/utils/arSupport.js` — capability detection, returns one of
+- `src/utils/arSupport.js`, capability detection, returns one of
   `webxr` / `quicklook` / `camera` / `none`
-- `src/utils/usdzExport.js` — scene → USDZ, sized down for Quick Look
-- `src/components/ar/CameraFeedBackground.jsx` — rear camera feed
-- `src/components/ar/DeviceOrientationCamera.jsx` — motion-driven camera
-- `src/components/ar/FitToMeters.jsx` — scales the scene to real-world size
-- `src/components/ar/ARSceneControls.jsx` — in-scene UI for headset sessions
-- `src/App.jsx` — `handleRenderModeChange` resolves the route before switching
+- `src/utils/usdzExport.js`, scene → USDZ, sized down for Quick Look
+- `src/components/ar/CameraFeedBackground.jsx`, rear camera feed
+- `src/components/ar/DeviceOrientationCamera.jsx`, motion-driven camera
+- `src/components/ar/FitToMeters.jsx`, scales the scene to real-world size
+- `src/components/ar/ARSceneControls.jsx`, in-scene UI for headset sessions
+- `src/App.jsx`, `handleRenderModeChange` resolves the route before switching
 
 ## Known limitations
 

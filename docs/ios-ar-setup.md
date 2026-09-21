@@ -21,20 +21,20 @@ iOS versions and now asks the device what it can do.
 
 `src/utils/arSupport.js` resolves one of four modes, capability-first:
 
-- **`webxr`** — an immersive session through `@react-three/xr`. ARCore phones,
+- **`webxr`**, an immersive session through `@react-three/xr`. ARCore phones,
   Android XR headsets, and Safari on visionOS all land here.
-- **`quicklook`** — iPhone and iPad. `src/utils/usdzExport.js` converts the
+- **`quicklook`**, iPhone and iPad. `src/utils/usdzExport.js` converts the
   globe to USDZ and hands it to Apple's AR Quick Look, which does real plane
   detection and placement. The app itself stays in 3D mode.
-- **`camera`** — rear camera feed plus device orientation. No world tracking:
+- **`camera`**, rear camera feed plus device orientation. No world tracking:
   the globe follows the device rather than staying on a surface.
-- **`none`** — desktops. The AR button is disabled with an explanation.
+- **`none`**, desktops. The AR button is disabled with an explanation.
 
 ## USDZ export limits
 
 USDZ stores its payload uncompressed, so every vertex costs roughly a hundred
 bytes of ASCII in the archive. The full city is ~220k vertices across ~3,700
-meshes, which exports at about 30 MB — too heavy for Quick Look on a phone.
+meshes, which exports at about 30 MB, too heavy for Quick Look on a phone.
 
 The exporter therefore:
 
@@ -45,7 +45,7 @@ The exporter therefore:
   (the city gives almost every mesh its own material instance);
 - keeps only position and normal attributes, since no material samples a
   texture;
-- approximates custom shaders — including the fresnel glass dome — with
+- approximates custom shaders, including the fresnel glass dome, with
   `MeshStandardMaterial`, and drops particle systems and Troika text outright,
   because USD has no equivalent for any of them.
 
@@ -80,13 +80,13 @@ npx cap open ios
 ```
 
 Distribution needs an Apple Developer account. Note that the Capacitor build
-gets no WebXR even on visionOS — a "Designed for iPad" app runs as a flat
+gets no WebXR even on visionOS, a "Designed for iPad" app runs as a flat
 window. The headset path is the deployed web app opened in Safari.
 
 ## Requirements recap
 
 - **Camera permission** for the fallback path (`NSCameraUsageDescription` is
   already set in `capacitor.config.json`).
-- **Motion permission** — iOS 13+ gates `deviceorientation` behind a prompt
+- **Motion permission**, iOS 13+ gates `deviceorientation` behind a prompt
   that must follow a user gesture; `requestOrientationPermission()` handles it.
 - **A physical device.** Neither AR path works in the iOS Simulator.

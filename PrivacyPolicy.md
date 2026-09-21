@@ -1,4 +1,4 @@
-# Privacy Policy — City In A Snowglobe
+# Privacy Policy: City In A Snowglobe
 
 **Last updated:** 16 September 2026
 
@@ -71,7 +71,7 @@ come from Google AdMob, and this policy will be updated to say so.
 
 ## Measurement
 
-The website uses **Vercel Speed Insights** to measure page performance — how
+The website uses **Vercel Speed Insights** to measure page performance, how
 quickly the page loads and responds. It does not use cookies and does not
 identify visitors. It does not run in the Android app.
 
@@ -79,9 +79,9 @@ identify visitors. It does not run in the Android app.
 
 ## Other services involved
 
-- [OpenWeather](https://openweather.co.uk/privacy-policy) — weather data.
-- [Vercel](https://vercel.com/legal/privacy-policy) — hosting.
-- [Google](https://policies.google.com/privacy) — advertising, and Play services
+- [OpenWeather](https://openweather.co.uk/privacy-policy), weather data.
+- [Vercel](https://vercel.com/legal/privacy-policy), hosting.
+- [Google](https://policies.google.com/privacy), advertising, and Play services
   on Android.
 
 ---

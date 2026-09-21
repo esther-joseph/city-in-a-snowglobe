@@ -14,8 +14,11 @@ const OUT_DIR = path.resolve('assets/play-store')
 const WORK_DIR = path.join(OUT_DIR, '_work')
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
+// The clock is hidden for the brand art specifically. It is a real feature and
+// it belongs in the screenshots, but an icon and a feature graphic outlive the
+// day they were rendered, and a date printed across them goes stale.
 const HIDE_UI = `
-  button, .controls-hint { display: none !important; }
+  button, .controls-hint, .city-clock { display: none !important; }
 `
 
 async function renderScene(browser, { width, height, scale, hour, zoom, city, simulate }) {
