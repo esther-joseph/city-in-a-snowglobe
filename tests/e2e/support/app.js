@@ -15,8 +15,10 @@ export const APP_TITLE = 'City In A Snowglobe'
  * @param {string} [path] - Where to land, for the launch-parameter specs.
  */
 export async function gotoApp(page, path = '/') {
-  // Skip the loading cover's hold. Every spec that clicks would otherwise wait
-  // it out first, since the cover sits over the whole app for fifteen seconds.
+  // Skip the loading cover. Every spec that clicks would otherwise wait out its
+  // hold first, since the cover sits over the whole app and takes pointer
+  // events while it is there, and it would spend a second WebGL context per
+  // page load on a screen no assertion looks at.
   const target = path.includes('cover=')
     ? path
     : `${path}${path.includes('?') ? '&' : '?'}cover=off`
@@ -26,7 +28,9 @@ export async function gotoApp(page, path = '/') {
   await stubWeatherApi(page)
   await page.goto(target)
   await expect(page.locator('canvas').first()).toBeAttached()
-  await expect(temperature(page)).toBeVisible({ timeout: 20000 })
+  // A cold first paint on a loaded machine can take a while: the scene has to
+  // compile its shaders before anything renders.
+  await expect(temperature(page)).toBeVisible({ timeout: 45000 })
 }
 
 /** Slide the weather drawer open and wait for it to settle. */
