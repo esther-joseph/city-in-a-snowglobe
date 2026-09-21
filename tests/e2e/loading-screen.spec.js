@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { stubWeatherApi } from './support/weatherFixture.js'
-import { temperature } from './support/app.js'
+import { gotoApp, temperature } from './support/app.js'
 
 /**
  * The cover over the scene while it is still being assembled.
@@ -89,5 +89,17 @@ test.describe('Loading screen', () => {
     // The app's own error state says more than a bar that never fills, so the
     // cover must not hold the reader there.
     await expect(cover(page)).toBeHidden({ timeout: 25000 })
+  })
+})
+
+test.describe('Loading screen, skipped', () => {
+  test('?cover=off mounts no cover and no second canvas', async ({ page }) => {
+    await gotoApp(page)
+
+    await expect(cover(page)).toHaveCount(0)
+    // The cover carries its own WebGL canvas. Browsers keep only a handful of
+    // live contexts and drop the oldest when that runs out, so a canvas that
+    // exists for half a second on every page load is worth not creating.
+    await expect(page.locator('canvas')).toHaveCount(1)
   })
 })
