@@ -1,238 +1,163 @@
 # City In A Snowglobe
 
+![City In A Snowglobe](assets/play-store/feature-graphic-1024x500.png)
 
-An interactive snow-globe city that visualizes real-time weather data from OpenWeatherMap using React, React-Three-Fiber, and @react-three/xr.
+A city inside a snow globe, under its own live weather and sky. Built with React, React Three Fiber, and @react-three/xr, with weather from OpenWeatherMap.
 
-## Features
+Live at [city-in-a-snowglobe.com](https://www.city-in-a-snowglobe.com).
 
-- 🏙️ **Procedural Snow-Globe City** – Landmark-aware buildings, vegetation ring, bridges, benches, fountain, and plaques inside a glass globe
-- 🌦️ **Live Weather Sync** – Current, hourly, and weekly data sourced via a SOLID-compliant WeatherService using `OPENWEATHER_API_KEY`
-- 🌩️ **Rich Weather Effects** – Rain, snow, cloud layers, stellated starfield, moon phases, and emoji-style ⚡ thunderbolts that can be manually toggled for testing
-- 🔆 **Sun & Moon Timeline** – 12-hour slider that updates temperatures, icons, and star/sun positions in real time
-- ✨ **Shakeable Globe** – Dedicated “Shake Snow Globe” button (and device motion on mobile) to spin particles and rotation with responsive positioning
-- 🗂️ **Weather Drawer UI** – Tailwind-inspired drawer containing view toggles (Minimal / Compact / Informational), sun-position diagram, metrics grid, pollen/UV indices, thunder/snow debug toggles, and city search with autocomplete
-- 📱 **3D & AR Modes** – Switch between the default 3D canvas and an AR view powered by `@react-three/xr` (transparent background, re-instantiating sessions for stability)
-- 🌁 **Dynamic Glass Tinting** – Snow-globe glass tint, fogging, and aura colors adapt to time of day and weather conditions
-- 🖱️ **Interactive Controls** – OrbitControls for rotate/pan/zoom plus mobile-friendly layout adjustments
-- ✅ **Vercel Ready** – Uses `OPENWEATHER_API_KEY` env variable only (no inline entry) and includes `vercel.json`
+## What it does
 
-## Documentation
+**The globe.** A procedural city on a reeded wooden plinth, under glass, with a forged gold ring and the city name in extruded lettering. Buildings, bridges, benches, a fountain, and a park laid out around it.
 
-### Getting Started
-- **Setup Instructions** – API key creation, dependency install, `npm run dev`, and `.env` usage
-- **Usage Guide** – Walkthrough of drawer UI, search, view modes, timeline, shake mode, and weather effects
-- **Technologies** – Complete list of dependencies and their purposes
+**Live weather.** Current conditions, an hourly trend, and a day by day forecast. Everything in the scene follows it: cloud cover, rain, snow, thunder, fog, and how the glass is tinted.
 
-### Platform-Specific Guides
-- **[Android Release Guide](docs/android/README.md)** – Complete guide for building and releasing to Google Play Store
-  - Getting started with Capacitor
-  - Build commands and signing setup
-  - Play Store submission checklist
-- **[iOS AR Setup](docs/ios-ar-setup.md)** – iOS AR mode configuration and troubleshooting
-  - iOS 17+ WebXR support
-  - Camera permission handling
-  - Device compatibility
+**A real sky.** The sun and moon sit where they actually are for the city and the date, using NOAA solar and lunar positions. Night brings out stars.
 
-### Development & Polish
-- **[Game-Feel Audit](docs/game-feel/GAME_FEEL_AUDIT.md)** – Comprehensive game-feel polish guide
-  - Animation improvements
-  - Particle system refinements
-  - Perceived performance optimizations
-  - Optional delight features
+**Seasons.** The park changes with the city's own date and hemisphere. Bare trees in winter, blossom in spring, green in summer, and turning leaves in autumn, with petals or leaves falling and settling on the grass.
 
-## Setup Instructions
+**Snow that rests.** Snow lands and stays on the ground, on trees, on bushes, and on rooftops instead of falling through them.
 
-### 1. Get Your OpenWeatherMap API Key
+**Shake it.** A button, or a shake of the phone, tumbles the globe and throws the snow up.
 
-1. Visit [OpenWeatherMap](https://openweathermap.org/api)
-2. Sign up for a free account
-3. Generate an API key (it may take a few minutes to activate)
+**3D and AR.** The default 3D canvas, plus AR where the device supports it. Android and Android XR use WebXR, iOS hands off to AR Quick Look, and anything else falls back to a camera view.
 
-### 2. Install Dependencies
+## Running it locally
+
+You need an OpenWeatherMap API key. Sign up at [openweathermap.org/api](https://openweathermap.org/api) and generate one. It can take a few minutes to activate.
 
 ```bash
 npm install
 ```
 
-### 3. Run the Development Server
+Create a `.env` file in the root and add your key:
+
+```
+OPENWEATHER_API_KEY=your_key_here
+```
+
+Then start it:
 
 ```bash
 npm run dev
 ```
 
-The app runs at `http://localhost:5173` by default (Vite).
+The app runs at `http://localhost:3000`.
 
-### 4. Set Up API Key
+The key is server side only. It never reaches the browser. Requests go through `/api/openweather`, which is a Vercel function in production and Vite middleware in development, and that is the only place the key is read.
 
-**Option A: Environment Variable (Required for Vercel)**
-1. Create a `.env` file in the root directory
-2. Add: `OPENWEATHER_API_KEY=your_api_key_here`
-3. For Vercel: Set `OPENWEATHER_API_KEY` in your Vercel project settings under Environment Variables
+## Using it
 
-**Note:** The API key must be set as an environment variable. The UI no longer exposes direct entry.
+Tap **Open Weather Info** for the panel. Search a city, switch between Minimal, Compact, and Informational layouts, and drag the Sun and Moon slider to move the sky through the day. The clock above the globe follows the slider, and **Reset to Current Time** puts it back.
 
-## Usage
+Outside the panel, drag to rotate, right drag to pan, and scroll or pinch to zoom.
 
-1. **Open the Weather Drawer** – Tap “Open Weather Info” to reveal the stacked UI (search, metrics, timeline, view modes, thunder/snow toggles, sun-position diagram).
-2. **Search for Cities** – Type in the drawer search bar. Suggestions float above other UI with city/state/country metadata. Clearing text uses the “×” button.
-3. **Change View Modes** – Minimal, Compact, or Informational layouts change icon size, metric grids, and extra cards (e.g., sun position diagram only in Informational).
-4. **Time Slider** – Drag the 12-hour slider to update the main temperature readout, graph, weather icons, and sun/moon positions. Sunrise/sunset labels update per-city/time zone.
-5. **Thunder/Snow Testing** – In the drawer header, tap the highlighted toggles to override weather data and preview thunder or snow particle systems.
-6. **Shake the Globe** – Press the floating “✨ Shake Snow Globe” button (always within viewport thanks to responsive clamps) or shake a physical device with motion permissions granted.
-7. **3D vs AR** – Use the Mode toggle at the bottom of the drawer to swap between 3D canvas (with aura sky / starfield) and AR (transparent background, reloaded session for performance). AR mode requires iOS 17+ or Android device with WebXR support and camera permission. The toggle automatically disables if AR is not supported on your device.
-8. **Scene Controls** – Outside the drawer, left-drag to rotate, right-drag to pan, scroll/pinch to zoom.
+The panel also has toggles that force thunder, snow, or rain, which are there for checking the effects without waiting for the weather.
 
-## Weather Effects
+## Deploying
 
-- ☀️ **Clear** – Sunny lighting, reflective windows, raised sun arc, translucent glass tint
-- ☁️ **Clouds** – Procedural cloud layer inside the globe (day & night) with density tied to API coverage and weather type
-- 🌧️ **Rain** – Teardrop instanced particles scaled to dome size with cloud umbrellas overhead
-- ❄️ **Snow** – Expanded snow particle volume matching cloud scale plus manual override toggle
-- ⚡ **Thunder** – Emoji-style thunderbolts spawning with random flashing, density matching snow, override toggle available
-- 🌫️ **Fog / Mist** – Increased glass roughness/tint, aura adjustments, subdued lighting
-- ✨ **Stars & Moon** – Stellation-based starfield and moon phase indicators when night mode or manual override applies
+The site runs on Vercel.
 
-## Technologies Used
+1. Push to GitHub and import the repository in Vercel.
+2. Add `OPENWEATHER_API_KEY` under Project Settings, Environment Variables.
+3. Deploy.
 
-- **React** - UI framework
-- **Three.js** - 3D rendering engine
-- **React-Three-Fiber** - React renderer for Three.js
-- **@react-three/drei** - Useful helpers for R3F
-- **@react-three/xr** - AR session support
-- **OpenWeatherMap API** - Weather data
-- **Vite** - Fast build tool
+`vercel.json` is already set up for Vite. There is no rewrite rule, so unknown paths return a real 404 from `public/404.html` instead of the app.
 
-## Deploy to Vercel
+For ads, add `VITE_ADSENSE_SLOT_DRAWER` and `VITE_ADSENSE_SLOT_FOOTER`. Slots with no id render nothing, so it is safe to deploy before the ad units exist. See [docs/monetization.md](docs/monetization.md).
 
-1. Push your code to GitHub
-2. Import your repository in Vercel
-3. Add environment variable:
-   - Go to Project Settings → Environment Variables
-   - Add `OPENWEATHER_API_KEY` with your OpenWeatherMap API key
-4. Deploy!
-
-The app will automatically build and deploy. The `vercel.json` file is configured for Vite.
-
-## Build for Production
+## Building
 
 ```bash
-npm run build
+npm run build      # production build into dist/
+npm run preview    # serve that build
+npm test           # the Playwright suite
 ```
 
-The optimized production build will be in the `dist` folder.
-
-## Preview Production Build
+Android, which needs the Capacitor setup:
 
 ```bash
-npm run preview
+npm run android:sync     # build and sync to the Android project
+npm run android:open     # open it in Android Studio
+npm run android:build    # release APK
+npm run android:bundle   # release AAB for Play
 ```
 
-## Project Structure
+The Android scripts set `SNOWGLOBE_PLATFORM=native`, which keeps the AdSense loader out of the app. AdSense is a website product and using it inside a packaged app breaks its policies.
 
-```
-weather-city-3d/
-├── src/
-│   ├── components/
-│   │   ├── City.jsx                # 3D snow-globe, bridges, landmarks
-│   │   ├── WeatherEffects.jsx      # Rain, snow, thunder, clouds, stars
-│   │   ├── WeatherDrawer.jsx       # Drawer shell with toggle button
-│   │   ├── WeatherUI.jsx / .css    # Drawer content, graphs, metrics, toggles
-│   │   ├── ModeToggle.jsx          # 3D / AR switcher (with device detection)
-│   │   └── city/*, environment/*   # Fountain, vegetation ring, sun/moon, etc.
-│   ├── services/WeatherService.js  # CRUD wrapper for OpenWeatherMap APIs
-│   ├── utils/
-│   │   └── arSupport.js            # AR capability detection (iOS/Android)
-│   ├── App.jsx                     # Main scene + Canvas/XR + shake button
-│   ├── App.css                     # Global styles / layout helpers
-│   └── main.jsx                    # Entry point
-├── docs/
-│   ├── android/                    # Android release documentation
-│   ├── game-feel/                  # Game-feel polish guide
-│   └── ios-ar-setup.md             # iOS AR mode guide
-├── index.html                      # HTML template (with iOS meta tags)
-├── vite.config.js                  # Vite configuration
-├── capacitor.config.js             # Capacitor configuration (iOS/Android)
-└── package.json                    # Dependencies
-```
+## Store artwork
 
-## Platform Support
-
-### Web (Desktop & Mobile)
-- ✅ All modern browsers (Chrome, Firefox, Safari, Edge)
-- ✅ WebGL 2.0 required for 3D rendering
-- ✅ Responsive design for mobile browsers
-
-### AR Mode Requirements
-- **iOS**: iOS 17+ with Safari browser, camera permission
-- **Android**: WebXR-compatible browser (Chrome recommended), camera permission
-- **Desktop**: Limited AR support (depends on WebXR availability)
-
-See [iOS AR Setup Guide](docs/ios-ar-setup.md) for detailed iOS requirements.
-
-### Mobile App (Capacitor)
-- ✅ **Android**: Full support with Capacitor wrapper (see [Android Release Guide](docs/android/README.md))
-- ✅ **iOS**: Capacitor support available, AR requires iOS 17+ for WebXR
-
-## Development Scripts
+Everything in `assets/play-store/` is captured from the running app, so the artwork is the real globe rather than a mockup:
 
 ```bash
-# Development
-npm run dev              # Start dev server
-npm run build            # Build for production
-npm run preview          # Preview production build
-
-# Android (requires Capacitor setup)
-npm run android:sync     # Build web app and sync to Android
-npm run android:open     # Open Android project in Android Studio
-npm run android:build    # Build release APK
-npm run android:bundle   # Build release AAB for Play Store
+npm run dev                # must be running
+npm run store:screenshots  # every device set
+npm run store:brand        # icon and feature graphic sources
 ```
 
-## API Rate Limits
+See [assets/play-store/README.md](assets/play-store/README.md) for what goes where in the Play Console.
 
-The free OpenWeatherMap API tier includes:
-- 60 calls/minute
-- 1,000,000 calls/month
+## Project layout
 
-This is more than enough for personal use!
+```
+src/
+  components/
+    City.jsx               the city, park, paths, and landmarks
+    SnowGlobe.jsx          plinth, glass, gold ring, 3D lettering
+    WeatherEffects.jsx     rain, snow, thunder, clouds, stars
+    WeatherDrawer.jsx      the side panel shell
+    WeatherUI.jsx          panel content, graphs, metrics, search
+    CityClock.jsx          the time and date above the globe
+    LoadingScreen.jsx      the cover shown while the sky loads
+    city/, environment/    fountain, vegetation, sun and moon
+    ads/AdSlot.jsx         one ad position, web or native
+  services/
+    WeatherService.js      the weather API, with a 15 minute cache
+    ads/                   which ad network fills a slot
+  utils/
+    celestialPosition.js   where the sun and moon actually are
+    seasons.js             season by date, hemisphere, and latitude
+    parkLayout.js          the park's paved surfaces and planting rule
+    surfaceHeightField.js  what the snow lands on
+api/
+  openweather.mjs          the proxy that holds the key
+  weather.js              a city shaped route over the same proxy
+tests/e2e/                 the Playwright suite
+docs/                      Android, iOS AR, and monetization guides
+```
+
+## Platform support
+
+**Web.** Any modern browser with WebGL 2. Desktop and mobile.
+
+**AR.** Android and Android XR through WebXR in Chrome. iOS 17 and up through AR Quick Look, which needs no WebXR. Everything else gets the camera fallback. All of them need camera permission, and a physical device, since simulators do not do AR.
+
+**Android app.** Full support through Capacitor. See [docs/android/README.md](docs/android/README.md).
+
+## Tests
+
+```bash
+npm test                 # the whole suite
+npm run test:ui          # the Playwright UI
+npm run test:report      # the last HTML report
+```
+
+The suite runs against a real dev server with the weather stubbed, one worker at a time, because every test renders a full WebGL scene and running them in parallel starves the GPU. Expect it to take a while.
 
 ## Troubleshooting
 
-**API Key Not Working?**
-- Make sure your API key is activated (can take 10-20 minutes after creation)
-- Check that you've entered it correctly without spaces
-- Verify your internet connection
+**The key does not work.** A new key can take 10 to 20 minutes to activate. Check for stray spaces. The key belongs in `.env` as `OPENWEATHER_API_KEY`, not in any `VITE_` variable, since anything prefixed `VITE_` is shipped to the browser.
 
-**3D Scene Not Loading?**
-- Ensure your browser supports WebGL
-- Try a different browser (Chrome, Firefox, Edge recommended)
-- Check browser console for errors
+**The scene does not load.** Check that the browser supports WebGL 2, and look in the console. Chrome, Firefox, and Edge are the safe ones.
 
-**AR Mode Not Working?**
-- **iOS**: Requires iOS 17+ and Safari browser. Camera permission must be granted. See [iOS AR Setup Guide](docs/ios-ar-setup.md)
-- **Android**: Requires WebXR-compatible browser (Chrome recommended) and camera permission
-- Ensure you're on a physical device (simulators don't support AR)
-- Check that AR button is enabled (it will be disabled if not supported)
+**AR is not available.** The button disables itself when the device cannot do it. On iOS you need 17 or later. On Android you need a WebXR browser. Either way you need camera permission and a real device.
 
-**City Not Found?**
-- Try different spelling or add country code (e.g., "London, GB")
-- Use major city names
+**A city is not found.** Try adding the country code, like "London, GB", or use the larger city nearby.
 
 ## License
 
-MIT - Feel free to use this project however you like!
-
-## Additional Resources
-
-- **[Game-Feel Audit](docs/game-feel/GAME_FEEL_AUDIT.md)** – Animation polish, particle refinement, and performance optimizations
-- **[Android Release Guide](docs/android/README.md)** – Complete Play Store submission guide
-- **[iOS AR Setup](docs/ios-ar-setup.md)** – iOS AR mode configuration
+MIT. Use it however you like.
 
 ## Credits
 
-Built with ❤️ using React-Three-Fiber and OpenWeatherMap API
-
-### Special Thanks
-- OpenWeatherMap for weather data API
-- Three.js community for amazing 3D tools
-- React Three Fiber team for the excellent React renderer
+Weather from OpenWeatherMap. Built on Three.js and React Three Fiber. Weather icons from [@bybas/weather-icons](https://github.com/basmilius/weather-icons).

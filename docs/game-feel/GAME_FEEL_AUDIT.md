@@ -150,7 +150,7 @@ Create `src/config/sceneTuning.js`:
 ```javascript
 /**
  * Scene Tuning Constants
- * 
+ *
  * These values control perceived speed, scale relationships, and feedback intensity
  * to create consistent game-feel across all interactions.
  */
@@ -475,13 +475,13 @@ const handleSliderChange = (e) => {
   const now = performance.now()
   const timeDelta = now - lastScrubTimeRef.current
   const valueDelta = Math.abs(value - lastScrubValueRef.current)
-  
+
   if (timeDelta > 0) {
     const speed = valueDelta / timeDelta
     setScrubSpeed(speed)
     // Pass to WeatherEffects via prop
   }
-  
+
   lastScrubTimeRef.current = now
   lastScrubValueRef.current = value
 }
@@ -502,7 +502,7 @@ function RainParticles({ performanceScale = 1, scrubSpeed = 0 }) {
     const scrubBoost = scrubSpeed * PARTICLE_EMISSION_SCALING.scrubSpeedMultiplier
     return baseRate + scrubBoost
   }, [scrubSpeed])
-  
+
   // Apply emissionRate to particle velocities or spawn rates
 }
 ```
@@ -589,7 +589,7 @@ const handleRenderModeChange = (newMode) => {
 
 // Render overlay:
 {isTransitioning && (
-  <div 
+  <div
     className="fixed inset-0 bg-black z-[9999] transition-opacity duration-200"
     style={{ opacity: isTransitioning ? 1 : 0 }}
   />
@@ -652,7 +652,7 @@ useEffect(() => {
     (navigator.deviceMemory && navigator.deviceMemory <= 2) // 2GB or less RAM
   )
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  
+
   if (prefersReducedMotion) {
     setPerformanceTier('reduced-motion')
   } else if (isLowEnd) {
@@ -689,7 +689,7 @@ useFrame((state, delta) => {
   const time = state.clock.elapsedTime
   const glassMesh = glassRef.current
   if (!glassMesh) return
-  
+
   // Subtle rotation shake on thunder flash
   const thunderIntensity = Math.random() < 0.02 ? 1.0 : 0.0 // Flash detection
   if (thunderIntensity > 0) {
@@ -793,21 +793,21 @@ useFrame(() => {
 ## Implementation Priority
 
 ### High Priority (Quick Wins):
-1. ✅ Timeline slider preview (visual feedback during drag)
-2. ✅ Search button loading state
-3. ✅ Shake particle burst (reactive emission)
-4. ✅ View mode fade transitions
+1.  Timeline slider preview (visual feedback during drag)
+2.  Search button loading state
+3.  Shake particle burst (reactive emission)
+4.  View mode fade transitions
 
 ### Medium Priority (Polish):
-5. ✅ Building sway (wind-based secondary motion)
-6. ✅ Glass vibration on shake (subtle material pulse)
-7. ✅ Particle emission scaling (scrub speed, shake velocity)
-8. ✅ Optimistic UI (city search)
+5.  Building sway (wind-based secondary motion)
+6.  Glass vibration on shake (subtle material pulse)
+7.  Particle emission scaling (scrub speed, shake velocity)
+8.  Optimistic UI (city search)
 
 ### Low Priority (Delight):
-9. ✅ Window brightness pulse (night)
-10. ✅ Moon glow pulse (optional)
-11. ✅ Temperature shimmer (optional, off by default)
+9.  Window brightness pulse (night)
+10.  Moon glow pulse (optional)
+11.  Temperature shimmer (optional, off by default)
 
 ---
 

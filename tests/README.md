@@ -13,10 +13,22 @@ tests/e2e/
 ├── tablet-responsive.spec.js  # Galaxy Tab S4 profile
 ├── accessibility.spec.js      # Headings, labels, keyboard, ARIA
 ├── performance.spec.js        # Load time, interaction, canvas
+├── seasons.spec.js            # Season by date, hemisphere, latitude
+├── celestial-position.spec.js # Sun and moon positions against known values
+├── sky-drift.spec.js          # Cloud and star wrapping across a long frame
+├── scene-stability.spec.js    # The 3D scene surviving a re-render
+├── shake.spec.js              # Shake spins once, and only when asked
+├── park-planting.spec.js      # Nothing planted on a path
+├── spring-blossom.spec.js     # Blossom crowns and beds on the grass
+├── city-clock.spec.js         # City time, the slider, the sheen
+├── loading-screen.spec.js     # The cover, its hold, and letting go
+├── monetization.spec.js       # Ad slots, the weather cache, launch params
+├── site-compliance.spec.js    # robots.txt, sitemap, the privacy page
 └── support/
     ├── app.js                 # gotoApp / openDrawer and shared locators
     └── weatherFixture.js      # Canned /api/openweather responses
 ```
+
 
 ## Running
 
@@ -47,7 +59,7 @@ an already-running one on port 3000 is reused.
 **The suite runs serially** with a 90s per-test budget and a 15s expect
 timeout. Every test renders a full WebGL scene; parallel contexts starve each
 other, and mobile emulation renders the scene on the CPU. A full run takes
-about six minutes — that is expected, not a hang.
+about six minutes, that is expected, not a hang.
 
 **Projects**: `chromium` and `Mobile Chrome`. Firefox, WebKit and the iPhone 12
 profile are commented out in the config because they need browsers that
