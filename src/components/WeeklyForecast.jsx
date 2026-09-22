@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import PropTypes from 'prop-types'
 import MeteoconIcon from './MeteoconIcon'
 import ScrollStrip from './ScrollStrip'
+import { DEFAULT_UNIT, formatTemp as formatInUnit } from '../utils/temperature'
 import './ForecastCards.css'
 
 /**
@@ -32,10 +33,8 @@ function dateLabel(timestamp, timezoneOffset) {
   })
 }
 
-const formatTemp = (value) =>
-  value === null || value === undefined || Number.isNaN(value) ? '--' : `${Math.round(value)}°`
-
-function WeeklyForecast({ days = [], timezoneOffset = 0 }) {
+function WeeklyForecast({ days = [], timezoneOffset = 0, unit = DEFAULT_UNIT }) {
+  const formatTemp = (value) => formatInUnit(value, unit)
   const shown = useMemo(() => days.slice(0, MAX_DAYS), [days])
 
   if (shown.length === 0) return null
@@ -120,7 +119,9 @@ WeeklyForecast.propTypes = {
     })
   ),
   /** Seconds east of UTC, so the days are the city's rather than the reader's. */
-  timezoneOffset: PropTypes.number
+  timezoneOffset: PropTypes.number,
+  /** Which scale to show in. The readings themselves are always Fahrenheit. */
+  unit: PropTypes.string
 }
 
 export default WeeklyForecast

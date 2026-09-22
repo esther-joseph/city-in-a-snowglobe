@@ -227,6 +227,17 @@
   font-weight: 600;
 }
 
+/* The unit pair sits under the view modes. Narrower buttons, since two
+   degree symbols do not need the room three words do. */
+.unit-toggle {
+  margin-top: 8px;
+}
+
+.unit-toggle .view-toggle-button {
+  padding: 6px 16px;
+  font-variant-numeric: tabular-nums;
+}
+
 .test-toggles {
   display: flex;
   flex-wrap: wrap;

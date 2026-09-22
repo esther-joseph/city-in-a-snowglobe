@@ -3,6 +3,7 @@ import './WeatherUI.css'
 import SunPositionDiagram from './SunPositionDiagram'
 import WeeklyForecast from './WeeklyForecast'
 import HourlyForecast from './HourlyForecast'
+import { DEFAULT_UNIT, UNITS, UNIT_SUFFIX, formatTemp } from '../utils/temperature'
 import AdSlot from './ads/AdSlot'
 import MeteoconIcon from './MeteoconIcon'
 
@@ -36,6 +37,9 @@ function WeatherUI({
 }) {
   const [city, setCity] = useState(currentCity)
   const [viewMode, setViewMode] = useState('informational')
+  // Fahrenheit by default. The weather is fetched in imperial and converted
+  // for display, so switching costs nothing and never refetches.
+  const [unit, setUnit] = useState(DEFAULT_UNIT)
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
@@ -45,6 +49,11 @@ function WeatherUI({
     { id: 'minimal', label: 'Minimal' },
     { id: 'compact', label: 'Compact' },
     { id: 'informational', label: 'Informational' }
+  ]
+
+  const UNIT_OPTIONS = [
+    { id: UNITS.FAHRENHEIT, label: UNIT_SUFFIX[UNITS.FAHRENHEIT] },
+    { id: UNITS.CELSIUS, label: UNIT_SUFFIX[UNITS.CELSIUS] }
   ]
 
   const handleSubmit = (e) => {
@@ -224,12 +233,11 @@ function WeatherUI({
     return Number.isFinite(tempValue) ? tempValue : null
   }, [hourlyForecast, weatherData, timeOverride, displayHour])
 
-  const temperatureLabel =
-    selectedTimeTemperature !== null
-      ? `${Math.round(selectedTimeTemperature)}°F`
-      : (temperatureF !== undefined
-          ? `${Math.round(temperatureF)}°F`
-          : '--')
+  const temperatureLabel = formatTemp(
+    selectedTimeTemperature !== null ? selectedTimeTemperature : temperatureF,
+    unit,
+    { withUnit: true }
+  )
   const feelsLikeF = weatherData?.main?.feels_like
   const humidity = weatherData?.main?.humidity
   const windSpeed = weatherData?.wind?.speed
@@ -360,6 +368,24 @@ function WeatherUI({
           </button>
           ))}
       </div>
+
+        {/* Same pill group as the view modes, one row down: the two controls
+            do different jobs but read as a pair, which is where a reader
+            expects to find both. */}
+        <div className="view-toggle unit-toggle" role="group" aria-label="Temperature units">
+          {UNIT_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={`view-toggle-button${unit === option.id ? ' active' : ''}`}
+              aria-pressed={unit === option.id}
+              onClick={() => setUnit(option.id)}
+              data-testid={`unit-${option.id}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         {/* <div className="test-toggles">
           {onThunderToggle && (
             <button
@@ -432,7 +458,7 @@ function WeatherUI({
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Feels Like</span>
-                  <span className="stat-value">{feelsLikeF !== undefined ? `${Math.round(feelsLikeF)}°F` : '--'}</span>
+                  <span className="stat-value">{formatTemp(feelsLikeF, unit, { withUnit: true })}</span>
                 </div>
               </div>
             </div>
@@ -465,7 +491,7 @@ function WeatherUI({
                     {(viewMode === 'compact' || viewMode === 'informational') && feelsLikeF !== undefined && (
                       <div className="stat-item">
                         <span className="stat-label">Feels Like</span>
-                        <span className="stat-value">{Math.round(feelsLikeF)}°F</span>
+                        <span className="stat-value">{formatTemp(feelsLikeF, unit, { withUnit: true })}</span>
                       </div>
                     )}
                     {viewMode === 'compact' && pressure !== undefined && (
@@ -518,6 +544,7 @@ function WeatherUI({
                   timezoneOffset={hourlyForecast.timezoneOffset ?? weatherData?.timezone ?? 0}
                   sunrise={weatherData?.sys?.sunrise ?? null}
                   sunset={weatherData?.sys?.sunset ?? null}
+                  unit={unit}
                 />
               )}
 
@@ -525,6 +552,7 @@ function WeatherUI({
                 <WeeklyForecast
                   days={weeklyForecast}
                   timezoneOffset={weatherData?.timezone ?? 0}
+                  unit={unit}
                 />
               )}
               {viewMode === 'informational' && (
