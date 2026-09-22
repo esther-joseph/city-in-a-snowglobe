@@ -41,10 +41,12 @@ test.describe('UI Components', () => {
     await expect(page.locator('.weather-summary')).toBeVisible()
   })
 
-  test('should display temperature graph in informational view', async ({ page }) => {
+  test('should display the hourly forecast strip in informational view', async ({ page }) => {
+    // This asserted the 12-hour line chart, which the 48-hour card strip
+    // replaced. The strip carries the same reading in more detail.
     await page.getByRole('button', { name: /Informational/i }).click()
-    await expect(page.locator('.temperature-graph')).toBeVisible()
-    await expect(page.locator('.temperature-chart')).toBeVisible()
+    await expect(page.getByTestId('hourly-forecast')).toBeVisible()
+    await expect(page.getByTestId('hourly-scroller').locator('.forecast-tile').first()).toBeVisible()
   })
 
   test('should display sun position diagram in informational view', async ({ page }) => {

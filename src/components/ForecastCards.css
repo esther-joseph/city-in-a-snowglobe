@@ -1,0 +1,230 @@
+/*
+ * Horizontally scrolled forecast cards, for the day by day and the hour by
+ * hour strips.
+ *
+ * The surface matches .weather-info: same dark glass, same radius, same
+ * shadow, so the strips sit in the panel as part of the same set rather than
+ * as something bolted on.
+ */
+
+.forecast-card {
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  padding: 18px 0 14px;
+  border-radius: 18px;
+  color: white;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.forecast-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 22px 12px;
+}
+
+.forecast-card-header h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.forecast-card-header span {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* The strip itself. */
+.forecast-scroller {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 22px 12px;
+  /* Cards come to rest on their own edges rather than halfway across one. */
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * The native bar is hidden. macOS overlay scrollbars take no layout space and
+ * fade out when the strip is still, so ScrollStrip draws its own below.
+ */
+.forecast-scroller {
+  scrollbar-width: none;
+}
+
+.forecast-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-strip__track {
+  height: 6px;
+  margin: 0 22px 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.scroll-strip__thumb {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #b8862f, #f0bf55);
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+
+.scroll-strip__thumb:active {
+  cursor: grabbing;
+  background: linear-gradient(90deg, #f0bf55, #ffe9a8);
+}
+
+.forecast-tile {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px 14px;
+  min-width: 84px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+
+.forecast-tile--day {
+  min-width: 96px;
+}
+
+.forecast-tile__when {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+}
+
+.forecast-tile__date {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  margin-top: -6px;
+}
+
+.forecast-tile__temp {
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast-tile__icon {
+  width: 44px;
+  height: 44px;
+}
+
+/* Precipitation, with a drawn drop rather than an emoji. */
+.forecast-tile__pop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  color: #8fc9f5;
+}
+
+.forecast-tile__drop {
+  width: 7px;
+  height: 9px;
+  background: currentColor;
+  /* A teardrop: round at the bottom, drawn to a point at the top. */
+  border-radius: 0 60% 60% 60%;
+  transform: rotate(-45deg);
+  opacity: 0.85;
+}
+
+/*
+ * The division between day and night.
+ *
+ * A leaning rule rather than a slash character: a text slash sits on the
+ * baseline and collides with whatever is on either side of it, where this can
+ * be centred against icons and numbers of any height.
+ */
+.forecast-split {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.forecast-split__rule {
+  width: 1px;
+  height: 22px;
+  transform: rotate(18deg);
+  background: linear-gradient(
+    to bottom,
+    rgba(240, 191, 85, 0),
+    rgba(240, 191, 85, 0.75),
+    rgba(240, 191, 85, 0)
+  );
+  flex: 0 0 auto;
+}
+
+.forecast-split--temps .forecast-split__rule {
+  height: 18px;
+}
+
+.forecast-split__icon {
+  width: 34px;
+  height: 34px;
+}
+
+.forecast-split__temp {
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast-split__temp--night {
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 500;
+}
+
+/* Where one day hands over to the next in the hourly strip. */
+.forecast-tile--daybreak {
+  border-left: 1px solid rgba(240, 191, 85, 0.35);
+}
+
+.forecast-tile__daybreak {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(240, 191, 85, 0.8);
+}
+
+.forecast-tile--daybreak {
+  padding-top: 18px;
+}
+
+@media (max-width: 480px) {
+  .forecast-card-header,
+  .forecast-scroller {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
