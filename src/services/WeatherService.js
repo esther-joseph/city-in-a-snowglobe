@@ -123,45 +123,74 @@ class WeatherService {
         city: forecastJson.city
       }
       
-      // Group by day for weekly forecast
+      // Group by day for the weekly forecast.
+      //
+      // Grouped by the *city's* date, not the viewer's. Using the viewer's
+      // local date put a forecast for Tokyo into whatever day it happened to
+      // be in London, which shifted every bucket by a day for anyone far
+      // enough east or west.
       const dailyData = {}
       forecastJson.list.forEach((item) => {
-        const date = new Date(item.dt * 1000)
-        const dateKey = date.toDateString()
+        const local = new Date((item.dt + timezoneOffset) * 1000)
+        const dateKey = local.toISOString().slice(0, 10)
         if (!dailyData[dateKey]) {
           dailyData[dateKey] = {
             date: dateKey,
             timestamp: item.dt,
             temps: [],
             weather: [],
+            dayTemps: [],
+            nightTemps: [],
+            dayWeather: [],
+            nightWeather: [],
+            pop: 0,
             min: Infinity,
             max: -Infinity
           }
         }
+        const bucket = dailyData[dateKey]
         const temp = item.main?.temp
+        // `sys.pod` is OpenWeather's own day/night flag for the entry, which
+        // is better than guessing from the hour: it already accounts for how
+        // late the sun sets at that latitude and season.
+        const isDaytime = item.sys?.pod !== 'n'
+
         if (typeof temp === 'number') {
-          dailyData[dateKey].temps.push(temp)
-          dailyData[dateKey].min = Math.min(dailyData[dateKey].min, temp)
-          dailyData[dateKey].max = Math.max(dailyData[dateKey].max, temp)
+          bucket.temps.push(temp)
+          bucket.min = Math.min(bucket.min, temp)
+          bucket.max = Math.max(bucket.max, temp)
+          if (isDaytime) bucket.dayTemps.push(temp)
+          else bucket.nightTemps.push(temp)
         }
         if (item.weather?.[0]) {
-          dailyData[dateKey].weather.push(item.weather[0])
+          bucket.weather.push(item.weather[0])
+          if (isDaytime) bucket.dayWeather.push(item.weather[0])
+          else bucket.nightWeather.push(item.weather[0])
         }
+        // Probability of precipitation is per three-hour window. The day's
+        // figure is the worst of them, which is what a reader means when they
+        // ask whether it is going to rain tomorrow.
+        if (typeof item.pop === 'number') bucket.pop = Math.max(bucket.pop, item.pop)
       })
-      
-      // Convert to array and get most common weather for each day
-      const weeklyData = Object.values(dailyData).map((day) => {
-        // Get most common weather condition
-        const weatherCounts = {}
-        day.weather.forEach((w) => {
-          const main = w.main
-          weatherCounts[main] = (weatherCounts[main] || 0) + 1
+
+      /** The condition that turns up most often in a set of entries. */
+      const commonWeather = (entries) => {
+        if (!entries.length) return null
+        const counts = {}
+        entries.forEach((entry) => {
+          counts[entry.main] = (counts[entry.main] || 0) + 1
         })
-        const mostCommonWeather = Object.keys(weatherCounts).reduce((a, b) =>
-          weatherCounts[a] > weatherCounts[b] ? a : b
-        )
-        const weather = day.weather.find((w) => w.main === mostCommonWeather) || day.weather[0]
-        
+        const winner = Object.keys(counts).reduce((a, b) => (counts[a] > counts[b] ? a : b))
+        return entries.find((entry) => entry.main === winner) || entries[0]
+      }
+
+      const weeklyData = Object.values(dailyData).map((day) => {
+        const weather = commonWeather(day.weather)
+        // A day's temperature is its high and a night's is its low, which is
+        // how every forecast anyone has read states it.
+        const dayTemp = day.dayTemps.length ? Math.max(...day.dayTemps) : null
+        const nightTemp = day.nightTemps.length ? Math.min(...day.nightTemps) : null
+
         return {
           date: day.date,
           timestamp: day.timestamp,
@@ -170,7 +199,16 @@ class WeatherService {
             max: Math.round(day.max),
             avg: Math.round(day.temps.reduce((a, b) => a + b, 0) / day.temps.length)
           },
-          weather: weather
+          day: {
+            temp: dayTemp === null ? null : Math.round(dayTemp),
+            weather: commonWeather(day.dayWeather)
+          },
+          night: {
+            temp: nightTemp === null ? null : Math.round(nightTemp),
+            weather: commonWeather(day.nightWeather)
+          },
+          precipitation: Math.round(day.pop * 100),
+          weather
         }
       })
 

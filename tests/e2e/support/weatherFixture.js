@@ -30,25 +30,40 @@ export const CURRENT_WEATHER = {
   cod: 200
 }
 
+// Eighteen three-hour steps, so the 48-hour strip has a full set to show and
+// the daily buckets have both daylight and night entries to split on.
 export const FORECAST = {
   cod: '200',
-  cnt: 8,
-  list: Array.from({ length: 8 }, (_, index) => ({
-    dt: NOW + index * 10800,
-    main: {
-      temp: 70 + index,
-      feels_like: 69 + index,
-      temp_min: 68 + index,
-      temp_max: 74 + index,
-      pressure: 1014,
-      humidity: 50
-    },
-    weather: [{ id: 801, main: 'Clouds', description: 'few clouds', icon: '02d' }],
-    clouds: { all: 20 },
-    wind: { speed: 7.2, deg: 200 },
-    visibility: 10000,
-    dt_txt: new Date((NOW + index * 10800) * 1000).toISOString()
-  })),
+  cnt: 18,
+  list: Array.from({ length: 18 }, (_, index) => {
+    const dt = NOW + index * 10800
+    // The city is UTC-4, so work out whether this step falls in its daylight.
+    const localHour = new Date((dt - 14400) * 1000).getUTCHours()
+    const daytime = localHour >= 6 && localHour < 18
+    return {
+      dt,
+      main: {
+        temp: daytime ? 70 + (index % 5) : 58 + (index % 4),
+        feels_like: 69 + (index % 5),
+        temp_min: 68 + (index % 5),
+        temp_max: 74 + (index % 5),
+        pressure: 1014,
+        humidity: 50
+      },
+      weather: [
+        daytime
+          ? { id: 801, main: 'Clouds', description: 'few clouds', icon: '02d' }
+          : { id: 500, main: 'Rain', description: 'light rain', icon: '10n' }
+      ],
+      clouds: { all: 20 },
+      wind: { speed: 7.2, deg: 200 },
+      visibility: 10000,
+      // Probability of precipitation, which the cards show as a percentage.
+      pop: daytime ? 0.1 : 0.6,
+      sys: { pod: daytime ? 'd' : 'n' },
+      dt_txt: new Date(dt * 1000).toISOString()
+    }
+  }),
   city: {
     id: 5128581,
     name: 'New York',
