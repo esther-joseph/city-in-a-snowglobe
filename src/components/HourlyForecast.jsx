@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import PropTypes from 'prop-types'
 import MeteoconIcon from './MeteoconIcon'
 import ScrollStrip from './ScrollStrip'
+import { DEFAULT_UNIT, formatTemp } from '../utils/temperature'
 import './ForecastCards.css'
 
 /**
@@ -32,7 +33,13 @@ function dayBreakLabel(timestamp, timezoneOffset) {
   return local.toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' })
 }
 
-function HourlyForecast({ entries = [], timezoneOffset = 0, sunrise = null, sunset = null }) {
+function HourlyForecast({
+  entries = [],
+  timezoneOffset = 0,
+  sunrise = null,
+  sunset = null,
+  unit = DEFAULT_UNIT
+}) {
   const hours = useMemo(() => {
     if (!entries.length) return []
     const first = entries[0].dt
@@ -102,9 +109,7 @@ function HourlyForecast({ entries = [], timezoneOffset = 0, sunrise = null, suns
                 className="forecast-row__icon"
               />
 
-              <span className="forecast-row__temp">
-                {typeof temp === 'number' ? `${Math.round(temp)}°` : '--'}
-              </span>
+              <span className="forecast-row__temp">{formatTemp(temp, unit)}</span>
 
               <span className="forecast-row__pop">
                 <span className="forecast-tile__drop" aria-hidden="true" />
@@ -130,7 +135,9 @@ HourlyForecast.propTypes = {
   ),
   timezoneOffset: PropTypes.number,
   sunrise: PropTypes.number,
-  sunset: PropTypes.number
+  sunset: PropTypes.number,
+  /** Which scale to show in. The readings themselves are always Fahrenheit. */
+  unit: PropTypes.string
 }
 
 export default HourlyForecast
