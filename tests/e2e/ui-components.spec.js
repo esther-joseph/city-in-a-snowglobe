@@ -46,7 +46,7 @@ test.describe('UI Components', () => {
     // replaced. The strip carries the same reading in more detail.
     await page.getByRole('button', { name: /Informational/i }).click()
     await expect(page.getByTestId('hourly-forecast')).toBeVisible()
-    await expect(page.getByTestId('hourly-scroller').locator('.forecast-tile').first()).toBeVisible()
+    await expect(page.getByTestId('hourly-scroller').locator('.forecast-row').first()).toBeVisible()
   })
 
   test('should display sun position diagram in informational view', async ({ page }) => {

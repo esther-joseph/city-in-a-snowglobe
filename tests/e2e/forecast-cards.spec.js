@@ -4,29 +4,45 @@ import { gotoApp, openDrawer } from './support/app.js'
 /**
  * The two forecast strips.
  *
- * Both are cards in a row you scroll sideways, with a scrollbar drawn rather
- * than borrowed. The native one is no use here: macOS overlay scrollbars take
- * no layout space and fade out whenever the strip is still, so there would be
- * nothing on screen to say the row continues past the edge of the panel.
+ * The day strip is cards in a row you scroll sideways. The hourly strip is
+ * rows in a column you scroll down, because there are sixteen of them and
+ * four fields each, and read down a column those fields line up.
+ *
+ * Both draw their own scrollbar rather than borrowing one. The native bar is
+ * no use here: macOS overlay scrollbars take no layout space and fade out
+ * whenever the strip is still, so there would be nothing on screen to say the
+ * list continues past the edge.
  */
 
 const weekly = (page) => page.getByTestId('weekly-forecast')
 const hourly = (page) => page.getByTestId('hourly-forecast')
 
-async function metrics(page, testId) {
-  return page.evaluate((id) => {
-    const scroller = document.querySelector(`[data-testid="${id}"]`)
-    const track = document.querySelector(`[data-testid="${id}-bar"]`)
-    const thumb = track?.querySelector('.scroll-strip__thumb')
-    return {
-      cards: scroller.children.length,
-      scrollWidth: scroller.scrollWidth,
-      clientWidth: scroller.clientWidth,
-      trackVisible: Boolean(track) && getComputedStyle(track).display !== 'none',
-      thumbWidth: thumb ? thumb.getBoundingClientRect().width : 0,
-      trackWidth: track ? track.getBoundingClientRect().width : 0
-    }
-  }, testId)
+async function metrics(page, testId, axis) {
+  return page.evaluate(
+    ({ id, direction }) => {
+      const scroller = document.querySelector(`[data-testid="${id}"]`)
+      const track = document.querySelector(`[data-testid="${id}-bar"]`)
+      const thumb = track?.querySelector('.scroll-strip__thumb')
+      const down = direction === 'y'
+      return {
+        cards: scroller.children.length,
+        total: down ? scroller.scrollHeight : scroller.scrollWidth,
+        visible: down ? scroller.clientHeight : scroller.clientWidth,
+        trackVisible: Boolean(track) && getComputedStyle(track).display !== 'none',
+        thumbLength: thumb
+          ? down
+            ? thumb.getBoundingClientRect().height
+            : thumb.getBoundingClientRect().width
+          : 0,
+        trackLength: track
+          ? down
+            ? track.getBoundingClientRect().height
+            : track.getBoundingClientRect().width
+          : 0
+      }
+    },
+    { id: testId, direction: axis }
+  )
 }
 
 test.describe('Forecast strips', () => {
@@ -65,52 +81,118 @@ test.describe('Forecast strips', () => {
     expect(temps[0]).not.toBe(temps[1])
   })
 
-  test('the hour strip covers two days, three hours at a time', async ({ page }) => {
+  test('the hour strip reads time, icon, temperature, precipitation', async ({ page }) => {
     await expect(hourly(page)).toBeVisible()
-    // The free forecast is three-hourly, so 48 hours is sixteen or so cards
+    // The free forecast is three-hourly, so 48 hours is sixteen or so rows
     // rather than forty-eight. The heading says what is actually covered.
     await expect(hourly(page).locator('h3')).toHaveText(/\d+-Hour Forecast/)
     await expect(hourly(page)).toContainText('Every 3 hours')
 
-    const first = hourly(page).locator('.forecast-tile').first()
-    await expect(first.locator('.forecast-tile__icon')).toBeVisible()
-    await expect(first.locator('.forecast-tile__temp')).toContainText('°')
-    await expect(first.locator('.forecast-tile__pop')).toContainText('%')
-    await expect(first.locator('.forecast-tile__when')).not.toHaveText('')
+    const first = hourly(page).locator('.forecast-row').first()
+    await expect(first.locator('.forecast-row__when')).not.toHaveText('')
+    await expect(first.locator('.forecast-row__icon')).toBeVisible()
+    await expect(first.locator('.forecast-row__temp')).toContainText('°')
+    await expect(first.locator('.forecast-row__pop')).toContainText('%')
+
+    // In that order, left to right. Matched by containment rather than by the
+    // first class name: MeteoconIcon puts its own class ahead of the one the
+    // row gives it.
+    const wanted = [
+      'forecast-row__when',
+      'forecast-row__icon',
+      'forecast-row__temp',
+      'forecast-row__pop'
+    ]
+    const order = await first.evaluate(
+      (row, classes) =>
+        Array.from(row.children).map(
+          (child) => classes.find((name) => child.classList.contains(name)) ?? child.className
+        ),
+      wanted
+    )
+    expect(order).toEqual(wanted)
   })
 
-  test('both strips scroll, and both show a bar', async ({ page }) => {
-    for (const id of ['weekly-scroller', 'hourly-scroller']) {
-      const measured = await metrics(page, id)
-      expect(measured.cards, `${id} cards`).toBeGreaterThan(2)
-      expect(measured.scrollWidth, `${id} overflows`).toBeGreaterThan(measured.clientWidth)
-      expect(measured.trackVisible, `${id} bar is shown`).toBe(true)
-      // A thumb narrower than its track is what tells you there is more to see.
-      expect(measured.thumbWidth).toBeGreaterThan(0)
-      expect(measured.thumbWidth).toBeLessThan(measured.trackWidth)
+  test('the weekday shares the time cell so the columns stay aligned', async ({ page }) => {
+    const rows = hourly(page).locator('.forecast-row')
+    const daybreak = hourly(page).locator('.forecast-row--daybreak').first()
+    await expect(daybreak).toBeVisible()
+    // Weekday and hour together, divided, in the one cell.
+    await expect(daybreak.locator('.forecast-row__weekday')).not.toHaveText('')
+    await expect(daybreak.locator('.forecast-row__when')).toContainText(/[A-Za-z]{3}/)
+
+    // Every row's four columns start on the same four verticals, which is the
+    // whole reason the weekday shares the cell instead of sitting above it.
+    const lefts = await rows.evaluateAll((all) =>
+      all
+        .slice(0, 8)
+        .map((row) => Array.from(row.children).map((c) => Math.round(c.getBoundingClientRect().left)))
+    )
+    for (const row of lefts) {
+      expect(row).toEqual(lefts[0])
     }
   })
 
-  test('the bar follows the scroll to the end', async ({ page }) => {
-    const rightEdges = await page.evaluate(() => {
-      const scroller = document.querySelector('[data-testid="hourly-scroller"]')
-      const thumb = document.querySelector('[data-testid="hourly-scroller-bar"] .scroll-strip__thumb')
-      const track = document.querySelector('[data-testid="hourly-scroller-bar"]')
-      scroller.scrollLeft = scroller.scrollWidth
+  test('the hour strip scrolls down, not sideways', async ({ page }) => {
+    const measured = await metrics(page, 'hourly-scroller', 'y')
+    expect(measured.cards).toBeGreaterThan(8)
+    expect(measured.total, 'taller than the window it sits in').toBeGreaterThan(
+      measured.visible
+    )
+    expect(measured.trackVisible).toBe(true)
+    expect(measured.thumbLength).toBeGreaterThan(0)
+    expect(measured.thumbLength).toBeLessThan(measured.trackLength)
+
+    const sideways = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="hourly-scroller"]')
+      return el.scrollWidth <= el.clientWidth + 1
+    })
+    expect(sideways, 'nothing hidden off to the side').toBe(true)
+  })
+
+  test('the day strip scrolls sideways, and shows a bar', async ({ page }) => {
+    const measured = await metrics(page, 'weekly-scroller', 'x')
+    expect(measured.cards).toBeGreaterThan(2)
+    expect(measured.total).toBeGreaterThan(measured.visible)
+    expect(measured.trackVisible).toBe(true)
+    // A thumb shorter than its track is what tells you there is more to see.
+    expect(measured.thumbLength).toBeGreaterThan(0)
+    expect(measured.thumbLength).toBeLessThan(measured.trackLength)
+  })
+
+  test('each bar follows its own scroll to the end', async ({ page }) => {
+    const edges = await page.evaluate(() => {
+      const read = (id, down) => {
+        const scroller = document.querySelector(`[data-testid="${id}"]`)
+        const track = document.querySelector(`[data-testid="${id}-bar"]`)
+        const thumb = track.querySelector('.scroll-strip__thumb')
+        if (down) scroller.scrollTop = scroller.scrollHeight
+        else scroller.scrollLeft = scroller.scrollWidth
+        return { scroller, track, thumb, down }
+      }
+      const weekly = read('weekly-scroller', false)
+      const hourly = read('hourly-scroller', true)
       return new Promise((resolve) => {
         requestAnimationFrame(() =>
           requestAnimationFrame(() =>
             resolve({
-              thumb: Math.round(thumb.getBoundingClientRect().right),
-              track: Math.round(track.getBoundingClientRect().right)
+              weekly: {
+                thumb: Math.round(weekly.thumb.getBoundingClientRect().right),
+                track: Math.round(weekly.track.getBoundingClientRect().right)
+              },
+              hourly: {
+                thumb: Math.round(hourly.thumb.getBoundingClientRect().bottom),
+                track: Math.round(hourly.track.getBoundingClientRect().bottom)
+              }
             })
           )
         )
       })
     })
 
-    // Scrolled to the end, the thumb should be at the end.
-    expect(Math.abs(rightEdges.thumb - rightEdges.track)).toBeLessThanOrEqual(2)
+    // Scrolled to the end, each thumb should be at the end of its track.
+    expect(Math.abs(edges.weekly.thumb - edges.weekly.track)).toBeLessThanOrEqual(2)
+    expect(Math.abs(edges.hourly.thumb - edges.hourly.track)).toBeLessThanOrEqual(2)
   })
 
   test('the 12-hour chart is gone, replaced by the hour strip', async ({ page }) => {

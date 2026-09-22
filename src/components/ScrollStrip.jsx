@@ -18,7 +18,8 @@ import './ForecastCards.css'
  * event fires many times a second and every one of them would otherwise
  * re-render every card in the strip.
  */
-function ScrollStrip({ children, className = '', testId }) {
+function ScrollStrip({ children, className = '', testId, axis = 'x' }) {
+  const vertical = axis === 'y'
   const scrollerRef = useRef(null)
   const trackRef = useRef(null)
   const thumbRef = useRef(null)
@@ -30,22 +31,30 @@ function ScrollStrip({ children, className = '', testId }) {
     const thumb = thumbRef.current
     if (!scroller || !track || !thumb) return
 
-    const { scrollWidth, clientWidth, scrollLeft } = scroller
-    const scrollable = scrollWidth > clientWidth + 1
+    const total = vertical ? scroller.scrollHeight : scroller.scrollWidth
+    const visible = vertical ? scroller.clientHeight : scroller.clientWidth
+    const position = vertical ? scroller.scrollTop : scroller.scrollLeft
+
+    const scrollable = total > visible + 1
     track.style.display = scrollable ? '' : 'none'
     if (!scrollable) return
 
-    const ratio = clientWidth / scrollWidth
-    const width = Math.max(ratio * 100, 12)
-    // The thumb has real width, so it can only travel the track's width minus
-    // its own. Scaling by that keeps its right edge landing on the right edge
-    // at the end of the scroll.
-    const travel = 100 - width
-    const progress = scrollLeft / (scrollWidth - clientWidth)
+    const size = Math.max((visible / total) * 100, 12)
+    // The thumb has a real size, so it can only travel the track minus its
+    // own length. Scaling by that keeps its far edge landing on the track's
+    // far edge at the end of the scroll.
+    const travel = 100 - size
+    const progress = position / (total - visible)
+    const shift = progress * travel * (100 / size)
 
-    thumb.style.width = `${width}%`
-    thumb.style.transform = `translateX(${progress * travel * (100 / width)}%)`
-  }, [])
+    if (vertical) {
+      thumb.style.height = `${size}%`
+      thumb.style.transform = `translateY(${shift}%)`
+    } else {
+      thumb.style.width = `${size}%`
+      thumb.style.transform = `translateX(${shift}%)`
+    }
+  }, [vertical])
 
   useEffect(() => {
     const scroller = scrollerRef.current
@@ -65,30 +74,43 @@ function ScrollStrip({ children, className = '', testId }) {
     }
   }, [sync, children])
 
-  const startDrag = useCallback((event) => {
-    const scroller = scrollerRef.current
-    const track = trackRef.current
-    if (!scroller || !track) return
-    draggingRef.current = {
-      startX: event.clientX,
-      startScroll: scroller.scrollLeft,
-      trackWidth: track.clientWidth
-    }
-    event.currentTarget.setPointerCapture(event.pointerId)
-    event.preventDefault()
-  }, [])
+  const startDrag = useCallback(
+    (event) => {
+      const scroller = scrollerRef.current
+      const track = trackRef.current
+      if (!scroller || !track) return
+      draggingRef.current = {
+        start: vertical ? event.clientY : event.clientX,
+        startScroll: vertical ? scroller.scrollTop : scroller.scrollLeft,
+        trackLength: vertical ? track.clientHeight : track.clientWidth
+      }
+      event.currentTarget.setPointerCapture(event.pointerId)
+      event.preventDefault()
+    },
+    [vertical]
+  )
 
-  const onDrag = useCallback((event) => {
-    const drag = draggingRef.current
-    const scroller = scrollerRef.current
-    if (!drag || !scroller) return
-    const hidden = scroller.scrollWidth - scroller.clientWidth
-    const moved = event.clientX - drag.startX
-    // A pixel of thumb is worth however many pixels of content the track
-    // stands in for.
-    scroller.scrollLeft = drag.startScroll + (moved / drag.trackWidth) * scroller.scrollWidth
-    scroller.scrollLeft = Math.max(0, Math.min(hidden, scroller.scrollLeft))
-  }, [])
+  const onDrag = useCallback(
+    (event) => {
+      const drag = draggingRef.current
+      const scroller = scrollerRef.current
+      if (!drag || !scroller) return
+
+      const total = vertical ? scroller.scrollHeight : scroller.scrollWidth
+      const visible = vertical ? scroller.clientHeight : scroller.clientWidth
+      const moved = (vertical ? event.clientY : event.clientX) - drag.start
+      // A pixel of thumb is worth however many pixels of content the track
+      // stands in for.
+      const next = Math.max(
+        0,
+        Math.min(total - visible, drag.startScroll + (moved / drag.trackLength) * total)
+      )
+
+      if (vertical) scroller.scrollTop = next
+      else scroller.scrollLeft = next
+    },
+    [vertical]
+  )
 
   const endDrag = useCallback((event) => {
     draggingRef.current = null
@@ -98,8 +120,12 @@ function ScrollStrip({ children, className = '', testId }) {
   }, [])
 
   return (
-    <div className={`scroll-strip ${className}`.trim()}>
-      <div className="forecast-scroller" ref={scrollerRef} data-testid={testId}>
+    <div className={`scroll-strip scroll-strip--${axis} ${className}`.trim()}>
+      <div
+        className={vertical ? 'forecast-rows' : 'forecast-scroller'}
+        ref={scrollerRef}
+        data-testid={testId}
+      >
         {children}
       </div>
       <div className="scroll-strip__track" ref={trackRef} data-testid={testId && `${testId}-bar`}>
@@ -111,7 +137,7 @@ function ScrollStrip({ children, className = '', testId }) {
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
           role="scrollbar"
-          aria-orientation="horizontal"
+          aria-orientation={vertical ? 'vertical' : 'horizontal'}
           aria-label="Scroll the forecast"
           tabIndex={-1}
         />
@@ -123,7 +149,9 @@ function ScrollStrip({ children, className = '', testId }) {
 ScrollStrip.propTypes = {
   children: PropTypes.node,
   className: PropTypes.string,
-  testId: PropTypes.string
+  testId: PropTypes.string,
+  /** 'x' for a row of cards, 'y' for a column of them. */
+  axis: PropTypes.oneOf(['x', 'y'])
 }
 
 export default ScrollStrip

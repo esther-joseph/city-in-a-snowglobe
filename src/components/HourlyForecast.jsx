@@ -5,13 +5,17 @@ import ScrollStrip from './ScrollStrip'
 import './ForecastCards.css'
 
 /**
- * The next two days, hour by hour, as cards you scroll sideways.
+ * The next two days, hour by hour, as rows you scroll down.
  *
  * A caveat worth knowing before reading the numbers: OpenWeather's free
  * forecast is three-hourly, not hourly. Forty entries at three hours each is
- * five days, so covering 48 hours means sixteen cards rather than forty-eight.
+ * five days, so covering 48 hours means sixteen rows rather than forty-eight.
  * Filling the gaps by interpolation would look like more data than was
- * actually forecast, so the cards show the hours the forecast actually has.
+ * actually forecast, so the rows show the hours the forecast actually has.
+ *
+ * Laid out as rows in a column rather than cards in a row: there are sixteen
+ * of them carrying four fields each, and read down a column the fields line
+ * up with one another instead of being read one card at a time.
  */
 const HOURS_COVERED = 48
 
@@ -61,7 +65,7 @@ function HourlyForecast({ entries = [], timezoneOffset = 0, sunrise = null, suns
         <span>Every 3 hours</span>
       </div>
 
-      <ScrollStrip testId="hourly-scroller">
+      <ScrollStrip axis="y" testId="hourly-scroller">
         {hours.map((entry, index) => {
           const night = isNightAt(entry.dt)
           const temp = entry.main?.temp
@@ -72,33 +76,39 @@ function HourlyForecast({ entries = [], timezoneOffset = 0, sunrise = null, suns
 
           return (
             <article
-              className={`forecast-tile forecast-tile--hour${newDay ? ' forecast-tile--daybreak' : ''}`}
+              className={`forecast-row${newDay ? ' forecast-row--daybreak' : ''}`}
               key={entry.dt}
             >
-              {newDay && (
-                <span className="forecast-tile__daybreak">
-                  {dayBreakLabel(entry.dt, timezoneOffset)}
-                </span>
-              )}
+              {/* The weekday shares the time cell rather than sitting above
+                  the row. A label on its own line would push that one row
+                  taller than the rest and break the column alignment down the
+                  whole strip. */}
+              <span className="forecast-row__when">
+                {newDay && (
+                  <>
+                    <span className="forecast-row__weekday">
+                      {dayBreakLabel(entry.dt, timezoneOffset)}
+                    </span>
+                    <span className="forecast-row__rule" aria-hidden="true" />
+                  </>
+                )}
+                {hourLabel(entry.dt, timezoneOffset)}
+              </span>
 
               <MeteoconIcon
                 weatherMain={entry.weather?.[0]?.main}
                 isNight={night}
-                size={44}
-                className="forecast-tile__icon"
+                size={36}
+                className="forecast-row__icon"
               />
 
-              <span className="forecast-tile__temp">
+              <span className="forecast-row__temp">
                 {typeof temp === 'number' ? `${Math.round(temp)}°` : '--'}
               </span>
 
-              <span className="forecast-tile__pop">
+              <span className="forecast-row__pop">
                 <span className="forecast-tile__drop" aria-hidden="true" />
                 {`${Math.round((entry.pop ?? 0) * 100)}%`}
-              </span>
-
-              <span className="forecast-tile__when">
-                {hourLabel(entry.dt, timezoneOffset)}
               </span>
             </article>
           )
