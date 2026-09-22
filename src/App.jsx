@@ -32,6 +32,7 @@ import {
 import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
+import { enterARWhenReady } from './utils/arSession'
 import LoadingScreen from './components/LoadingScreen'
 import PropTypes from 'prop-types'
 import CityClock from './components/CityClock'
@@ -1048,6 +1049,18 @@ function App() {
       if (capability.mode === AR_MODES.WEBXR) {
         setArMode(AR_MODES.WEBXR)
         setRenderMode('ar')
+
+        // The <XR> component has to connect itself to the renderer before a
+        // session can attach, and that does not happen until React has
+        // committed this canvas. enterARWhenReady waits for it.
+        enterARWhenReady(xrStore).catch((error) => {
+          console.warn('Could not start the AR session:', error)
+          setArNotice(
+            'Your device would not start an AR session. Check that the site has camera permission, then try again.'
+          )
+          setArMode(null)
+          setRenderMode('3d')
+        })
         return
       }
 
@@ -1105,81 +1118,26 @@ function App() {
     return () => clearInterval(interval)
   }, [manualHour])
 
+  /**
+   * End the XR session whenever the app leaves AR.
+   *
+   * Starting one is handled in handleRenderModeChange, where the button press
+   * is. It has to be: requestSession needs the transient activation a click
+   * gives it, and a session started from an effect has already lost it.
+   *
+   * What used to live here was a second capability check that re-decided
+   * everything the handler had just decided, and it read two field names
+   * getARCapability has never returned: one for WebXR availability, one for
+   * iOS. Both came back undefined, so the negated check was always true and
+   * every attempt to enter AR set the mode straight back to 3D. The WebXR
+   * message is null, so it did that without saying anything, which is why AR
+   * looked like it simply never loaded.
+   */
   useEffect(() => {
-    if (renderMode !== 'ar') {
-      xrStore.getState().session?.end().catch(() => {})
-      return
-    }
-
-    // Import AR support utilities
-    import('./utils/arSupport').then(({ getARCapability, requestCameraPermission }) => {
-      let cancelled = false
-
-      // Check AR capability
-      getARCapability().then(async (capability) => {
-        if (cancelled) return
-
-        // Check WebXR availability first
-        if (!capability.webXRAvailable) {
-          console.warn('WebXR not available:', capability.message || 'WebXR not supported on this device')
-      setRenderMode('3d')
-          if (capability.message) {
-            // Optional: Show user-friendly message
-            alert(capability.message)
-          }
-      return
-    }
-
-        // Request camera permission (especially important for iOS)
-        const hasPermission = await requestCameraPermission()
-        if (!hasPermission && !cancelled) {
-          console.warn('Camera permission denied; AR mode requires camera access')
-          setRenderMode('3d')
-          alert('AR mode requires camera permission. Please allow camera access in your browser settings.')
-          return
-        }
-
-        // Check if immersive-ar is supported
-        if (!capability.webXRARSupported) {
-          if (capability.isIOS && capability.iosVersion < 17) {
-            console.warn('iOS 17+ required for WebXR AR support')
-            setRenderMode('3d')
-            alert('AR mode requires iOS 17 or later. Please update your device.')
-          } else {
-            console.warn('AR not supported on this device:', capability.message)
-            setRenderMode('3d')
-          }
-          return
-        }
-
-        // Enter immersive AR via the xr v6 store. enterAR() builds the session
-        // init internally (local-floor reference space + the optional features
-        // configured on the store) and connects it to the <XR> renderer. This
-        // replaces the old startSession() helper, which was incompatible with
-        // @react-three/fiber v9 / React 19 and produced the black screen.
-        xrStore.enterAR().catch((error) => {
-          console.warn('Failed to start AR session:', error)
-          if (!cancelled) {
-            setRenderMode('3d')
-            alert('Failed to start AR session. Please try again or use 3D mode.')
-          }
-        })
-      }).catch((error) => {
-        console.warn('Failed to check AR capability:', error)
-        if (!cancelled) {
-          setRenderMode('3d')
-        }
-      })
-
-    return () => {
-      cancelled = true
-      xrStore.getState().session?.end().catch(() => {})
-    }
-    }).catch((error) => {
-      console.error('Failed to load AR support utilities:', error)
-      setRenderMode('3d')
-    })
-  }, [renderMode, setRenderMode])
+    if (renderMode === 'ar') return undefined
+    xrStore.getState().session?.end().catch(() => {})
+    return undefined
+  }, [renderMode])
 
   useEffect(() => {
     if (renderMode !== '3d') return
