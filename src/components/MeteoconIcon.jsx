@@ -2,8 +2,12 @@ import React from 'react'
 import PropTypes from 'prop-types'
 
 /**
- * MeteoconIcon — Meteocons line-style weather icons, served from /public (see postinstall).
- * Icon files come from @meteocons/svg-static (copied to public/weather-icons/line).
+ * Line-style weather icons, served from /public by the postinstall copy.
+ *
+ * The files come from @bybas/weather-icons, which ships them with their SMIL
+ * animations intact. They are rendered through <img>, where declarative
+ * animation still runs but scripts do not, which is what we want from an
+ * untrusted-shaped asset.
  */
 function MeteoconIcon({ weatherMain, isNight = false, className = '', size = 24, ...props }) {
   // Map OpenWeatherMap weather conditions to Meteocons icon names
