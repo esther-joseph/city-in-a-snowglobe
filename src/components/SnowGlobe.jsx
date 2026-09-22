@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import { useFrame, extend } from '@react-three/fiber'
 import { createHammeredMaps } from '../utils/hammeredMetal'
 import { createWoodGrainMaps } from '../utils/woodGrain'
+import { createGlowTexture } from '../utils/glowTexture'
 
 export const SNOW_GLOBE_CONTENT_SCALE = 0.28
 const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
@@ -457,55 +458,39 @@ function getLabelGeometry(text, radius, size) {
 }
 
 /**
- * A soft amber aura around the lettering.
+ * The glow around the lettering.
  *
- * The shell is the label geometry pushed out along its own vertex normals.
- * Scaling it would not do: the glyphs are laid out around the globe axis
- * rather than about their own centre, so a scale swings them outward along
- * the arc instead of thickening them. Drawn back faces only, so it shows just
- * where it clears the letter's silhouette, and in normal blending — additive
- * washes amber to white against a bright sky.
+ * Built the way the rest of the scene's lights are built, because it used to
+ * be built its own way and looked it. The sun, the moon and the street lamps
+ * all do the same three things: an emissive surface, a soft halo on a
+ * camera-facing sprite, and a real light with a distance and a decay so the
+ * glow lands on what is nearby.
+ *
+ * What was here instead was the label geometry inflated along its normals and
+ * drawn back-faces-only, twice. That is the nested-shell trick glowTexture.js
+ * exists to avoid: a shell has an edge, so the glow stopped at an outline
+ * rather than falling off, and being geometry it inflated unevenly across
+ * letters of different thickness.
  */
-const glowShellCache = new Map()
 
-function getGlowShell(text, radius, size, amount) {
-  const key = `${text}|${radius}|${size}|${amount}`
-  if (!glowShellCache.has(key)) {
-    const shell = getLabelGeometry(text, radius, size).clone()
-    const position = shell.attributes.position
-    const normal = shell.attributes.normal
-    for (let i = 0; i < position.count; i += 1) {
-      position.setXYZ(
-        i,
-        position.getX(i) + normal.getX(i) * amount,
-        position.getY(i) + normal.getY(i) * amount,
-        position.getZ(i) + normal.getZ(i) * amount
-      )
-    }
-    position.needsUpdate = true
-    shell.computeBoundingSphere()
-    glowShellCache.set(key, shell)
+// Amber through to champagne, gone by the edge. The same shape of ramp the
+// sun uses, in the ring's colour rather than the sky's.
+let letterGlowTexture = null
+const getLetterGlowTexture = () => {
+  if (!letterGlowTexture) {
+    letterGlowTexture = createGlowTexture([
+      { stop: 0, color: AMBER_LIGHT, alpha: 0.85 },
+      { stop: 0.28, color: AMBER_GOLD, alpha: 0.42 },
+      { stop: 0.62, color: AMBER_GLOW, alpha: 0.14 },
+      { stop: 1, color: AMBER_GLOW, alpha: 0 }
+    ])
   }
-  return glowShellCache.get(key)
+  return letterGlowTexture
 }
 
-// Two shells, the outer one fainter, so the light falls off instead of
-// stopping at a single hard outline.
-const GLOW_SHELLS = [
-  { amount: 0.07, opacity: 0.3 },
-  { amount: 0.17, opacity: 0.13 }
-]
-
-const glowMaterials = GLOW_SHELLS.map(
-  ({ opacity }) =>
-    new THREE.MeshBasicMaterial({
-      color: AMBER_LIGHT,
-      transparent: true,
-      opacity,
-      depthWrite: false,
-      side: THREE.BackSide
-    })
-)
+// Three sprites spread along each label's arc. One flat sprite cannot follow
+// a curve, and one per letter would be forty of them.
+const GLOW_SPREAD = [-0.24, 0, 0.24]
 
 function RotatingPlaque({ radius, labelY, text, material }) {
   const groupRef = useRef()
@@ -517,23 +502,40 @@ function RotatingPlaque({ radius, labelY, text, material }) {
 
   const size = 1.62
   const geometry = useMemo(() => getLabelGeometry(text, radius, size), [text, radius, size])
-  const shells = useMemo(
-    () => GLOW_SHELLS.map(({ amount }) => getGlowShell(text, radius, size, amount)),
-    [text, radius, size]
-  )
+  const glowTexture = useMemo(() => getLetterGlowTexture(), [])
 
   return (
     <group ref={groupRef} position={[0, labelY, 0]}>
       {[0, 1, 2].map((copy) => (
         <group key={`plaque-${copy}`} rotation={[0, (copy / 3) * Math.PI * 2, 0]}>
           <mesh geometry={geometry} material={material} />
-          {shells.map((shell, index) => (
-            <mesh
-              key={`glow-${GLOW_SHELLS[index].amount}`}
-              geometry={shell}
-              material={glowMaterials[index]}
-            />
+
+          {GLOW_SPREAD.map((offset) => (
+            <sprite
+              key={`glow-${offset}`}
+              position={[Math.sin(offset) * radius, 0, Math.cos(offset) * radius]}
+              scale={[size * 3.4, size * 2.2, 1]}
+            >
+              <spriteMaterial
+                map={glowTexture}
+                transparent
+                depthWrite={false}
+                opacity={0.55}
+                toneMapped={false}
+              />
+            </sprite>
           ))}
+
+          {/* The light the lettering actually casts, the same way a lamp does:
+              short reach, quadratic falloff, so it warms the plinth under the
+              letters and nothing else. */}
+          <pointLight
+            position={[0, 0, radius * 0.94]}
+            intensity={1.5}
+            distance={5.5}
+            decay={2}
+            color={AMBER_GLOW}
+          />
         </group>
       ))}
     </group>
