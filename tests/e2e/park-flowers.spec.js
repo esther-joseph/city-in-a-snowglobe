@@ -92,7 +92,7 @@ test.describe('Daisies', () => {
 })
 
 test.describe('Seasonal colour', () => {
-  test('flowers are lighter than the trees they stand under', async ({ page }) => {
+  test('flowers are painted like the rest of the park', async ({ page }) => {
     await gotoApp(page)
 
     const seasons = await page.evaluate(async () => {
@@ -103,6 +103,7 @@ test.describe('Seasonal colour', () => {
         showFlowers: palette.showFlowers,
         flowers: palette.flowers.map((colour) => ({ colour, ...hexToHsl(colour) })),
         canopy: palette.canopy.map((colour) => hexToHsl(colour)),
+        bush: palette.bush.map((colour) => hexToHsl(colour)),
         grass: hexToHsl(palette.grass)
       }))
     })
@@ -114,69 +115,60 @@ test.describe('Seasonal colour', () => {
       }
 
       expect(season.flowers.length, `${season.name} has a few to choose from`).toBeGreaterThan(3)
-
       const unique = new Set(season.flowers.map((flower) => flower.colour))
       expect(unique.size, `${season.name}'s flowers differ from each other`).toBe(
         season.flowers.length
       )
 
+      // The trees and the bushes are painted in strong, flat colour. The beds
+      // belong to the same park, so they are painted the same way: this is
+      // what the derived pastels got wrong, and they read as something
+      // dropped in from another scene.
+      const strongest = Math.max(...season.canopy.concat(season.bush).map((tone) => tone.s))
+
       for (const flower of season.flowers) {
-        // Pale, but still a colour rather than white.
-        expect(flower.l, `${season.name} ${flower.colour} is light`).toBeGreaterThan(0.65)
-        expect(flower.s, `${season.name} ${flower.colour} keeps its hue`).toBeGreaterThan(0.2)
+        const white = flower.s < 0.12
+        if (!white) {
+          expect(
+            flower.s,
+            `${season.name} ${flower.colour} is as saturated as the planting`
+          ).toBeGreaterThan(strongest * 0.45)
+        }
 
-        // Lighter than the grass it sits on, or it is not a flower, it is
-        // a patch of lawn.
-        expect(flower.l, `${season.name} ${flower.colour} reads against the grass`).toBeGreaterThan(
-          season.grass.l + 0.15
-        )
+        // And it still has to be separable from the grass it stands in, by
+        // hue or by light. The bar is low on purpose: spring's beds include a
+        // lime that is deliberately close to new grass, and a rule strict
+        // enough to reject it would reject half of what a real bed holds.
+        const hueGap = Math.abs(flower.h - season.grass.h) % 1
+        const distance = Math.min(hueGap, 1 - hueGap)
+        expect(
+          distance > 0.05 || flower.l > season.grass.l + 0.05,
+          `${season.name} ${flower.colour} is not the grass`
+        ).toBe(true)
       }
-
-      // At least one of them sits across the wheel from the canopy. Same
-      // family throughout would vanish into the planting.
-      const canopyHue = season.canopy[0].h
-      const distance = (hue) => {
-        const gap = Math.abs(hue - canopyHue) % 1
-        return Math.min(gap, 1 - gap)
-      }
-      const furthest = Math.max(...season.flowers.map((flower) => distance(flower.h)))
-      expect(furthest, `${season.name} has a complementary note`).toBeGreaterThan(0.2)
     }
   })
 
-  test('the helpers do what the palettes assume', async ({ page }) => {
+  test('the colour helpers do what the flowers assume', async ({ page }) => {
     await gotoApp(page)
 
     const result = await page.evaluate(async () => {
-      const { hexToHsl, hslToHex, pastel, deepen, complementOf } = await import(
-        '/src/utils/colorHarmony.js'
-      )
+      const { hexToHsl, hslToHex, deepen } = await import('/src/utils/colorHarmony.js')
       const samples = ['#2d7a2f', '#c9682a', '#ffc2da', '#123456', '#ffffff', '#000000']
       return samples.map((colour) => ({
         colour,
         roundTrip: hslToHex(hexToHsl(colour)),
-        pastel: hexToHsl(pastel(colour)),
         deepened: hexToHsl(deepen(colour, 0.34)),
-        original: hexToHsl(colour),
-        // Hue is a circle: a colour at 0.9 turned by 0.42 lands at 0.32, and
-        // a plain subtraction calls that a turn of 0.58.
-        complementGap: ((hexToHsl(complementOf(colour)).h - hexToHsl(colour).h) % 1 + 1) % 1
+        original: hexToHsl(colour)
       }))
     })
 
     for (const sample of result) {
       expect(sample.roundTrip, `${sample.colour} survives the round trip`).toBe(sample.colour)
-      // Every pastel lands in the same register whatever it started as.
-      expect(sample.pastel.l).toBeCloseTo(0.79, 2)
+      // A leaf lying on the grass has to be darker than the grass, or it is
+      // a patch of grass.
       expect(sample.deepened.l).toBeLessThanOrEqual(sample.original.l)
-      // Hex is only so precise; the hue lands where it was asked to within a
-      // step of the eight-bit grid it has to be written into.
-      // White and black have no hue to turn, and turning them returns them.
-      if (sample.original.s > 0.05) {
-        expect(sample.complementGap, `${sample.colour} turns`).toBeCloseTo(0.42, 2)
-      } else {
-        expect(sample.complementGap, `${sample.colour} has no hue to turn`).toBe(0)
-      }
+      expect(sample.deepened.h).toBeCloseTo(sample.original.h, 2)
     }
   })
 })
