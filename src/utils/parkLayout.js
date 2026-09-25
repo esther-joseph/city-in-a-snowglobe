@@ -126,6 +126,18 @@ export function placeOnGrass(angle, distance, radius, obstacles = []) {
   if (nearest - clearance < GRASS_BAND.inner) return null
   if (nearest + clearance > GRASS_BAND.outer) return null
 
+  // Only the obstacles this walk could possibly reach. The walk stays within
+  // a metre of the ring it was asked for, so anything further in or out than
+  // that cannot be hit, and checking it against every candidate is the bulk
+  // of what planting a park costs: a hundred and eighty placements, each
+  // trying a couple of hundred spots, against a list that grows as the park
+  // fills.
+  const reach = clearance + 1.6
+  const nearby = obstacles.filter(([x, z, radius]) => {
+    const distance = Math.hypot(x, z)
+    return Math.abs(distance - nearest) < radius + reach
+  })
+
   const stepSize = Math.PI / 90 // two degrees
   // A step in or out as well as around. Walking in angle alone gets past a
   // path, which runs the whole depth of the grass, but a bench is a small
@@ -144,7 +156,7 @@ export function placeOnGrass(angle, distance, radius, obstacles = []) {
         const z = Math.sin(candidate) * radial
         if (
           clearOfRadialPaths(x, z, clearance) &&
-          clearOfObstacles(x, z, clearance, obstacles)
+          clearOfObstacles(x, z, clearance, nearby)
         ) {
           return [x, z]
         }

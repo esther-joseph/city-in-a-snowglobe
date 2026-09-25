@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import PropTypes from 'prop-types'
 import * as THREE from 'three'
 import { getFlutedGeometry } from '../../utils/fluting'
+import { standardMaterial } from '../../utils/sharedMaterial'
 
 /**
  * A cast iron park lamp, of the kind that stands along a city park's paths.
@@ -36,11 +37,14 @@ const LANTERN_HEIGHT = BELLY_HEIGHT + SHOULDER_HEIGHT
 /** How far the glass stands out at its widest. */
 const SHOULDER = 0.215
 
+/** Every piece of iron on every lamp is the same iron, and says so. */
+const iron = () =>
+  standardMaterial({ color: IRON, roughness: IRON_ROUGH, metalness: IRON_METAL })
+
 function Iron({ children, ...props }) {
   return (
-    <mesh castShadow receiveShadow {...props}>
+    <mesh castShadow receiveShadow material={iron()} {...props}>
       {children}
-      <meshStandardMaterial color={IRON} roughness={IRON_ROUGH} metalness={IRON_METAL} />
     </mesh>
   )
 }
@@ -99,12 +103,11 @@ function LightPost({ position = [0, 0, 0], isNight }) {
       {/* The reeded column. */}
       <mesh
         geometry={columnGeometry}
+        material={iron()}
         position={[0, BASE_HEIGHT + COLUMN_HEIGHT / 2, 0]}
         castShadow
         receiveShadow
-      >
-        <meshStandardMaterial color={IRON} roughness={IRON_ROUGH} metalness={IRON_METAL} />
-      </mesh>
+      />
 
       {/* Collar under the lantern, and the small flared cup it sits in. */}
       <Iron position={[0, collarTop + 0.03, 0]}>
