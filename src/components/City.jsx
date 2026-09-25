@@ -18,6 +18,7 @@ import LightPost from './city/LightPost'
 import { furnitureObstacles, BENCHES, LAMP_POSTS } from '../utils/parkFurniture'
 import { getViewpoints } from '../utils/arViewpoints'
 import { getRockGeometries } from '../utils/rocks'
+import { placeBedPlots, plantBeds } from '../utils/flowerBeds'
 
 const WINDOW_DAY_COLOR = '#4a90e2' // Reflective blue for daytime
 const WINDOW_NIGHT_COLOR = '#0b1623'
@@ -1077,6 +1078,14 @@ function City({
       })
     }
 
+    // The flower beds are cut before anything is planted around them: they
+    // are the deliberate part of a park and the shrubbery works around them,
+    // not the other way about.
+    const beds = placeBedPlots({
+      place: (angle, distance, radius) => placeOnGrass(angle, distance, radius, standing)
+    })
+    beds.forEach((bed) => standing.push([bed.at[0], bed.at[1], bed.radius]))
+
     // A bush reaches about 0.6 of its scale: the lobes sit 0.34 out with 0.26
     // of their own, and the grass disc at the foot reaches 0.55.
     const bushRadius = (scale) => scale * 0.6
@@ -1149,10 +1158,10 @@ function City({
       })
     }
 
-    return { trees, bushes, rocks }
+    return { trees, bushes, rocks, beds }
   }, [generatedBuildings])
 
-  const { trees, bushes, rocks } = planting
+  const { trees, bushes, rocks, beds } = planting
 
   // Where petals and leaves come from: roughly the middle of each canopy.
   const fallSources = useMemo(
@@ -1166,39 +1175,16 @@ function City({
   )
 
   /**
-   * Flower beds, laid out like everything else in the park: on the grass and
-   * clear of the paving.
+   * The flower beds.
    *
-   * Three rings rather than two, and they reach further in — the band between
-   * the fountain ring and the trees was bare grass.
+   * Plots rather than scattered singles, laid out inside the same planting
+   * pass so they clear the paths and the furniture like everything else, and
+   * so that what is planted afterwards clears them.
    */
-  const flowerBeds = useMemo(() => {
-    if (!seasonPalette.showFlowers) return []
-    const colors = seasonPalette.flowers
-    const rings = [
-      { count: 26, distance: 8.0, radius: 0.26 },
-      { count: 32, distance: 12.7, radius: 0.3 },
-      { count: 34, distance: 14.6, radius: 0.28 }
-    ]
-
-    const beds = []
-    rings.forEach((ring, ringIndex) => {
-      for (let i = 0; i < ring.count; i += 1) {
-        const angle = (i / ring.count) * Math.PI * 2 + ringIndex * 0.11
-        const distance = ring.distance + ((i % 3) - 1) * 0.55
-        const spot = placeOnGrass(angle, distance, ring.radius)
-        if (!spot) continue
-        beds.push({
-          key: `flower-${ringIndex}-${i}`,
-          position: [spot[0], 0.1, spot[1]],
-          radius: ring.radius,
-          // Offset per ring so neighbouring rings do not line up in stripes.
-          color: colors[(i + ringIndex * 2) % colors.length]
-        })
-      }
-    })
-    return beds
-  }, [seasonPalette])
+  const flowerBeds = useMemo(
+    () => (seasonPalette.showFlowers ? plantBeds(beds, seasonPalette.flowers) : []),
+    [beds, seasonPalette]
+  )
 
   return (
     <SnowGlobe cityName={cityName} weatherType={weatherType} tintColor={glassTint}>

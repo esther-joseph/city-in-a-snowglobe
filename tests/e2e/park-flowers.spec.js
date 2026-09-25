@@ -61,7 +61,7 @@ test.describe('Daisies', () => {
     expect(parts.leaves.max[1]).toBeLessThan(parts.petals.max[1])
   })
 
-  test('one flower per bed, in three draw calls', async ({ page }) => {
+  test('the whole park of them costs three draw calls', async ({ page }) => {
     await expect
       .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
       .toBe(true)
@@ -82,10 +82,11 @@ test.describe('Daisies', () => {
       return meshes
     })
 
-    // Petals, eye and leaves: three meshes however many flowers are planted.
+    // Petals, eye and leaves: three meshes however many are planted, across
+    // however many beds.
     expect(found).toHaveLength(3)
     expect(new Set(found.map((mesh) => mesh.count)).size, 'all three agree').toBe(1)
-    expect(found[0].count).toBeGreaterThan(40)
+    expect(found[0].count, 'a park full of flowers').toBeGreaterThan(40)
     // The petals take a colour each; the other two do not need one.
     expect(found.filter((mesh) => mesh.coloured)).toHaveLength(1)
   })
@@ -169,6 +170,135 @@ test.describe('Seasonal colour', () => {
       // a patch of grass.
       expect(sample.deepened.l).toBeLessThanOrEqual(sample.original.l)
       expect(sample.deepened.h).toBeCloseTo(sample.original.h, 2)
+    }
+  })
+})
+
+/**
+ * The beds themselves.
+ *
+ * The flowers used to be scattered: three rings of single daisies at jittered
+ * radii, one colour each, all the way around the park. Nobody plants like
+ * that. A park cuts a plot, edges it in iron, and sets the planting inside it
+ * in rings of one colour at a time.
+ */
+test.describe('Flower beds', () => {
+  const layout = (page) =>
+    page.evaluate(async () => {
+      const { placeBedPlots, plantBeds } = await import('/src/utils/flowerBeds.js')
+      const { SEASON_PALETTES, SEASONS } = await import('/src/utils/seasons.js')
+
+      // Placement without obstacles: what the plots are before the park gets
+      // in the way.
+      const plots = placeBedPlots({
+        place: (angle, distance, radius) => [
+          Math.cos(angle) * distance,
+          Math.sin(angle) * distance
+        ]
+      })
+
+      return plantBeds(plots, SEASON_PALETTES[SEASONS.SUMMER].flowers)
+    })
+
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+  })
+
+  test('a bed is a plot with its planting inside it', async ({ page }) => {
+    const beds = await layout(page)
+
+    expect(beds.length, 'beds around the park').toBeGreaterThanOrEqual(6)
+
+    for (const bed of beds) {
+      expect(bed.flowers.length, 'a bed is planted, not decorated').toBeGreaterThan(10)
+
+      for (const flower of bed.flowers) {
+        const reach = Math.hypot(flower.position[0] - bed.at[0], flower.position[2] - bed.at[1])
+        // Inside the edging, with a margin of bare earth: a flower growing
+        // through the fence is a weed.
+        expect(reach + flower.scale * 0.5).toBeLessThan(bed.radius)
+      }
+    }
+  })
+
+  test('the planting is in blocks of colour, not a mixture', async ({ page }) => {
+    const beds = await layout(page)
+
+    for (const bed of beds) {
+      const colours = new Set(bed.flowers.map((flower) => flower.color))
+      // Two: a heart and a ring around it. Bedding is planted in blocks.
+      expect(colours.size, 'one or two colours to a bed').toBeLessThanOrEqual(2)
+    }
+
+    // And variety across the park rather than within a bed.
+    const across = new Set(beds.flatMap((bed) => bed.flowers.map((flower) => flower.color)))
+    expect(across.size, 'the beds are not all the same').toBeGreaterThan(2)
+  })
+
+  test('every bed is edged, all the way round', async ({ page }) => {
+    await expect
+      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
+      .toBe(true)
+
+    const edging = await page.evaluate(async () => {
+      const THREE = await import('/node_modules/.vite/deps/three.js')
+      const matrix = new THREE.Matrix4()
+      const place = new THREE.Vector3()
+      const scale = new THREE.Vector3()
+
+      let hoops = null
+      const plots = []
+
+      window.__snowGlobeScene.traverse((object) => {
+        if (!object.isInstancedMesh) return
+        const parameters = object.geometry?.parameters
+
+        // The edging: half loops of iron.
+        if (parameters?.arc !== undefined && parameters.arc < Math.PI * 1.01) {
+          const found = []
+          for (let i = 0; i < object.count; i += 1) {
+            object.getMatrixAt(i, matrix)
+            place.setFromMatrixPosition(matrix)
+            found.push({ x: place.x, y: place.y, z: place.z })
+          }
+          hoops = { count: object.count, radius: parameters.radius, at: found }
+          return
+        }
+
+        // The plots: low discs of turned earth.
+        if (parameters?.height === 0.06 && parameters.radialSegments === 20) {
+          for (let i = 0; i < object.count; i += 1) {
+            object.getMatrixAt(i, matrix)
+            place.setFromMatrixPosition(matrix)
+            scale.setFromMatrixScale(matrix)
+            plots.push({ x: place.x, z: place.z, radius: scale.x })
+          }
+        }
+      })
+
+      return { hoops, plots }
+    })
+
+    expect(edging.plots.length, 'plots of earth').toBeGreaterThanOrEqual(6)
+    expect(edging.hoops, 'iron hoops').not.toBeNull()
+
+    for (const plot of edging.plots) {
+      const mine = edging.hoops.at.filter(
+        (hoop) => Math.hypot(hoop.x - plot.x, hoop.z - plot.z) < plot.radius + 0.2
+      )
+
+      // Enough loops to close the circle: they are set side by side, so the
+      // count follows from the plot's circumference.
+      const expected = Math.round((Math.PI * 2 * plot.radius) / (edging.hoops.radius * 2))
+      expect(mine.length, 'a run of loops around the plot').toBeGreaterThanOrEqual(expected - 1)
+
+      // All of them standing on the edge, none out in the middle.
+      for (const hoop of mine) {
+        const reach = Math.hypot(hoop.x - plot.x, hoop.z - plot.z)
+        expect(Math.abs(reach - plot.radius)).toBeLessThan(0.05)
+        // Low. It is there to say where the bed ends, not to keep anyone out.
+        expect(hoop.y).toBeLessThan(0.2)
+      }
     }
   })
 })
