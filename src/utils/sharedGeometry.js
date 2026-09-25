@@ -59,3 +59,15 @@ export function unitColumn(taper, segments) {
 export function sharedGeometryCount() {
   return cache.size
 }
+
+/**
+ * A plane one unit square, in XY, facing +Z.
+ *
+ * Every window in the city was its own buffer. They are all the same
+ * rectangle at different sizes, which is what a scale is for.
+ *
+ * @returns {THREE.PlaneGeometry} Shared.
+ */
+export function unitPlane() {
+  return shared('plane', () => new THREE.PlaneGeometry(1, 1))
+}

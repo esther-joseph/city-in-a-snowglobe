@@ -19,6 +19,8 @@ import { furnitureObstacles, BENCHES, LAMP_POSTS } from '../utils/parkFurniture'
 import { getViewpoints } from '../utils/arViewpoints'
 import { getRockGeometries } from '../utils/rocks'
 import { placeBedPlots, plantBeds } from '../utils/flowerBeds'
+import { standardMaterial } from '../utils/sharedMaterial'
+import { unitPlane } from '../utils/sharedGeometry'
 
 const WINDOW_DAY_COLOR = '#4a90e2' // Reflective blue for daytime
 const WINDOW_NIGHT_COLOR = '#0b1623'
@@ -289,10 +291,13 @@ function RectangularWindows({
             rotation={rotation}
             castShadow={false}
             receiveShadow={false}
-          >
-            <planeGeometry args={[windowWidth, windowHeight]} />
-            <meshStandardMaterial {...windowMaterialProps} />
-          </mesh>
+            // One rectangle and one material for every window in the city,
+            // sized by its scale. There are thousands of them, and they were
+            // thousands of buffers and thousands of materials.
+            geometry={unitPlane()}
+            scale={[windowWidth, windowHeight, 1]}
+            material={standardMaterial(windowMaterialProps)}
+          />
         )
       }
     }
