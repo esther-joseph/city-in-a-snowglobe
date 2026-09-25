@@ -2,10 +2,9 @@
  * Small colour moves, done in HSL.
  *
  * The park's palettes are written as hex, which is the right thing to read in
- * a file but the wrong thing to do arithmetic on: lightening #2d7a2f by eye
+ * a file but the wrong thing to do arithmetic on: darkening #2d7a2f by eye
  * means guessing three numbers at once. These convert, move one axis, and
- * convert back, so a season's flowers can be derived from its canopy rather
- * than typed out again and left to drift when the canopy changes.
+ * convert back.
  */
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value))
@@ -59,43 +58,7 @@ export function hslToHex({ h, s, l }) {
     .join('')}`
 }
 
-/**
- * Toward white, keeping the hue.
- *
- * Saturation comes down as well as lightness going up, because a colour that
- * only gains lightness goes neon rather than pale.
- *
- * @param {string} hex
- * @param {number} amount - 0 leaves it alone, 1 is white.
- * @returns {string}
- */
-export function lighten(hex, amount) {
-  const { h, s, l } = hexToHsl(hex)
-  return hslToHex({
-    h,
-    s: s * (1 - amount * 0.55),
-    l: l + (1 - l) * amount
-  })
-}
 
-/**
- * The same hue, said quietly: the lightness of a petal and enough colour left
- * in it to still be a colour.
- *
- * Lightening by a fraction is the wrong tool when the sources are not equally
- * dark to begin with. Summer's canopy is a deep green and spring's is nearly
- * white, and the same fraction applied to both gives one pastel and one sheet
- * of paper. This sets the lightness rather than nudging it, so every season's
- * beds land in the same register.
- *
- * @param {string} hex
- * @param {{ lightness?: number, min?: number, max?: number }} [options]
- * @returns {string}
- */
-export function pastel(hex, { lightness = 0.79, min = 0.3, max = 0.58 } = {}) {
-  const { h, s } = hexToHsl(hex)
-  return hslToHex({ h, s: Math.min(max, Math.max(min, s)), l: lightness })
-}
 
 /**
  * Down and richer: the same colour, in shadow.
@@ -110,21 +73,4 @@ export function pastel(hex, { lightness = 0.79, min = 0.3, max = 0.58 } = {}) {
 export function deepen(hex, amount = 0.3) {
   const { h, s, l } = hexToHsl(hex)
   return hslToHex({ h, s: Math.min(1, s * (1 + amount * 0.6)), l: l * (1 - amount) })
-}
-
-/**
- * The colour across the wheel, which is what makes a flower read against the
- * leaves behind it rather than disappearing into them.
- *
- * Not the exact opposite: a half turn lands on the one hue guaranteed to
- * argue with its neighbour. This stops a little short, which is the split
- * complement and what a planted bed actually looks like.
- *
- * @param {string} hex
- * @param {number} [spread=0.42] - Turns around the wheel.
- * @returns {string}
- */
-export function complementOf(hex, spread = 0.42) {
-  const { h, s, l } = hexToHsl(hex)
-  return hslToHex({ h: h + spread, s, l })
 }
