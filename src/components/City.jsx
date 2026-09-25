@@ -14,6 +14,7 @@ import SeasonalFall from './city/SeasonalFall'
 import { getSeasonPalette, SEASONS } from '../utils/seasons'
 import FlowerBeds from './city/FlowerBeds'
 import Rocks from './city/Rocks'
+import LightPost from './city/LightPost'
 import { furnitureObstacles, BENCHES, LAMP_POSTS } from '../utils/parkFurniture'
 import { getViewpoints } from '../utils/arViewpoints'
 import { getRockGeometries } from '../utils/rocks'
@@ -962,66 +963,6 @@ function BridgeModel({ data }) {
   )
 }
 
-// Mid-century modern lamp post — tapered pole, gooseneck arm, globe lantern
-// The arm automatically faces the fountain center.
-function LightPost({ position = [0, 0, 0], isNight }) {
-  const [x, y, z] = position
-  const poleH = 3.2
-  const lampColor = isNight ? '#fff5b0' : '#e6f2ff'
-  const emissive = isNight ? '#ffd84a' : '#000000'
-  // Rotate group so the arm (local +x) always points toward origin (fountain center)
-  const rotY = Math.atan2(z, -x)
-
-  return (
-    <group position={[x, y, z]} rotation={[0, rotY, 0]}>
-      {/* Flared base */}
-      <mesh castShadow receiveShadow position={[0, 0.14, 0]}>
-        <cylinderGeometry args={[0.18, 0.26, 0.28, 10]} />
-        <meshStandardMaterial color="#1e1e1e" roughness={0.50} metalness={0.60} />
-      </mesh>
-      {/* Tapered pole */}
-      <mesh castShadow receiveShadow position={[0, poleH * 0.5 + 0.28, 0]}>
-        <cylinderGeometry args={[0.048, 0.12, poleH, 10]} />
-        <meshStandardMaterial color="#1c1c1c" roughness={0.48} metalness={0.62} />
-      </mesh>
-      {/* Horizontal arm */}
-      <mesh castShadow position={[0.42, poleH + 0.30, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.032, 0.044, 0.90, 8]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.48} metalness={0.62} />
-      </mesh>
-      {/* Downward knuckle */}
-      <mesh castShadow position={[0.84, poleH + 0.11, 0]} rotation={[0, 0, -Math.PI * 0.28]}>
-        <cylinderGeometry args={[0.032, 0.038, 0.38, 8]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.48} metalness={0.62} />
-      </mesh>
-      {/* Globe lantern */}
-      <mesh castShadow position={[0.84, poleH - 0.10, 0]}>
-        <sphereGeometry args={[0.24, 14, 14]} />
-        <meshStandardMaterial
-          color={lampColor}
-          emissive={emissive}
-          emissiveIntensity={isNight ? 2.2 : 0.08}
-          roughness={0.08}
-          metalness={0.0}
-          transparent
-          opacity={isNight ? 0.92 : 0.70}
-        />
-      </mesh>
-      {/* Globe cap ring */}
-      <mesh castShadow position={[0.84, poleH + 0.15, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.26, 0.028, 8, 20]} />
-        <meshStandardMaterial color="#111" roughness={0.5} metalness={0.7} />
-      </mesh>
-      <pointLight
-        position={[0.84, poleH - 0.10, 0]}
-        intensity={isNight ? 1.8 : 0}
-        distance={9}
-        color="#ffe8a0"
-        decay={2}
-      />
-    </group>
-  )
-}
 
 function City({
   profile = {},
