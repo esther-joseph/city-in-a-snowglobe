@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp } from './support/app.js'
+import { gotoApp, waitForPark } from './support/app.js'
 
 /**
  * What the scene shares.
@@ -59,9 +59,7 @@ test.describe('Shared materials and geometry', () => {
   })
 
   test('the park draws thousands of meshes from a handful of each', async ({ page }) => {
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
-      .toBe(true)
+    await waitForPark(page)
 
     const counted = await page.evaluate(() => {
       const materials = new Set()

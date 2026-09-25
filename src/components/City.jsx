@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import SnowGlobe from './SnowGlobe'
 import Fountain from './city/Fountain'
@@ -20,6 +20,7 @@ import { furnitureObstacles, BENCHES, LAMP_POSTS } from '../utils/parkFurniture'
 import { getViewpoints } from '../utils/arViewpoints'
 import { getRockGeometries } from '../utils/rocks'
 import { scatterFlowers } from '../utils/flowerClusters'
+import { useStages } from '../utils/useStages'
 import { placeBedPlots, plantBeds } from '../utils/flowerBeds'
 import { standardMaterial } from '../utils/sharedMaterial'
 import { unitPlane } from '../utils/sharedGeometry'
@@ -618,6 +619,20 @@ function Building({
  */
 const VIEWER_SPACE = 0.9
 
+/**
+ * The order the scene arrives in.
+ *
+ * The plaza first, because it is the one part that is always in frame: the
+ * ground, the water, the paths, the benches and the lamps. Then the skyline,
+ * which is most of the meshes in the scene. Then the park, in three passes of
+ * its own, largest first.
+ */
+const STAGE = { SKYLINE: 1, TREES: 2, UNDERGROWTH: 3, DETAIL: 4 }
+const PLANTING_STAGES = STAGE.DETAIL
+
+/** What the planting looks like before any of it has been worked out. */
+const NOTHING_PLANTED = { trees: [], bushes: [], rocks: [], beds: [], occupied: [] }
+
 function Bench({ position, rotation }) {
   return (
     <group position={position} rotation={rotation}>
@@ -997,6 +1012,25 @@ function City({
   const benches = BENCHES
 
   /**
+   * The park arrives after the city does.
+   *
+   * Stage by stage: the ground, the water, the benches and the lamps are
+   * there from the first frame, because they are what the place is. The
+   * trees follow, then the undergrowth, then the stones and everything in
+   * flower. Each stage is its own commit with a painted frame between, so
+   * the globe is on screen and the app answers while the park is still
+   * filling in.
+   */
+  const stage = useStages(PLANTING_STAGES)
+  const planted = stage >= STAGE.TREES
+
+  // So the tests can wait for a park rather than for a canvas. The scene is
+  // on screen well before it is finished now, which is the point of it.
+  useEffect(() => {
+    if (import.meta.env.DEV) window.__snowGlobePlanted = stage >= PLANTING_STAGES
+  }, [stage])
+
+  /**
    * Everything planted on the grass, worked out together.
    *
    * It used to be three lists that knew nothing about each other, and each of
@@ -1012,6 +1046,10 @@ function City({
    * thin ring of lollipops.
    */
   const planting = useMemo(() => {
+    // Nothing is worked out before the first frame has been drawn: this is
+    // the expensive part, and it is what the staging is for.
+    if (!planted) return NOTHING_PLANTED
+
     const trees = []
     const bushes = []
     const rocks = []
@@ -1166,7 +1204,7 @@ function City({
     }
 
     return { trees, bushes, rocks, beds, occupied: standing }
-  }, [generatedBuildings])
+  }, [generatedBuildings, planted])
 
   const { trees, bushes, rocks, beds } = planting
 
@@ -1208,7 +1246,7 @@ function City({
   return (
     <SnowGlobe cityName={cityName} weatherType={weatherType} tintColor={glassTint}>
       <group position={[0, 0.02, 0]}>
-        {generatedBuildings.map((building) =>
+        {(stage >= STAGE.SKYLINE ? generatedBuildings : []).map((building) =>
           building.isLandmark ? (
             <LandmarkModel key={building.key} data={building} />
           ) : (
@@ -1278,9 +1316,9 @@ function City({
 
       {/* The beds around the fountain, and everything in flower. None of it
           in winter. */}
-      <FlowerBeds plots={seasonPalette.showFlowers ? beds : []} />
+      <FlowerBeds plots={seasonPalette.showFlowers && stage >= STAGE.DETAIL ? beds : []} />
       <Flowers
-        flowers={flowers}
+        flowers={stage >= STAGE.DETAIL ? flowers : []}
         leafColor={seasonPalette.grassTuft}
         windDirection={windDirection}
         windSpeed={windSpeed}
@@ -1295,12 +1333,12 @@ function City({
         ))}
 
         {/* Stones in the grass, under and around the planting. */}
-        <Rocks stones={rocks} />
+        <Rocks stones={stage >= STAGE.DETAIL ? rocks : []} />
 
         {/* Vegetation */}
         <VegetationRing
           trees={trees}
-          bushes={bushes}
+          bushes={stage >= STAGE.UNDERGROWTH ? bushes : []}
           windDirection={windDirection}
           windSpeed={windSpeed}
           season={season}
@@ -1326,7 +1364,7 @@ function City({
         ))}
 
         {/* Bridges */}
-        {generatedBridges.map((bridge) => (
+        {(stage >= STAGE.SKYLINE ? generatedBridges : []).map((bridge) => (
           <BridgeModel key={bridge.key} data={bridge} />
         ))}
         {extraElements}

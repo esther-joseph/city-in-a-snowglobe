@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp } from './support/app.js'
+import { gotoApp, waitForPark } from './support/app.js'
 
 /**
  * The flowers.
@@ -62,9 +62,7 @@ test.describe('Daisies', () => {
   })
 
   test('the whole park of them costs three draw calls', async ({ page }) => {
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
-      .toBe(true)
+    await waitForPark(page)
 
     const found = await page.evaluate(async () => {
       const { getDaisyGeometry } = await import('/src/utils/daisy.js')
@@ -277,9 +275,7 @@ test.describe('Flower beds', () => {
   })
 
   test('every bed is edged, all the way round', async ({ page }) => {
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
-      .toBe(true)
+    await waitForPark(page)
 
     const edging = await page.evaluate(async () => {
       const THREE = await import('/node_modules/.vite/deps/three.js')

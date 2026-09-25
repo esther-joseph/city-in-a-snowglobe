@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp } from './support/app.js'
+import { gotoApp, waitForPark } from './support/app.js'
 
 /**
  * Nothing may be planted on a path.
@@ -136,9 +136,7 @@ test.describe('Park furniture', () => {
   })
 
   test('the stones are clear of the benches and the lamps', async ({ page }) => {
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
-      .toBe(true)
+    await waitForPark(page)
 
     const report = await page.evaluate(async () => {
       const THREE = await import('/node_modules/.vite/deps/three.js')
@@ -202,9 +200,7 @@ test.describe('Park furniture', () => {
   })
 
   test('the park is fuller than it was', async ({ page }) => {
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
-      .toBe(true)
+    await waitForPark(page)
 
     const counts = await page.evaluate(async () => {
       const { getRockGeometries } = await import('/src/utils/rocks.js')

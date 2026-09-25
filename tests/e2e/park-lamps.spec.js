@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp } from './support/app.js'
+import { gotoApp, waitForPark } from './support/app.js'
 
 /**
  * The lamp posts.
@@ -13,9 +13,7 @@ import { gotoApp } from './support/app.js'
  */
 
 const lamps = async (page) => {
-  await expect
-    .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
-    .toBe(true)
+  await waitForPark(page)
 
   return page.evaluate(async () => {
     const THREE = await import('/node_modules/.vite/deps/three.js')

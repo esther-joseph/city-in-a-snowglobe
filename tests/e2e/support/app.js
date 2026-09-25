@@ -39,6 +39,19 @@ export async function openDrawer(page) {
   await expect(page.getByRole('button', { name: /Close Weather Info/i })).toBeVisible()
 }
 
+/**
+ * Wait for the park, not merely for the scene.
+ *
+ * The city is on screen within a frame or two; the planting arrives over the
+ * next few, a stage at a time, so that the globe is visible while it fills
+ * in. Anything counting trees or stones has to wait for the last stage.
+ */
+export async function waitForPark(page) {
+  await expect
+    .poll(() => page.evaluate(() => Boolean(window.__snowGlobePlanted)), { timeout: 45000 })
+    .toBe(true)
+}
+
 export const drawer = (page) => page.locator('.overflow-y-auto').first()
 export const searchInput = (page) => page.getByPlaceholder('Enter city name...')
 // Not getByRole(/search/i): the clear button is labelled "Clear search".
