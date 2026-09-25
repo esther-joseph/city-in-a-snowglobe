@@ -12,12 +12,14 @@ import {
 } from '../utils/parkLayout'
 import SeasonalFall from './city/SeasonalFall'
 import { getSeasonPalette, SEASONS } from '../utils/seasons'
+import Flowers from './city/Flowers'
 import FlowerBeds from './city/FlowerBeds'
 import Rocks from './city/Rocks'
 import LightPost from './city/LightPost'
 import { furnitureObstacles, BENCHES, LAMP_POSTS } from '../utils/parkFurniture'
 import { getViewpoints } from '../utils/arViewpoints'
 import { getRockGeometries } from '../utils/rocks'
+import { scatterFlowers } from '../utils/flowerClusters'
 import { placeBedPlots, plantBeds } from '../utils/flowerBeds'
 import { standardMaterial } from '../utils/sharedMaterial'
 import { unitPlane } from '../utils/sharedGeometry'
@@ -1083,9 +1085,9 @@ function City({
       })
     }
 
-    // The flower beds are cut before anything is planted around them: they
-    // are the deliberate part of a park and the shrubbery works around them,
-    // not the other way about.
+    // The beds are cut before anything is planted around them: they are the
+    // deliberate part of a park, and the shrubbery works around them rather
+    // than the other way about.
     const beds = placeBedPlots({
       place: (angle, distance, radius) => placeOnGrass(angle, distance, radius, standing)
     })
@@ -1163,7 +1165,7 @@ function City({
       })
     }
 
-    return { trees, bushes, rocks, beds }
+    return { trees, bushes, rocks, beds, occupied: standing }
   }, [generatedBuildings])
 
   const { trees, bushes, rocks, beds } = planting
@@ -1180,16 +1182,28 @@ function City({
   )
 
   /**
-   * The flower beds.
+   * The flowers.
    *
-   * Plots rather than scattered singles, laid out inside the same planting
-   * pass so they clear the paths and the furniture like everything else, and
-   * so that what is planted afterwards clears them.
+   * Scattered over the grass in clumps of one, two or three, clear of the
+   * paving like everything else. They are laid out on their own rather than
+   * inside the planting pass, because what is in flower changes with the
+   * season and the park is not dug up every time the weather turns.
    */
-  const flowerBeds = useMemo(
-    () => (seasonPalette.showFlowers ? plantBeds(beds, seasonPalette.flowers) : []),
-    [beds, seasonPalette]
-  )
+  const flowers = useMemo(() => {
+    if (!seasonPalette.showFlowers) return []
+
+    // Everything in flower, in one list: the beds around the fountain and the
+    // clumps out on the grass. They are drawn through one set of instanced
+    // meshes, so the whole park of them costs three draw calls.
+    return [
+      ...plantBeds(beds, seasonPalette.flowers).flatMap((bed) => bed.flowers),
+      ...scatterFlowers({
+        palette: seasonPalette.flowers,
+        place: (angle, distance, radius) =>
+          placeOnGrass(angle, distance, radius, planting.occupied)
+      })
+    ]
+  }, [beds, planting, seasonPalette])
 
   return (
     <SnowGlobe cityName={cityName} weatherType={weatherType} tintColor={glassTint}>
@@ -1262,9 +1276,11 @@ function City({
         <meshStandardMaterial color="#c0b7a4" roughness={0.85} metalness={0.05} side={2} />
       </mesh>
 
-      {/* Flower beds. Hidden in winter. */}
-      <FlowerBeds
-        beds={flowerBeds}
+      {/* The beds around the fountain, and everything in flower. None of it
+          in winter. */}
+      <FlowerBeds plots={seasonPalette.showFlowers ? beds : []} />
+      <Flowers
+        flowers={flowers}
         leafColor={seasonPalette.grassTuft}
         windDirection={windDirection}
         windSpeed={windSpeed}

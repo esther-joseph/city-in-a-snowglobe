@@ -177,10 +177,10 @@ test.describe('Seasonal colour', () => {
 /**
  * The beds themselves.
  *
- * The flowers used to be scattered: three rings of single daisies at jittered
- * radii, one colour each, all the way around the park. Nobody plants like
- * that. A park cuts a plot, edges it in iron, and sets the planting inside it
- * in rings of one colour at a time.
+ * A park's formal planting goes where everyone passes it, which here is the
+ * first band of grass outside the fountain's paving: a ring of cut plots,
+ * edged in iron, each planted in rings of one colour at a time. Further out
+ * the park is informal and the flowers are clumps on the grass.
  */
 test.describe('Flower beds', () => {
   const layout = (page) =>
@@ -202,6 +202,47 @@ test.describe('Flower beds', () => {
 
   test.beforeEach(async ({ page }) => {
     await gotoApp(page)
+  })
+
+  test('the beds ring the fountain, on the grass', async ({ page }) => {
+    const { beds, fountain, grass } = await page.evaluate(async () => {
+      const { placeBedPlots } = await import('/src/utils/flowerBeds.js')
+      const { FOUNTAIN_RING, GRASS_BAND, fitsOnGrass } = await import(
+        '/src/utils/parkLayout.js'
+      )
+
+      const plots = placeBedPlots({
+        place: (angle, distance, radius) =>
+          fitsOnGrass(Math.cos(angle) * distance, Math.sin(angle) * distance, radius)
+            ? [Math.cos(angle) * distance, Math.sin(angle) * distance]
+            : null
+      })
+
+      return {
+        fountain: FOUNTAIN_RING,
+        grass: GRASS_BAND,
+        beds: plots.map((plot) => ({
+          radius: plot.radius,
+          distance: Math.hypot(plot.at[0], plot.at[1])
+        }))
+      }
+    })
+
+    expect(beds.length, 'a ring of them').toBeGreaterThanOrEqual(6)
+
+    for (const bed of beds) {
+      // Off the paving around the water, and not out among the trees: the
+      // whole plot sits in the first band of grass.
+      expect(bed.distance - bed.radius, 'clear of the fountain paving').toBeGreaterThan(
+        fountain.outer
+      )
+      expect(bed.distance - bed.radius, 'and close to it').toBeLessThan(fountain.outer + 0.8)
+      expect(bed.distance + bed.radius, 'inside the grass').toBeLessThan(grass.outer)
+    }
+
+    // All at the same distance: it is a ring, not a scattering.
+    const distances = beds.map((bed) => bed.distance)
+    expect(Math.max(...distances) - Math.min(...distances)).toBeLessThan(0.001)
   })
 
   test('a bed is a plot with its planting inside it', async ({ page }) => {
@@ -300,5 +341,81 @@ test.describe('Flower beds', () => {
         expect(hoop.y).toBeLessThan(0.2)
       }
     }
+  })
+})
+
+/**
+ * And the flowers that are not in a bed.
+ *
+ * Out past the beds the park is informal. It used to be single daisies evenly
+ * spaced around three rings, which reads as a pattern rather than as
+ * planting. They come up in clumps now: one here, three there, all of a
+ * clump the same colour, because a clump is one plant that has spread.
+ */
+test.describe('Clumps on the grass', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+  })
+
+  test('a clump is one, two or three flowers of one colour', async ({ page }) => {
+    const clumps = await page.evaluate(async () => {
+      const { clumpAt } = await import('/src/utils/flowerClusters.js')
+
+      // A fixed sequence rather than chance, so the sizes are all covered.
+      const sizes = []
+      for (let seed = 0; seed < 40; seed += 1) {
+        let step = 0
+        const random = () => {
+          step += 1
+          return ((seed * 7 + step * 13) % 100) / 100
+        }
+        const clump = clumpAt({ at: [3, 4], radius: 0.28, color: '#ff6b8a', random })
+        sizes.push({
+          count: clump.length,
+          colours: new Set(clump.map((flower) => flower.color)).size,
+          // How far the furthest flower's own circle reaches from the middle
+          // of the spot that was cleared for it.
+          reach: Math.max(
+            ...clump.map(
+              (flower) =>
+                Math.hypot(flower.position[0] - 3, flower.position[2] - 4) + flower.scale * 0.5
+            )
+          ),
+          turns: new Set(clump.map((flower) => flower.yaw)).size,
+          heights: new Set(clump.map((flower) => flower.position[1])).size
+        })
+      }
+      return sizes
+    })
+
+    const counts = new Set(clumps.map((clump) => clump.count))
+    expect([...counts].sort(), 'ones, twos and threes').toEqual([1, 2, 3])
+
+    for (const clump of clumps) {
+      expect(clump.colours, 'a clump is one plant').toBe(1)
+      // It has to fit in the spot the planting cleared for it, or a clump of
+      // three overhangs a path the single flower did not.
+      expect(clump.reach, 'inside the spot it was given').toBeLessThanOrEqual(0.28)
+      expect(clump.turns, 'each one faces its own way').toBe(clump.count)
+      expect(clump.heights, 'all of them on the ground').toBe(1)
+    }
+  })
+
+  test('the clumps are scattered clear of the beds', async ({ page }) => {
+    const rings = await page.evaluate(async () => {
+      const { scatterFlowers } = await import('/src/utils/flowerClusters.js')
+
+      const flowers = scatterFlowers({
+        palette: ['#ff6b8a', '#ffcd3c', '#c084fc'],
+        place: (angle, distance) => [Math.cos(angle) * distance, Math.sin(angle) * distance]
+      })
+
+      return flowers.map((flower) => Math.hypot(flower.position[0], flower.position[2]))
+    })
+
+    expect(rings.length, 'a park full of them').toBeGreaterThan(80)
+    // The beds reach to about eight; nothing scattered starts inside that.
+    expect(Math.min(...rings), 'clear of the beds').toBeGreaterThan(8.2)
+    expect(Math.max(...rings), 'and inside the park').toBeLessThan(16)
   })
 })

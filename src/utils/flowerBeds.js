@@ -1,15 +1,18 @@
 /**
  * Flower beds, the way a park plants them.
  *
- * The flowers used to be scattered: three rings of single daisies at slightly
- * jittered radii, each its own colour, all the way around the park. Nobody
- * plants like that. A park puts its flowers in beds — a cut plot of turned
- * earth, edged, with the planting inside it in rings of one colour at a time.
+ * A cut plot of turned earth, edged in iron, with the planting inside it in
+ * rings of one colour at a time. They ring the fountain, on the first band of
+ * grass outside its paving, which is where a park puts its formal planting:
+ * where everyone walking round the water passes them and everyone sitting on
+ * the benches looks at them. Further out the park is informal, and the
+ * flowers there are clumps on the grass rather than beds.
  *
- * This works out where those plots go and what is planted in each. Where they
+ * This works out where the plots go and what is planted in each. Where they
  * go is handed in, because the park is planted in one pass and a bed has to
  * clear the paths and the benches like everything else.
  */
+import { FOUNTAIN_RING } from './parkLayout'
 
 /** Rows inside a plot: the middle, then two rings out toward the edge. */
 const ROWS = [
@@ -20,6 +23,9 @@ const ROWS = [
 
 /** How far inside the edging the outermost row sits. */
 const MARGIN = 0.22
+
+/** And how much grass is left between a plot's edging and the paving. */
+const BED_MARGIN = 0.3
 
 /**
  * @typedef {Object} Bed
@@ -78,8 +84,7 @@ export function layOutBed({ key, at, radius, palette, index, ground = 0.12 }) {
 }
 
 /**
- * Where the plots go: two rings of them, on the diagonals where the grass is
- * widest, near enough to the paths to be seen from them.
+ * Where the plots go: a ring of them on the grass around the fountain.
  *
  * Separate from what is planted in them, because the two happen at different
  * times. A plot is cut once, with the rest of the park, so that the bushes
@@ -92,22 +97,20 @@ export function layOutBed({ key, at, radius, palette, index, ground = 0.12 }) {
  * @returns {Array<{ key: string, at: [number, number], radius: number }>}
  */
 export function placeBedPlots({ place }) {
-  const rings = [
-    // Inside, where they are seen from the benches and the fountain ring.
-    { count: 4, distance: 7.4, radius: 1.05, offset: Math.PI / 4 },
-    // And out among the trees, between the radial paths.
-    { count: 4, distance: 12.4, radius: 1.25, offset: Math.PI / 4 }
-  ]
+  // Eight of them around the fountain, set between the radial paths rather
+  // than across them: a bed is as close to the water as it can be while its
+  // whole plot is still on the grass.
+  const count = 8
+  const radius = 0.95
+  const distance = FOUNTAIN_RING.outer + radius + BED_MARGIN
 
   const plots = []
-  rings.forEach((ring, ringIndex) => {
-    for (let i = 0; i < ring.count; i += 1) {
-      const angle = (i / ring.count) * Math.PI * 2 + ring.offset
-      const spot = place(angle, ring.distance, ring.radius)
-      if (!spot) continue
-      plots.push({ key: `bed-${ringIndex}-${i}`, at: spot, radius: ring.radius })
-    }
-  })
+  for (let i = 0; i < count; i += 1) {
+    const angle = (i / count) * Math.PI * 2 + Math.PI / count
+    const spot = place(angle, distance, radius)
+    if (!spot) continue
+    plots.push({ key: `bed-${i}`, at: spot, radius })
+  }
 
   return plots
 }

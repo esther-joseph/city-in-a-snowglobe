@@ -30,12 +30,73 @@ const IRON_METAL = 0.66
 /** Everything is measured from the foot, in park units, which read as metres. */
 const BASE_HEIGHT = 0.46
 const COLUMN_HEIGHT = 3.05
-/** The lantern, in its two courses: the belly, then the shoulder under the cap. */
-const BELLY_HEIGHT = 0.5
-const SHOULDER_HEIGHT = 0.2
-const LANTERN_HEIGHT = BELLY_HEIGHT + SHOULDER_HEIGHT
-/** How far the glass stands out at its widest. */
-const SHOULDER = 0.215
+/**
+ * The lantern's outline, from the neck where it meets the collar to the rim
+ * the cap sits on.
+ *
+ * An onion, or an acorn: narrow at the neck, swelling to its widest a third
+ * of the way up, then a long curve in to a small shoulder. Two straight
+ * tapers were doing this before, one out and one in, and a pair of cones
+ * meeting at their wide ends reads as a lampshade on a funnel. The whole
+ * character of a cast iron lantern is in this curve.
+ *
+ * [radius, height], in park units, which read as metres.
+ */
+const LANTERN_OUTLINE = [
+  [0.09, 0],
+  [0.165, 0.045],
+  [0.225, 0.105],
+  [0.258, 0.185],
+  [0.262, 0.26],
+  [0.25, 0.34],
+  [0.224, 0.42],
+  [0.187, 0.49],
+  [0.142, 0.55],
+  [0.1, 0.6],
+  [0.075, 0.63]
+]
+
+const LANTERN_HEIGHT = LANTERN_OUTLINE[LANTERN_OUTLINE.length - 1][1]
+/** How far the glass stands out at its widest, for the collar under it. */
+const SHOULDER = Math.max(...LANTERN_OUTLINE.map(([radius]) => radius))
+/** Panes around the lantern, and the bars between them. */
+const PANES = 8
+
+/**
+ * The glass, turned from the outline.
+ *
+ * A lathe is the honest way to build something that was cast on one: the
+ * profile is spun, and at eight segments the facets themselves read as the
+ * panes. Built once and shared by every lamp in the park.
+ */
+let sharedGlass = null
+const glassGeometry = () => {
+  if (!sharedGlass) {
+    sharedGlass = new THREE.LatheGeometry(
+      LANTERN_OUTLINE.map(([radius, height]) => new THREE.Vector2(radius, height)),
+      PANES
+    )
+  }
+  return sharedGlass
+}
+
+/**
+ * One glazing bar, swept along the same outline.
+ *
+ * Straight bars up a curved lantern stand away from it at the waist and cut
+ * into it at the shoulder. These follow the glass because they are the same
+ * curve, which is what holds a lantern together.
+ */
+let sharedBar = null
+const barGeometry = () => {
+  if (!sharedBar) {
+    const curve = new THREE.CatmullRomCurve3(
+      LANTERN_OUTLINE.map(([radius, height]) => new THREE.Vector3(radius, height, 0))
+    )
+    sharedBar = new THREE.TubeGeometry(curve, 14, 0.011, 4, false)
+  }
+  return sharedBar
+}
 
 /** Every piece of iron on every lamp is the same iron, and says so. */
 const iron = () =>
@@ -71,7 +132,7 @@ function LightPost({ position = [0, 0, 0], isNight }) {
   const collarTop = BASE_HEIGHT + COLUMN_HEIGHT
   const lanternBottom = collarTop + 0.12
   const lanternTop = lanternBottom + LANTERN_HEIGHT
-  const lanternMiddle = lanternBottom + BELLY_HEIGHT * 0.55
+  const lanternMiddle = lanternBottom + LANTERN_HEIGHT * 0.38
 
   // The glass is lit from within rather than by the scene, so it holds its
   // colour whatever the sky is doing. By day it is a pale, almost spent
@@ -113,54 +174,40 @@ function LightPost({ position = [0, 0, 0], isNight }) {
       <Iron position={[0, collarTop + 0.03, 0]}>
         <cylinderGeometry args={[0.09, 0.075, 0.06, 12]} />
       </Iron>
-      <Iron position={[0, lanternBottom + 0.02, 0]}>
-        <cylinderGeometry args={[0.17, 0.1, 0.09, 12]} />
+      <Iron position={[0, lanternBottom - 0.02, 0]}>
+        <cylinderGeometry args={[0.115, 0.085, 0.07, 12]} />
       </Iron>
 
-      {/* The glass, in two courses: up and outward from the foot to a
-          shoulder, then back in under the cap. A lantern has a belly. A
-          single taper reads as a lampshade and a sphere reads as a bulb. */}
-      <mesh position={[0, lanternBottom + BELLY_HEIGHT / 2, 0]}>
-        <cylinderGeometry args={[SHOULDER, 0.13, BELLY_HEIGHT, 8]} />
-        <meshStandardMaterial {...glass} />
-      </mesh>
-      <mesh position={[0, lanternBottom + BELLY_HEIGHT + SHOULDER_HEIGHT / 2, 0]}>
-        <cylinderGeometry args={[0.165, SHOULDER, SHOULDER_HEIGHT, 8]} />
-        <meshStandardMaterial {...glass} />
+      {/* The glass: the outline, spun. */}
+      <mesh position={[0, lanternBottom, 0]} geometry={glassGeometry()}>
+        <meshStandardMaterial {...glass} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Glazing bars up the corners of the belly, where the panes are widest.
-          Eight sides, eight bars, each on a corner. */}
-      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
-        const angle = (i / 8) * Math.PI * 2 + Math.PI / 8
-        const radius = SHOULDER * 0.86
-        return (
-          <Iron
-            key={`bar-${i}`}
-            position={[
-              Math.cos(angle) * radius,
-              lanternBottom + BELLY_HEIGHT / 2,
-              Math.sin(angle) * radius
-            ]}
-            rotation={[0, -angle, 0.07]}
-          >
-            <boxGeometry args={[0.02, BELLY_HEIGHT, 0.02]} />
-          </Iron>
-        )
-      })}
+      {/* A bar at every corner of the panes, following the same curve. */}
+      {Array.from({ length: PANES }, (unused, i) => (
+        <mesh
+          key={`bar-${i}`}
+          castShadow
+          material={iron()}
+          geometry={barGeometry()}
+          position={[0, lanternBottom, 0]}
+          rotation={[0, (i / PANES) * Math.PI * 2, 0]}
+        />
+      ))}
 
-      {/* Domed cap, its collar, and the finial on top. */}
+      {/* The cap the lantern closes into: a low dome on a rim, with a small
+          finial. It is a third of the width of the glass, not a lid over it. */}
+      <Iron position={[0, lanternTop, 0]}>
+        <cylinderGeometry args={[0.095, 0.085, 0.035, 12]} />
+      </Iron>
       <Iron position={[0, lanternTop + 0.02, 0]}>
-        <cylinderGeometry args={[0.19, 0.2, 0.05, 12]} />
+        <sphereGeometry args={[0.093, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.4]} />
       </Iron>
-      <Iron position={[0, lanternTop + 0.05, 0]}>
-        <sphereGeometry args={[0.19, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.2]} />
+      <Iron position={[0, lanternTop + 0.09, 0]}>
+        <sphereGeometry args={[0.032, 10, 8]} />
       </Iron>
-      <Iron position={[0, lanternTop + 0.21, 0]}>
-        <sphereGeometry args={[0.042, 10, 8]} />
-      </Iron>
-      <Iron position={[0, lanternTop + 0.29, 0]}>
-        <coneGeometry args={[0.026, 0.11, 8]} />
+      <Iron position={[0, lanternTop + 0.15, 0]}>
+        <coneGeometry args={[0.02, 0.085, 8]} />
       </Iron>
 
       {/* The lamp itself sits inside the glass, so the bars cast their own

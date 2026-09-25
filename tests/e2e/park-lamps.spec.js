@@ -81,6 +81,45 @@ test.describe('Lamp posts', () => {
     }
   })
 
+  test('the lantern is turned, not stacked out of cones', async ({ page }) => {
+    await gotoApp(page)
+
+    const outline = await page.evaluate(async () => {
+      const source = await (await fetch('/src/components/city/LightPost.jsx')).text()
+      const start = source.indexOf('const LANTERN_OUTLINE = [')
+      if (start < 0) return null
+      // To the line that closes the array, not to the first bracket after it,
+      // which is the end of its first pair.
+      const end = source.indexOf('\n]', start)
+      const block = source.slice(start, end)
+      return [...block.matchAll(/\[([\d.]+),\s*([\d.]+)\]/g)].map((pair) => ({
+        radius: Number(pair[1]),
+        height: Number(pair[2])
+      }))
+    })
+
+    expect(outline, 'a profile to spin').not.toBeNull()
+    expect(outline.length, 'enough points to read as a curve').toBeGreaterThan(6)
+
+    const widest = outline.reduce((a, b) => (b.radius > a.radius ? b : a))
+    const top = outline[outline.length - 1]
+
+    // An onion, not a barrel and not a cone: narrow at the neck, widest low
+    // down, and a long curve in to a small shoulder.
+    expect(outline[0].radius, 'narrow at the neck').toBeLessThan(widest.radius * 0.5)
+    expect(widest.height / top.height, 'widest in the lower half').toBeLessThan(0.5)
+    expect(top.radius, 'closing to a shoulder').toBeLessThan(widest.radius * 0.45)
+
+    // And the curve turns rather than kinking: every step out is smaller than
+    // the one before it, and likewise coming back in.
+    const rising = outline.filter((point) => point.height <= widest.height)
+    for (let i = 2; i < rising.length; i += 1) {
+      const step = rising[i].radius - rising[i - 1].radius
+      const previous = rising[i - 1].radius - rising[i - 2].radius
+      expect(step, 'the swell eases off rather than cornering').toBeLessThanOrEqual(previous + 1e-9)
+    }
+  })
+
   test('the column is reeded rather than turned plain', async ({ page }) => {
     await gotoApp(page)
 
