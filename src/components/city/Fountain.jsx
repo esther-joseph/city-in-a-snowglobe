@@ -1,9 +1,11 @@
 import React, { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import PropTypes from 'prop-types'
 import * as THREE from 'three'
+import { Water } from 'three/examples/jsm/objects/Water.js'
 import {
   WATER_HEIGHT_GLSL,
+  createFallingSheetMaps,
   createJetStreakMaps,
   createWaterNormalMap,
   jetArc,
@@ -50,6 +52,13 @@ const getJetStreaks = () => {
   return sharedJetStreaks
 }
 
+/** The curtain that comes over each rim. One set, shared by all of them. */
+let sharedSheet = null
+const getSheetMaps = () => {
+  if (!sharedSheet) sharedSheet = createFallingSheetMaps({ strength: 1.2 })
+  return sharedSheet
+}
+
 /** A jet fades as it falls, so the tube is masked along its own length. */
 let sharedJetFade = null
 const getJetFade = () => {
@@ -76,62 +85,153 @@ const getJetFade = () => {
 }
 
 /**
- * A pool with waves in it.
+ * The swell, as uniforms and a shader header.
  *
- * The surface is a disc of vertices displaced in the vertex shader, which is
- * both the cheap way and the one that gets the light right: the normals come
- * from the slope of the same height field, so a crest catches the sun and a
- * trough does not. Everything else about the material is left to
- * MeshPhysicalMaterial, which is why this hooks into its shader rather than
- * replacing it: a hand-written water shader would have to re-earn the
- * clearcoat, the fog and the tone mapping it already has.
- *
- * `impacts` are the places a jet comes down, in the pool's own coordinates.
+ * Both kinds of pool below displace their surface with the same height field:
+ * crossing swells, a wave train from every point water lands, and a ring for
+ * water coming over a rim. Only the material underneath them differs, so the
+ * waves are built once here and patched into whichever shader is in use.
  */
-function WaterSurface({
-  position,
-  radius,
-  color = '#3fb8dd',
-  opacity = 0.82,
-  drift = 1,
-  impacts = [],
-  amplitude = 0.03
-}) {
-  const normalMap = useMemo(() => getWaterNormalMap().clone(), [])
-
+function useWaveShader({ impacts, ring, amplitude }) {
   // At least one, because a shader cannot declare an array of none.
   const ripples = useMemo(() => {
     const points = impacts.length > 0 ? impacts : [[0, 0, 0]]
     return points.map(([x, z, strength]) => new THREE.Vector3(x, z, strength))
   }, [impacts])
 
-  const uniforms = useMemo(
-    () => ({
+  return useMemo(() => {
+    const uniforms = {
       uTime: { value: 0 },
       uAmplitude: { value: amplitude },
-      uRipples: { value: ripples }
-    }),
-    [ripples, amplitude]
-  )
+      uRipples: { value: ripples },
+      uRing: { value: new THREE.Vector2(ring[0], ring[1]) }
+    }
+
+    const header = `
+      uniform float uTime;
+      uniform float uAmplitude;
+      uniform vec2 uRing;
+      #define RIPPLE_COUNT ${ripples.length}
+      uniform vec3 uRipples[RIPPLE_COUNT];
+      ${WATER_HEIGHT_GLSL}
+    `
+
+    return { uniforms, header, count: ripples.length }
+  }, [ripples, ring, amplitude])
+}
+
+/**
+ * A ring from nothing to the full radius, rather than a circle.
+ *
+ * A circle is a fan of triangles meeting in the middle, with every vertex out
+ * at the rim and nothing in between to raise into a wave.
+ */
+const poolGeometry = (radius) => new THREE.RingGeometry(radius * 0.0001, radius, 72, 20)
+
+/**
+ * The pool that reflects.
+ *
+ * Built on three.js's own Water, which is the flat mirror trick: the scene is
+ * rendered again from under the surface into a small target, and the shader
+ * reads it back through a scrolling normal map with a sun specular on top.
+ * That is what gives a pool the one thing a lit material cannot fake, which
+ * is the sky and the skyline standing in it.
+ *
+ * Two things are added to it. The surface is displaced, which Water does not
+ * do: its plane stays flat and all the movement is in the normals. The height
+ * field is patched into Water's own vertex shader rather than replacing it,
+ * so the reflection bends with the waves instead of sliding over them. And
+ * the material is told to blend, because Water writes an alpha at the end of
+ * its fragment shader and then leaves the material opaque.
+ *
+ * It costs a second render of the scene every frame, which is why only the
+ * basin gets one and why it takes it every other frame.
+ *
+ * WaterMesh, the other one in the docs, is the WebGPU rewrite: it is written
+ * in TSL and needs a WebGPURenderer. This scene draws through WebGL.
+ */
+function ReflectingPool({ radius, color, alpha, drift, waves, resolution, isNight }) {
+  const { scene } = useThree()
+  const normalMap = useMemo(() => getWaterNormalMap().clone(), [])
+
+  const water = useMemo(() => {
+    const instance = new Water(poolGeometry(radius), {
+      textureWidth: resolution,
+      textureHeight: resolution,
+      waterNormals: normalMap,
+      // Low. The default is written for an ocean, where the surface is metres
+      // from the eye; across two and a half of these it smears the reflection
+      // into noise.
+      distortionScale: 2.6,
+      alpha,
+      waterColor: new THREE.Color(color),
+      sunColor: new THREE.Color(isNight ? '#8fb8d8' : '#ffffff'),
+      sunDirection: new THREE.Vector3(0.3, 0.9, 0.2).normalize(),
+      fog: Boolean(scene.fog)
+    })
+
+    instance.material.transparent = true
+    instance.material.depthWrite = false
+    Object.assign(instance.material.uniforms, waves.uniforms)
+
+    // The disc is built in XY and laid flat by the mesh, so the surface rises
+    // along the local z. Both places Water reads `position` have to see the
+    // displaced one, or the reflection lands where the water is not.
+    instance.material.vertexShader = instance.material.vertexShader
+      .replace(
+        'void main() {',
+        `${waves.header}\n void main() {\n vec3 swell = vec3(position);\n swell.z += waterHeight(position.xy);`
+      )
+      .replace(
+        'mirrorCoord = modelMatrix * vec4( position, 1.0 );',
+        'mirrorCoord = modelMatrix * vec4( swell, 1.0 );'
+      )
+      .replace(
+        'vec4 mvPosition =  modelViewMatrix * vec4( position, 1.0 );',
+        'vec4 mvPosition = modelViewMatrix * vec4( swell, 1.0 );'
+      )
+
+    // Every other frame. A reflection of a scene that has barely moved is
+    // worth half the frames it costs, and at sixty of them nobody sees the
+    // one it skipped.
+    const reflect = instance.onBeforeRender
+    let frame = 0
+    instance.onBeforeRender = (renderer, sceneToRender, camera) => {
+      frame += 1
+      if (frame % 2 === 0) return
+      reflect(renderer, sceneToRender, camera)
+    }
+
+    return instance
+  }, [radius, resolution, normalMap, alpha, color, isNight, waves, scene.fog])
+
+  useFrame(({ clock }) => {
+    const elapsed = clock.getElapsedTime()
+    // Water's own clock drives the normal map; ours drives the swell.
+    water.material.uniforms.time.value = elapsed * 0.35 * drift
+    waves.uniforms.uTime.value = elapsed * drift
+  })
+
+  return <primitive object={water} rotation={[-Math.PI / 2, 0, 0]} />
+}
+
+/**
+ * The pools that do not reflect.
+ *
+ * The two dishes are a fifth of the basin's width and are seen from above,
+ * where there is nothing overhead to reflect but sky. They carry the same
+ * waves over a physical material instead, which costs nothing beyond the
+ * vertices: lit, clearcoated, translucent, with the scrolling normal map for
+ * the chop too fine to be worth a vertex.
+ */
+function PlainPool({ radius, color, alpha, drift, waves }) {
+  const normalMap = useMemo(() => getWaterNormalMap().clone(), [])
 
   const onBeforeCompile = useMemo(
     () => (shader) => {
-      shader.uniforms.uTime = uniforms.uTime
-      shader.uniforms.uAmplitude = uniforms.uAmplitude
-      shader.uniforms.uRipples = uniforms.uRipples
+      Object.assign(shader.uniforms, waves.uniforms)
+      shader.vertexShader = waves.header + shader.vertexShader
 
-      const header = `
-        uniform float uTime;
-        uniform float uAmplitude;
-        #define RIPPLE_COUNT ${ripples.length}
-        uniform vec3 uRipples[RIPPLE_COUNT];
-        ${WATER_HEIGHT_GLSL}
-      `
-
-      shader.vertexShader = header + shader.vertexShader
-
-      // The disc is built in XY and laid flat by the mesh, so the surface
-      // rises along the local z.
       shader.vertexShader = shader.vertexShader.replace(
         '#include <beginnormal_vertex>',
         `
@@ -150,31 +250,24 @@ function WaterSurface({
         `
       )
     },
-    [uniforms, ripples.length]
+    [waves]
   )
 
+  const geometry = useMemo(() => poolGeometry(radius), [radius])
+
   useFrame(({ clock }) => {
-    const time = clock.getElapsedTime()
-    uniforms.uTime.value = time * drift
-    normalMap.offset.set(time * 0.013 * drift, time * 0.009 * drift)
-    normalMap.rotation = Math.sin(time * 0.06) * 0.25
-    normalMap.needsUpdate = true
+    const elapsed = clock.getElapsedTime()
+    waves.uniforms.uTime.value = elapsed * drift
+    normalMap.offset.set(elapsed * 0.013 * drift, elapsed * 0.009 * drift)
+    normalMap.rotation = Math.sin(elapsed * 0.06) * 0.25
   })
 
-  // A ring from nothing to the full radius, rather than a circle: a circle is
-  // a fan of triangles meeting in the middle, with every vertex out at the
-  // rim and nothing in between to raise into a wave.
-  //
-  // No receiveShadow. A flat disc facing a shadow-casting sun bands with acne
-  // across its whole surface, and a pool of water has nothing useful to catch
-  // anyway.
   return (
-    <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[radius * 0.0001, radius, 72, 20]} />
+    <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]}>
       <meshPhysicalMaterial
         color={color}
         transparent
-        opacity={opacity}
+        opacity={alpha}
         roughness={0.12}
         metalness={0}
         normalMap={normalMap}
@@ -183,13 +276,62 @@ function WaterSurface({
         clearcoatRoughness={0.06}
         ior={1.33}
         side={THREE.DoubleSide}
+        depthWrite={false}
         onBeforeCompile={onBeforeCompile}
-        customProgramCacheKey={() => `water-${ripples.length}`}
-        // No transmission. It costs a whole extra render pass per material,
-        // and against a dark basin floor at this size it buys nothing an
-        // opacity cannot.
+        customProgramCacheKey={() => `pool-${waves.count}`}
       />
     </mesh>
+  )
+}
+
+const poolShape = {
+  radius: PropTypes.number.isRequired,
+  color: PropTypes.string,
+  alpha: PropTypes.number,
+  drift: PropTypes.number,
+  waves: PropTypes.object.isRequired
+}
+
+ReflectingPool.propTypes = { ...poolShape, resolution: PropTypes.number, isNight: PropTypes.bool }
+PlainPool.propTypes = poolShape
+
+/**
+ * A pool of water, reflecting or not.
+ *
+ * No receiveShadow either way: a flat disc facing a shadow-casting sun bands
+ * with acne across its whole surface, and a pool has nothing useful to catch.
+ */
+function WaterSurface({
+  position,
+  radius,
+  color = '#2f9dc4',
+  alpha = 0.84,
+  drift = 1,
+  impacts = [],
+  ring = [0, 0],
+  amplitude = 0.03,
+  reflects = false,
+  resolution = 256,
+  isNight = false
+}) {
+  const waves = useWaveShader({ impacts, ring, amplitude })
+
+  return (
+    <group position={position}>
+      {reflects ? (
+        <ReflectingPool
+          radius={radius}
+          color={color}
+          alpha={alpha}
+          drift={drift}
+          waves={waves}
+          resolution={resolution}
+          isNight={isNight}
+        />
+      ) : (
+        <PlainPool radius={radius} color={color} alpha={alpha} drift={drift} waves={waves} />
+      )}
+    </group>
   )
 }
 
@@ -197,10 +339,85 @@ WaterSurface.propTypes = {
   position: PropTypes.arrayOf(PropTypes.number).isRequired,
   radius: PropTypes.number.isRequired,
   color: PropTypes.string,
-  opacity: PropTypes.number,
+  alpha: PropTypes.number,
   drift: PropTypes.number,
   impacts: PropTypes.arrayOf(PropTypes.arrayOf(PropTypes.number)),
-  amplitude: PropTypes.number
+  ring: PropTypes.arrayOf(PropTypes.number),
+  amplitude: PropTypes.number,
+  reflects: PropTypes.bool,
+  resolution: PropTypes.number,
+  isNight: PropTypes.bool
+}
+
+/**
+ * The sheet of water coming over a rim.
+ *
+ * A tier of a fountain does not throw water at the one below it, it overflows
+ * into it: the bowl fills, the water goes over the edge the whole way round,
+ * and comes down as a curtain that thins and breaks as it falls. Six jets
+ * around a circle were six jets around a circle.
+ *
+ * An open cylinder, flaring outward as it falls because water leaving a lip
+ * keeps going the way it was going. What sells it is the scrolling, not the
+ * mesh: the texture runs down the sheet, opening holes in it lower down.
+ */
+function Overflow({ from, to, topRadius, bottomRadius, color = '#d6f2ff' }) {
+  const maps = useMemo(() => {
+    const sheet = getSheetMaps()
+    const normalMap = sheet.normalMap.clone()
+    const alphaMap = sheet.alphaMap.clone()
+    // Around the curtain, so the ribs stay the same width on a wide rim as
+    // on a narrow one.
+    const repeat = Math.max(3, Math.round(topRadius * 3.2))
+    // And twice down it, so the streaks stay short enough to read as water
+    // running rather than as long glass flutes.
+    normalMap.repeat.set(repeat, 2)
+    alphaMap.repeat.set(repeat, 2)
+    normalMap.needsUpdate = true
+    alphaMap.needsUpdate = true
+    return { normalMap, alphaMap }
+  }, [topRadius])
+
+  useFrame(({ clock }) => {
+    // Down, and faster than the eye can follow a single feature, which is
+    // what stops a repeating texture reading as a repeat.
+    const run = (clock.getElapsedTime() * 1.6) % 1
+    maps.normalMap.offset.set(0, run)
+    maps.alphaMap.offset.set(0, run)
+  })
+
+  const height = from - to
+
+  return (
+    <mesh position={[0, to + height / 2, 0]}>
+      <cylinderGeometry args={[topRadius, bottomRadius, height, 36, 1, true]} />
+      <meshPhysicalMaterial
+        color={color}
+        transparent
+        // Thin. A falling sheet is mostly the thing behind it; at anything
+        // like a glass opacity the curtain reads as a cylinder of glass,
+        // which is exactly what it looked like at 0.62.
+        opacity={0.3}
+        alphaMap={maps.alphaMap}
+        normalMap={maps.normalMap}
+        normalScale={new THREE.Vector2(1.4, 1.4)}
+        roughness={0.3}
+        metalness={0}
+        clearcoat={0.4}
+        clearcoatRoughness={0.25}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  )
+}
+
+Overflow.propTypes = {
+  from: PropTypes.number.isRequired,
+  to: PropTypes.number.isRequired,
+  topRadius: PropTypes.number.isRequired,
+  bottomRadius: PropTypes.number.isRequired,
+  color: PropTypes.string
 }
 
 /**
@@ -297,7 +514,7 @@ WaterJet.propTypes = {
  * under a pool has to sit further below it than the waves are tall.
  */
 export const POOLS = {
-  basin: { water: 0.33, floor: 0.26, radius: 2.54, amplitude: 0.045 },
+  basin: { water: 0.33, floor: 0.26, radius: 2.54, amplitude: 0.028 },
   middle: { water: 1.185, floor: 1.15, radius: 1.22, amplitude: 0.016 },
   upper: { water: 1.89, floor: 1.87, radius: 0.58, amplitude: 0.012 }
 }
@@ -311,7 +528,22 @@ export const POOLS = {
  */
 export const POOL_CLEARANCE = 1.5
 
-/** The two sets of jets, in one place: the shape of each arc and where it starts. */
+/**
+ * The two dishes water comes over the edge of.
+ *
+ * Each is a plate wider at the bottom than at the top, so water going over
+ * the lip runs down the outside of the flare and falls from its lower edge,
+ * which is where the curtain hangs from and how wide it is. Hanging it from
+ * the lip instead put the sheet inside the plate, and it appeared to come out
+ * of the underside.
+ */
+const MIDDLE_TIER = { lip: 1.28, edge: 1.48, underside: 0.93 }
+const UPPER_TIER = { lip: 0.64, edge: 0.78, underside: 1.67 }
+
+/** How far a falling sheet carries outward on its way down. */
+const FLARE = 0.14
+
+/** The crown, at the top: the one place the fountain still throws water. */
 const CROWN_JET = {
   from: 2.36,
   speed: 0.95,
@@ -319,63 +551,43 @@ const CROWN_JET = {
   lands: POOLS.upper.water,
   radius: 0.035
 }
-const OUTER_JET = {
-  from: 1.2,
-  ring: 1.05,
-  speed: 1.55,
-  rise: 0.72,
-  lands: POOLS.basin.water,
-  radius: 0.042
-}
-
 /** How far out a jet of this shape comes down, from where it left. */
 function reachOf({ from, speed, rise, lands }) {
   const arc = jetArc({ speed, rise, landingY: lands - from })
   return arc[arc.length - 1].x
 }
 
-function Fountain() {
-  // Where the outer ring of jets leaves the middle tier, and where it comes
-  // down in the basin. The second is what the basin's waves run out from.
-  const outerJets = useMemo(
-    () =>
-      [0, 1, 2, 3, 4, 5].map((i) => {
-        const angle = (i / 6) * Math.PI * 2
-        return { angle, x: Math.cos(angle) * 1.05, z: Math.sin(angle) * 1.05 }
-      }),
+function Fountain({ isNight = false }) {
+  // Where each tier's rim is, and how far the water lands from the middle
+  // when it comes over. A curtain leaving a lip keeps going the way it was
+  // going, so it lands a little outside the rim it left.
+  const rims = useMemo(
+    () => ({
+      // From the top dish down into the middle one.
+      upper: { from: UPPER_TIER.underside, radius: UPPER_TIER.edge, lands: UPPER_TIER.edge + FLARE },
+      // And from the middle one down into the basin.
+      middle: {
+        from: MIDDLE_TIER.underside,
+        radius: MIDDLE_TIER.edge,
+        lands: MIDDLE_TIER.edge + FLARE
+      }
+    }),
     []
   )
 
   // A pool's coordinates are its own: the disc is built in XY and laid flat,
   // so a point on it is [x, z] of the fountain read as [x, y] of the disc,
-  // with how hard the water is hit as the third number. Where each arc comes
-  // down is solved from the arc itself rather than guessed, so moving a jet
-  // moves the waves it makes.
-  const basinImpacts = useMemo(() => {
-    const landing = OUTER_JET.ring + reachOf(OUTER_JET)
-    return [
-      ...outerJets.map((jet) => [
-        Math.cos(jet.angle) * landing,
-        Math.sin(jet.angle) * landing,
-        1
-      ]),
-      // What runs down the stem, which arrives in the middle.
-      [0, 0, 0.5]
-    ]
-  }, [outerJets])
+  // with how hard the water is hit as the third number.
+  //
+  // The basin and the middle dish are fed by a curtain, which lands in a
+  // circle rather than at points, so their waves run out from a ring.
+  const basinRing = useMemo(() => [rims.middle.lands, 1], [rims])
+  const middleRing = useMemo(() => [rims.upper.lands, 0.8], [rims])
 
-  // The middle pool is fed over the rim of the one above it: a ring of spill
-  // rather than a jet, so it is softer and there is more of it.
-  const middleImpacts = useMemo(
-    () =>
-      [0, 1, 2, 3, 4, 5].map((i) => {
-        const angle = (i / 6) * Math.PI * 2 + 0.3
-        return [Math.cos(angle) * 0.34, Math.sin(angle) * 0.34, 0.6]
-      }),
-    []
-  )
+  // What runs down the stem and arrives in the middle of the basin.
+  const basinImpacts = useMemo(() => [[0, 0, 0.45]], [])
 
-  // The eight crown jets come down as a ring in the top pool.
+  // The eight crown jets do still come down as points, in the top dish.
   const upperImpacts = useMemo(() => {
     const landing = reachOf(CROWN_JET)
     return [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
@@ -423,10 +635,14 @@ function Fountain() {
       <WaterSurface
         position={[0, POOLS.basin.water, 0]}
         radius={POOLS.basin.radius}
-        color="#2f9dc4"
-        opacity={0.86}
+        color="#1f7fa8"
+        alpha={0.82}
         impacts={basinImpacts}
+        ring={basinRing}
         amplitude={POOLS.basin.amplitude}
+        reflects
+        resolution={256}
+        isNight={isNight}
       />
 
       {/* Central stem */}
@@ -446,11 +662,19 @@ function Fountain() {
       <WaterSurface
         position={[0, POOLS.middle.water, 0]}
         radius={POOLS.middle.radius}
-        color="#43b5d8"
-        opacity={0.8}
+        color="#2f9dc4"
+        alpha={0.78}
         drift={1.5}
-        impacts={middleImpacts}
+        ring={middleRing}
         amplitude={POOLS.middle.amplitude}
+      />
+
+      {/* And over its rim, the whole way round, into the basin. */}
+      <Overflow
+        from={rims.middle.from}
+        to={POOLS.basin.water}
+        topRadius={rims.middle.radius}
+        bottomRadius={rims.middle.lands}
       />
 
       <mesh position={[0, 1.48, 0]} castShadow receiveShadow>
@@ -466,11 +690,19 @@ function Fountain() {
       <WaterSurface
         position={[0, POOLS.upper.water, 0]}
         radius={POOLS.upper.radius}
-        color="#57c8ea"
-        opacity={0.78}
+        color="#3fb8dd"
+        alpha={0.76}
         drift={2.2}
         impacts={upperImpacts}
         amplitude={POOLS.upper.amplitude}
+      />
+
+      {/* Over the top dish's rim into the middle one. */}
+      <Overflow
+        from={rims.upper.from}
+        to={POOLS.middle.water}
+        topRadius={rims.upper.radius}
+        bottomRadius={rims.upper.lands}
       />
 
       <mesh position={[0, 2.12, 0]} castShadow receiveShadow>
@@ -493,22 +725,6 @@ function Fountain() {
         />
       ))}
 
-      {/* Middle tier throws out to the big pool below */}
-      {outerJets.map((jet, i) => (
-        <WaterJet
-          key={`outer-${i}`}
-          // Above the tier's lip, not under it. At 1.06 the nozzle sat below
-          // the pool it draws from and the arc only appeared halfway down.
-          position={[jet.x, OUTER_JET.from, jet.z]}
-          angle={jet.angle}
-          speed={OUTER_JET.speed}
-          rise={OUTER_JET.rise}
-          landingY={OUTER_JET.lands - OUTER_JET.from}
-          radius={OUTER_JET.radius}
-          idx={i + 8}
-        />
-      ))}
-
       {/* Finial */}
       <mesh position={[0, 2.5, 0]} castShadow>
         <sphereGeometry args={[0.09, 12, 12]} />
@@ -525,6 +741,10 @@ function Fountain() {
       <pointLight position={[0, 2.3, 0]} intensity={0.5} distance={3} color="#a8e8ff" decay={2} />
     </group>
   )
+}
+
+Fountain.propTypes = {
+  isNight: PropTypes.bool
 }
 
 export default Fountain

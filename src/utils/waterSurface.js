@@ -147,6 +147,14 @@ export const WATER_HEIGHT_GLSL = /* glsl */ `
       h += ring * exp(-r * 0.85) * (1.0 - exp(-r * 5.0)) * ripple.z * 1.3;
     }
 
+    // Water coming over a rim lands in a circle rather than at a point, so
+    // its waves run out from a ring: inward to the middle and outward to the
+    // wall, from everywhere along it at once. uRing is [radius, strength].
+    if (uRing.y > 0.0) {
+      float dr = abs(length(p) - uRing.x) + 0.0001;
+      h += sin(dr * 8.0 - uTime * 4.5) * exp(-dr * 0.8) * (1.0 - exp(-dr * 4.0)) * uRing.y * 1.4;
+    }
+
     return h * uAmplitude;
   }
 `
@@ -290,4 +298,89 @@ export function taperTube(geometry, curve, { tip = 0.45, beat = 0.14 } = {}) {
   position.needsUpdate = true
   geometry.computeVertexNormals()
   return geometry
+}
+
+/**
+ * A sheet of water coming over a rim.
+ *
+ * What falls from one tier of a fountain to the next is not a jet, it is a
+ * curtain: the bowl fills, the water goes over the edge all the way round and
+ * comes down as a sheet, thinning and breaking as it falls. The geometry is
+ * an open cylinder flaring slightly outward, and what makes it read is the
+ * texture scrolling down it rather than any movement of the mesh.
+ *
+ * @param {Object} [options]
+ * @param {number} [options.strength=1.1] - How hard the ribs read.
+ * @returns {{ normalMap: THREE.CanvasTexture, alphaMap: THREE.CanvasTexture }}
+ */
+export function createFallingSheetMaps({ strength = 1.1 } = {}) {
+  const width = 96
+  const height = 128
+  const tau = Math.PI * 2
+
+  // u runs around the curtain, v down it. Every term uses whole cycles in u so
+  // the sheet closes on itself with no seam.
+  const field = (u, v) => {
+    let value = Math.sin(u * tau * 9) * 0.45
+    value += Math.sin(u * tau * 17 + v * 2.1) * 0.25
+    value += Math.sin(u * tau * 5 - v * 3.7) * 0.2
+    // Down the fall the sheet breaks up: the fine detail grows with v.
+    value += Math.sin(u * tau * 31 + v * 9.0) * 0.12 * v
+    return value
+  }
+
+  const normalCanvas = document.createElement('canvas')
+  normalCanvas.width = width
+  normalCanvas.height = height
+  const normalContext = normalCanvas.getContext('2d')
+  const normalImage = normalContext.createImageData(width, height)
+
+  const alphaCanvas = document.createElement('canvas')
+  alphaCanvas.width = width
+  alphaCanvas.height = height
+  const alphaContext = alphaCanvas.getContext('2d')
+  const alphaImage = alphaContext.createImageData(width, height)
+
+  const stepU = 1 / width
+  const stepV = 1 / height
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const u = x / width
+      const v = y / height
+
+      const du = (field(u + stepU, v) - field(u - stepU, v)) * strength
+      const dv = (field(u, v + stepV) - field(u, v - stepV)) * strength
+      const length = Math.hypot(-du, -dv, 1)
+
+      const index = (y * width + x) * 4
+      normalImage.data[index] = ((-du / length) * 0.5 + 0.5) * 255
+      normalImage.data[index + 1] = ((-dv / length) * 0.5 + 0.5) * 255
+      normalImage.data[index + 2] = ((1 / length) * 0.5 + 0.5) * 255
+      normalImage.data[index + 3] = 255
+
+      // Solid where it leaves the rim, holed and thinning by the time it
+      // lands, and never quite opaque anywhere.
+      const gaps = Math.max(0, field(u, v)) * 0.35 * v
+      const alpha = Math.min(1, Math.max(0, 0.92 - v * 0.45 - gaps))
+      const level = alpha * 255
+      alphaImage.data[index] = level
+      alphaImage.data[index + 1] = level
+      alphaImage.data[index + 2] = level
+      alphaImage.data[index + 3] = 255
+    }
+  }
+
+  normalContext.putImageData(normalImage, 0, 0)
+  alphaContext.putImageData(alphaImage, 0, 0)
+
+  const wrap = (canvas) => {
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    texture.colorSpace = THREE.NoColorSpace
+    return texture
+  }
+
+  return { normalMap: wrap(normalCanvas), alphaMap: wrap(alphaCanvas) }
 }

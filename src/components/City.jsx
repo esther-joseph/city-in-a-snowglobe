@@ -1280,7 +1280,7 @@ function City({
       />
       
       {/* Fountain */}
-        <Fountain />
+        <Fountain isNight={isNight} />
 
         {/* Benches */}
         {benches.map((bench, index) => (
