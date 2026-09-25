@@ -1,0 +1,80 @@
+/* Matches ModeToggle, which sits directly above it in the panel. */
+.ar-viewpoints {
+  width: 100%;
+  padding: 18px 20px 20px;
+  border-radius: 18px;
+  background: rgba(9, 12, 24, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ar-viewpoints__header h3 {
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.ar-viewpoints__header p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ar-viewpoints__modes,
+.ar-viewpoints__spots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ar-viewpoints__mode,
+.ar-viewpoints__spot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.ar-viewpoints__mode:hover,
+.ar-viewpoints__spot:hover {
+  border-color: rgba(240, 191, 85, 0.45);
+}
+
+.ar-viewpoints__mode.active,
+.ar-viewpoints__spot.active {
+  background: rgba(240, 191, 85, 0.14);
+  border-color: rgba(240, 191, 85, 0.7);
+}
+
+.ar-viewpoints__mode-label,
+.ar-viewpoints__spot-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.ar-viewpoints__mode-note,
+.ar-viewpoints__spot-note {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.35;
+}
+
+/* The spots are a step in from the two modes, since they belong to one. */
+.ar-viewpoints__spots {
+  padding-left: 10px;
+  border-left: 1px solid rgba(240, 191, 85, 0.3);
+}

@@ -6,7 +6,7 @@ import { XR, XROrigin, createXRStore } from '@react-three/xr'
 import City from './components/City'
 import WeatherEffects from './components/WeatherEffects'
 import WeatherDrawer from './components/WeatherDrawer'
-import { SNOW_GLOBE_CONTENT_SCALE } from './components/SnowGlobe'
+import { SNOW_GLOBE_CONTENT_SCALE, SNOW_GLOBE_CITY_Y } from './components/SnowGlobe'
 import Sun from './components/environment/Sun'
 import Moon from './components/environment/Moon'
 import StarField from './components/environment/StarField'
@@ -23,6 +23,7 @@ import CameraFeedBackground from './components/ar/CameraFeedBackground'
 import DeviceOrientationCamera from './components/ar/DeviceOrientationCamera'
 import ARSceneControls from './components/ar/ARSceneControls'
 import FitToMeters from './components/ar/FitToMeters'
+import { AR_VIEWS, getViewpoint, getViewpoints, originFor } from './utils/arViewpoints'
 import {
   AR_MODES,
   getARCapability,
@@ -43,6 +44,25 @@ import CityClock from './components/CityClock'
 // so the session still starts on devices that lack some of them — which is
 // what makes it work on both ARCore (Android) and ARKit (iOS 17+ Safari).
 const xrStore = createXRStore()
+
+// Observational AR: the globe as an object in the room. Roughly the size of a
+// real snow globe, set down about an arm's length ahead at the height of a
+// table, so the viewer can lean in or walk around it. It is parked in world
+// space rather than pinned to the viewer, which is what makes walking around
+// it work; putting it on a surface the device has actually found is a separate
+// job from this one.
+const OBSERVATIONAL_DIAMETER = 0.45
+const OBSERVATIONAL_PLACEMENT = [0, 0.9, -0.7]
+const ORIGIN_AT_START = { position: [0, 0, 0], rotation: [0, 0, 0] }
+
+// Immersive AR: the park at its own scale. The city is modelled in units that
+// already read as metres — a bench is 2.4 across and its seat is half a metre
+// up — but it is then shrunk to fit inside the globe. Undoing exactly that
+// shrink is what makes a tower a tower and the dome a sky.
+const LIFE_SIZE = 1 / SNOW_GLOBE_CONTENT_SCALE
+// And where the park's ground ends up once it has been scaled back: the city
+// sits above the globe's base, not on the floor.
+const PARK_FLOOR = SNOW_GLOBE_CITY_Y * LIFE_SIZE
 
 const SEASON_NAMES = ['winter', 'spring', 'summer', 'autumn']
 
@@ -733,18 +753,19 @@ function resolveCityProfile(cityName) {
   return cityProfiles[normalized] || defaultCityProfile
 }
 
+// The camera fallback's own controls, matched to the ones the WebXR session
+// draws inside the scene: rounded, black, and lighter at the top.
 const arControlStyle = {
   pointerEvents: 'auto',
-  padding: '12px 20px',
-  backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  padding: '12px 22px',
+  background: 'linear-gradient(180deg, #20242e 0%, #000000 100%)',
   color: '#fff',
-  border: '2px solid rgba(255, 255, 255, 0.25)',
+  border: '1px solid rgba(255, 255, 255, 0.16)',
   borderRadius: '999px',
   fontSize: '15px',
   fontWeight: 600,
   cursor: 'pointer',
-  backdropFilter: 'blur(12px)',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.35)'
+  boxShadow: '0 6px 16px rgba(0,0,0,0.45)'
 }
 
 /**
@@ -929,6 +950,10 @@ function App() {
   const [arMode, setArMode] = useState(null)
   const [arNotice, setArNotice] = useState(null)
   const [arHeading, setArHeading] = useState(0)
+  // Where the viewer is, once a WebXR session is running: either outside the
+  // globe looking in, or standing at one of the three spots in the park.
+  const [arView, setArView] = useState(AR_VIEWS.OBSERVATIONAL)
+  const [arSpot, setArSpot] = useState('fountain')
   const sceneRef = useRef(null)
   const [arSessionKey, setArSessionKey] = useState(0)
   const [shakeTrigger, setShakeTrigger] = useState(0)
@@ -992,6 +1017,28 @@ function App() {
       setLoading(false)
     }
   }
+
+  const arViewpoints = useMemo(() => getViewpoints(), [])
+
+  /**
+   * Picking a place from inside the session is a request to be there, so it
+   * carries the switch to immersive with it. Nobody taps "Fountain" hoping to
+   * keep looking at the globe from outside.
+   */
+  const goToSpot = useCallback((id) => {
+    setArSpot(id)
+    setArView(AR_VIEWS.IMMERSIVE)
+  }, [])
+
+  // Observational leaves the viewer where the session started; immersive puts
+  // them at the spot they picked, turned to face what that spot is for.
+  const arOrigin = useMemo(
+    () =>
+      arView === AR_VIEWS.IMMERSIVE
+        ? originFor(getViewpoint(arSpot), { floor: PARK_FLOOR })
+        : ORIGIN_AT_START,
+    [arView, arSpot]
+  )
 
   const prevRenderModeRef = useRef(renderMode)
 
@@ -1473,6 +1520,10 @@ function App() {
             onRainToggle={setForceRain}
             forceRain={forceRain}
         renderMode={renderMode}
+        arView={arView}
+        arSpot={arSpot}
+        onArViewChange={setArView}
+        onArSpotChange={setArSpot}
         initiallyOpen={launch.panelOpen}
         onRenderModeChange={handleRenderModeChange}
         weatherService={weatherService}
@@ -1586,23 +1637,41 @@ function App() {
             <XR store={xrStore}>
               {/* XROrigin = where the user stands. v6 normalises to the
                   'local-floor' reference space on BOTH ARCore and ARKit, so y=0
-                  is the real floor on every device — no more platform-specific
-                  head-height hack. Standing the user at +Z and facing −Z puts the
-                  fountain (scene origin) ~1.4 m (a few feet) directly ahead.
-                  Tweak XR_VIEW_DISTANCE / XR_GROUND_OFFSET on-device to taste. */}
-              {(() => {
-                const XR_VIEW_DISTANCE = 1.4   // metres the user stands from centre (~4.5 ft)
-                const XR_GROUND_OFFSET = 0      // raise (+) / lower (−) the user vs. the scene floor
-                return <XROrigin position={[0, XR_GROUND_OFFSET, XR_VIEW_DISTANCE]} />
-              })()}
+                  is the real floor on every device.
+
+                  Observational leaves the origin alone and shrinks the globe
+                  onto the space in front of the viewer, so walking around the
+                  room walks around the globe. Immersive keeps the park at its
+                  own scale and moves the viewer instead, to the spot they
+                  picked and facing what that spot is for. */}
+              <XROrigin position={arOrigin.position} rotation={arOrigin.rotation} />
               <Suspense fallback={null}>
-                <ShakeableScene shakeTrigger={shakeTrigger}>
-                  <BaseScene includeSky={false} {...sceneProps} />
-                </ShakeableScene>
-                <ARSceneControls
-                  onShake={triggerShakeEffect}
-                  onExit={() => handleRenderModeChange('3d')}
-                />
+                {arView === AR_VIEWS.IMMERSIVE ? (
+                  <group scale={LIFE_SIZE}>
+                    <ShakeableScene shakeTrigger={shakeTrigger}>
+                      <BaseScene includeSky={false} {...sceneProps} />
+                    </ShakeableScene>
+                  </group>
+                ) : (
+                  <group position={OBSERVATIONAL_PLACEMENT}>
+                    <FitToMeters targetDiameter={OBSERVATIONAL_DIAMETER}>
+                      <ShakeableScene shakeTrigger={shakeTrigger}>
+                        <BaseScene includeSky={false} {...sceneProps} />
+                      </ShakeableScene>
+                    </FitToMeters>
+                  </group>
+                )}
+                {/* The controls travel with the viewer. At park scale a panel
+                    fixed to the world would be left standing in the fountain
+                    the moment they moved to another spot. */}
+                <group position={arOrigin.position} rotation={arOrigin.rotation}>
+                  <ARSceneControls
+                    spots={arViewpoints}
+                    activeSpot={arView === AR_VIEWS.IMMERSIVE ? arSpot : null}
+                    onSelectSpot={goToSpot}
+                    onExit={() => handleRenderModeChange('3d')}
+                  />
+                </group>
               </Suspense>
             </XR>
       </Canvas>
@@ -1661,9 +1730,8 @@ function App() {
               zIndex: 60
             }}
           >
-            <button onClick={triggerShakeEffect} style={arControlStyle}>
-              ✨ Shake
-            </button>
+            {/* No shake button in AR. What the controls are for here is
+                getting around the globe, not rattling it. */}
             <button
               onClick={() => setArHeading((heading) => heading + Math.PI / 12)}
               style={arControlStyle}

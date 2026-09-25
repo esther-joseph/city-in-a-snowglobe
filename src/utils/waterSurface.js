@@ -114,3 +114,180 @@ export function jetArc({ speed, rise, gravity = 9.8, landingY, samples = 14 }) {
   }
   return points
 }
+
+/**
+ * The height of a pool, as GLSL.
+ *
+ * Shared by the vertex shader that displaces the surface and the one that
+ * works out which way it is then facing, so there is one description of the
+ * water and not two that can disagree.
+ *
+ * Three crossing swells at different rates give a surface that never repeats
+ * on any axis the eye can follow. The rings are the part that matters: each
+ * one is a train of waves running outward from where a jet lands, losing
+ * height as it goes, which is what a disturbed pool actually does and what a
+ * spreading torus only suggested.
+ */
+export const WATER_HEIGHT_GLSL = /* glsl */ `
+  float waterHeight(vec2 p) {
+    float h = 0.0;
+    h += sin(p.x * 2.7 + uTime * 1.45) * 0.30;
+    h += sin((p.x * 0.9 + p.y * 2.1) - uTime * 1.05) * 0.42;
+    h += sin((p.y * 3.3 - p.x * 1.7) + uTime * 1.85) * 0.22;
+    h += sin((p.x * 5.9 + p.y * 4.7) - uTime * 2.6) * 0.11;
+
+    for (int i = 0; i < RIPPLE_COUNT; i += 1) {
+      vec3 ripple = uRipples[i];
+      float r = length(p - ripple.xy) + 0.0001;
+      // Outward train, damped with distance, and softened at the source so
+      // the very middle of an impact is not a spike.
+      float ring = sin(r * 9.0 - uTime * 5.0);
+      // Slow decay: a ring that dies within its own first wavelength is a
+      // dimple, not a ripple, and the far side of a basin never sees it.
+      h += ring * exp(-r * 0.85) * (1.0 - exp(-r * 5.0)) * ripple.z * 1.3;
+    }
+
+    return h * uAmplitude;
+  }
+`
+
+/**
+ * Streaks and droplets along a jet.
+ *
+ * A jet with a plain surface reads as a glass rod. Water leaving a nozzle is
+ * ribbed along its length and breaking up by the time it lands, so this is a
+ * height field of lengthwise streaks with beads scattered through it, turned
+ * into a normal map the same way the pool's is.
+ *
+ * @param {Object} [options]
+ * @param {number} [options.strength=1.4]
+ * @returns {{ normalMap: THREE.CanvasTexture, roughnessMap: THREE.CanvasTexture }}
+ */
+export function createJetStreakMaps({ strength = 1.4 } = {}) {
+  const width = 128
+  const height = 64
+  const tau = Math.PI * 2
+
+  // Beads, placed once so the two maps agree.
+  const beads = []
+  for (let i = 0; i < 26; i += 1) {
+    beads.push({
+      u: (i * 0.3797) % 1,
+      v: (i * 0.618) % 1,
+      r: 0.03 + ((i * 0.37) % 1) * 0.05,
+      weight: 0.5 + ((i * 0.71) % 1) * 0.6
+    })
+  }
+
+  const field = (u, v) => {
+    // Ribs running along the jet, at a few widths so no single stripe reads.
+    let value = Math.sin(v * tau * 7) * 0.5 + Math.sin(v * tau * 13 + u * tau) * 0.28
+    value += Math.sin(u * tau * 3 + v * tau * 2) * 0.22
+
+    for (const bead of beads) {
+      // Wrapped distance: the map tiles along the jet.
+      const du = Math.abs(((u - bead.u + 0.5) % 1) - 0.5)
+      const dv = Math.abs(((v - bead.v + 0.5) % 1) - 0.5)
+      const distance = Math.hypot(du, dv)
+      if (distance < bead.r) {
+        const falloff = Math.cos((distance / bead.r) * (Math.PI / 2))
+        value += falloff * falloff * bead.weight
+      }
+    }
+    return value
+  }
+
+  const normalCanvas = document.createElement('canvas')
+  normalCanvas.width = width
+  normalCanvas.height = height
+  const normalContext = normalCanvas.getContext('2d')
+  const normalImage = normalContext.createImageData(width, height)
+
+  const roughCanvas = document.createElement('canvas')
+  roughCanvas.width = width
+  roughCanvas.height = height
+  const roughContext = roughCanvas.getContext('2d')
+  const roughImage = roughContext.createImageData(width, height)
+
+  const stepU = 1 / width
+  const stepV = 1 / height
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const u = x / width
+      const v = y / height
+
+      const du = (field(u + stepU, v) - field(u - stepU, v)) * strength
+      const dv = (field(u, v + stepV) - field(u, v - stepV)) * strength
+      const length = Math.hypot(-du, -dv, 1)
+
+      const index = (y * width + x) * 4
+      normalImage.data[index] = ((-du / length) * 0.5 + 0.5) * 255
+      normalImage.data[index + 1] = ((-dv / length) * 0.5 + 0.5) * 255
+      normalImage.data[index + 2] = ((1 / length) * 0.5 + 0.5) * 255
+      normalImage.data[index + 3] = 255
+
+      // A bead is a smooth droplet; the ribs between them scatter more.
+      const rough = Math.min(1, Math.max(0, 0.34 - field(u, v) * 0.16))
+      const level = rough * 255
+      roughImage.data[index] = level
+      roughImage.data[index + 1] = level
+      roughImage.data[index + 2] = level
+      roughImage.data[index + 3] = 255
+    }
+  }
+
+  normalContext.putImageData(normalImage, 0, 0)
+  roughContext.putImageData(roughImage, 0, 0)
+
+  const wrap = (canvas, colorSpace) => {
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    texture.colorSpace = colorSpace
+    return texture
+  }
+
+  return {
+    normalMap: wrap(normalCanvas, THREE.NoColorSpace),
+    roughnessMap: wrap(roughCanvas, THREE.NoColorSpace)
+  }
+}
+
+/**
+ * Narrow a swept tube along its own length.
+ *
+ * TubeGeometry is one thickness from end to end, which is why the jets read
+ * as pipes. A jet leaves the nozzle at its fullest, stretches as it speeds up
+ * over the top, and is coming apart by the time it lands, so this pulls every
+ * ring in toward the curve by a factor of how far along it is, with a slow
+ * beat along the way for the beads a real stream breaks into.
+ *
+ * @param {THREE.BufferGeometry} geometry - From TubeGeometry.
+ * @param {THREE.Curve} curve - The same curve it was swept along.
+ * @param {Object} [options]
+ * @param {number} [options.tip=0.45] - Fraction of the radius left at the end.
+ * @param {number} [options.beat=0.14] - How much it swells and narrows.
+ * @returns {THREE.BufferGeometry} The same geometry, modified.
+ */
+export function taperTube(geometry, curve, { tip = 0.45, beat = 0.14 } = {}) {
+  const position = geometry.attributes.position
+  const uv = geometry.attributes.uv
+  const point = new THREE.Vector3()
+  const vertex = new THREE.Vector3()
+
+  for (let i = 0; i < position.count; i += 1) {
+    // TubeGeometry writes distance along the tube into u.
+    const t = uv.getX(i)
+    curve.getPointAt(Math.min(1, Math.max(0, t)), point)
+    vertex.fromBufferAttribute(position, i)
+
+    const scale = (1 - (1 - tip) * t) * (1 + Math.sin(t * Math.PI * 5.5) * beat)
+    vertex.sub(point).multiplyScalar(scale).add(point)
+    position.setXYZ(i, vertex.x, vertex.y, vertex.z)
+  }
+
+  position.needsUpdate = true
+  geometry.computeVertexNormals()
+  return geometry
+}
