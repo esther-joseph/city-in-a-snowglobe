@@ -12,6 +12,7 @@ import {
 } from '../utils/parkLayout'
 import SeasonalFall from './city/SeasonalFall'
 import { getSeasonPalette, SEASONS } from '../utils/seasons'
+import FlowerBeds from './city/FlowerBeds'
 
 const WINDOW_DAY_COLOR = '#4a90e2' // Reflective blue for daytime
 const WINDOW_NIGHT_COLOR = '#0b1623'
@@ -1169,7 +1170,7 @@ function City({
         if (!spot) continue
         beds.push({
           key: `flower-${ringIndex}-${i}`,
-          position: [spot[0], 0.14, spot[1]],
+          position: [spot[0], 0.1, spot[1]],
           radius: ring.radius,
           // Offset per ring so neighbouring rings do not line up in stripes.
           color: colors[(i + ringIndex * 2) % colors.length]
@@ -1251,17 +1252,12 @@ function City({
       </mesh>
 
       {/* Flower beds. Hidden in winter. */}
-      {flowerBeds.map((bed) => (
-        <mesh key={bed.key} position={bed.position} receiveShadow>
-          <cylinderGeometry args={[bed.radius, bed.radius, 0.07, 6]} />
-          <meshStandardMaterial
-            color={bed.color}
-            roughness={0.7}
-            emissive={bed.color}
-            emissiveIntensity={0.14}
-          />
-        </mesh>
-      ))}
+      <FlowerBeds
+        beds={flowerBeds}
+        leafColor={seasonPalette.grassTuft}
+        windDirection={windDirection}
+        windSpeed={windSpeed}
+      />
       
       {/* Fountain */}
         <Fountain />

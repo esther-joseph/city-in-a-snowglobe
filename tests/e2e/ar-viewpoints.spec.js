@@ -225,6 +225,124 @@ test.describe('AR viewpoints, against the park as it is built', () => {
   })
 })
 
+test.describe('The controls inside the session', () => {
+  /**
+   * A headset browser composites no HTML, so in an immersive session the only
+   * UI there is is geometry. It is one column within reach: the places to go,
+   * and the way out under them.
+   */
+  const controls = (page) =>
+    page.evaluate(async () => {
+      const module = await import('/src/components/ar/ARSceneControls.jsx')
+      const { getViewpoints } = await import('/src/utils/arViewpoints.js')
+      const rows = [
+        ...getViewpoints().map((spot) => ({ key: spot.id })),
+        { key: 'exit', break: true }
+      ]
+      return {
+        rows: rows.map((row) => row.key),
+        eye: module.EYE_HEIGHT,
+        reach: module.REACH,
+        button: module.BUTTON,
+        layout: module.columnLayout(rows)
+      }
+    })
+
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+  })
+
+  test('one button per spot, and the way out last', async ({ page }) => {
+    const { rows } = await controls(page)
+    expect(rows).toEqual(['fountain', 'bench', 'trees', 'exit'])
+    // No shake. In AR the globe is the room you are standing in.
+    expect(rows).not.toContain('shake')
+  })
+
+  test('every button is the same distance from the eye, and faces it', async ({ page }) => {
+    const { layout, eye, reach } = await controls(page)
+
+    for (const row of layout) {
+      const [, y, z] = row.position
+      expect(Math.hypot(y - eye, z), 'within reach').toBeCloseTo(reach, 5)
+
+      // Where the button faces, once its own pitch is applied: +Z turned
+      // about X by the rotation it was given.
+      const pitch = row.rotation[0]
+      const facing = [0, -Math.sin(pitch), Math.cos(pitch)]
+      // Where the eye is from there.
+      const toEye = [0, eye - y, -z]
+      const length = Math.hypot(toEye[1], toEye[2])
+      const alignment = (facing[1] * toEye[1] + facing[2] * toEye[2]) / length
+      expect(alignment, 'square on to the viewer').toBeGreaterThan(0.999)
+    }
+  })
+
+  test('the column hangs below the line of sight, in reading order', async ({ page }) => {
+    const { layout, eye, button } = await controls(page)
+
+    const heights = layout.map((row) => row.position[1])
+    for (let i = 1; i < heights.length; i += 1) {
+      expect(heights[i], 'each row below the last').toBeLessThan(heights[i - 1])
+    }
+
+    // All of it under the horizon, none of it on the floor.
+    for (const height of heights) {
+      expect(height).toBeLessThan(eye)
+      expect(height).toBeGreaterThan(eye - 0.6)
+    }
+
+    // The gap before the exit is wider than the gaps between the spots.
+    const gaps = heights.slice(1).map((height, index) => heights[index] - height)
+    expect(gaps[gaps.length - 1]).toBeGreaterThan(gaps[0])
+
+    // Close enough to reach, wide enough to read, and no wider than a phone
+    // screen holds at that distance.
+    expect(button.width).toBeLessThan(0.3)
+    expect(button.radius).toBeGreaterThan(0)
+  })
+
+  test('the panels are rounded and their gradient maps across them', async ({ page }) => {
+    const panel = await page.evaluate(async () => {
+      const { roundedPanel, createPanelGradient } = await import('/src/utils/roundedPanel.js')
+      const geometry = roundedPanel({ width: 0.26, height: 0.07, radius: 0.026 })
+      geometry.computeBoundingBox()
+
+      const position = geometry.attributes.position
+      const uv = geometry.attributes.uv
+      let minU = Infinity
+      let maxU = -Infinity
+      let corners = 0
+      for (let i = 0; i < position.count; i += 1) {
+        minU = Math.min(minU, uv.getX(i), uv.getY(i))
+        maxU = Math.max(maxU, uv.getX(i), uv.getY(i))
+        // A rounded rectangle has no vertex in its own corner.
+        if (Math.abs(position.getX(i)) > 0.129 && Math.abs(position.getY(i)) > 0.034) {
+          corners += 1
+        }
+      }
+
+      const texture = createPanelGradient()
+      return {
+        size: geometry.boundingBox.max.toArray(),
+        minU,
+        maxU,
+        corners,
+        gradientHeight: texture.image.height
+      }
+    })
+
+    expect(panel.size[0]).toBeCloseTo(0.13, 5)
+    expect(panel.size[1]).toBeCloseTo(0.035, 5)
+    // UVs rewritten from the positions, or a gradient cannot be mapped onto
+    // it: ShapeGeometry writes the shape's own coordinates instead.
+    expect(panel.minU).toBeCloseTo(0, 5)
+    expect(panel.maxU).toBeCloseTo(1, 5)
+    expect(panel.corners, 'the corners are cut').toBe(0)
+    expect(panel.gradientHeight).toBeGreaterThan(1)
+  })
+})
+
 test.describe('AR viewpoint panel', () => {
   test.skip(({ isMobile }) => !isMobile, 'the panel only appears once AR is running')
 

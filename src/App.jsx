@@ -23,7 +23,7 @@ import CameraFeedBackground from './components/ar/CameraFeedBackground'
 import DeviceOrientationCamera from './components/ar/DeviceOrientationCamera'
 import ARSceneControls from './components/ar/ARSceneControls'
 import FitToMeters from './components/ar/FitToMeters'
-import { AR_VIEWS, getViewpoint, originFor } from './utils/arViewpoints'
+import { AR_VIEWS, getViewpoint, getViewpoints, originFor } from './utils/arViewpoints'
 import {
   AR_MODES,
   getARCapability,
@@ -753,18 +753,19 @@ function resolveCityProfile(cityName) {
   return cityProfiles[normalized] || defaultCityProfile
 }
 
+// The camera fallback's own controls, matched to the ones the WebXR session
+// draws inside the scene: rounded, black, and lighter at the top.
 const arControlStyle = {
   pointerEvents: 'auto',
-  padding: '12px 20px',
-  backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  padding: '12px 22px',
+  background: 'linear-gradient(180deg, #20242e 0%, #000000 100%)',
   color: '#fff',
-  border: '2px solid rgba(255, 255, 255, 0.25)',
+  border: '1px solid rgba(255, 255, 255, 0.16)',
   borderRadius: '999px',
   fontSize: '15px',
   fontWeight: 600,
   cursor: 'pointer',
-  backdropFilter: 'blur(12px)',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.35)'
+  boxShadow: '0 6px 16px rgba(0,0,0,0.45)'
 }
 
 /**
@@ -1016,6 +1017,18 @@ function App() {
       setLoading(false)
     }
   }
+
+  const arViewpoints = useMemo(() => getViewpoints(), [])
+
+  /**
+   * Picking a place from inside the session is a request to be there, so it
+   * carries the switch to immersive with it. Nobody taps "Fountain" hoping to
+   * keep looking at the globe from outside.
+   */
+  const goToSpot = useCallback((id) => {
+    setArSpot(id)
+    setArView(AR_VIEWS.IMMERSIVE)
+  }, [])
 
   // Observational leaves the viewer where the session started; immersive puts
   // them at the spot they picked, turned to face what that spot is for.
@@ -1653,7 +1666,9 @@ function App() {
                     the moment they moved to another spot. */}
                 <group position={arOrigin.position} rotation={arOrigin.rotation}>
                   <ARSceneControls
-                    onShake={triggerShakeEffect}
+                    spots={arViewpoints}
+                    activeSpot={arView === AR_VIEWS.IMMERSIVE ? arSpot : null}
+                    onSelectSpot={goToSpot}
                     onExit={() => handleRenderModeChange('3d')}
                   />
                 </group>
@@ -1715,9 +1730,8 @@ function App() {
               zIndex: 60
             }}
           >
-            <button onClick={triggerShakeEffect} style={arControlStyle}>
-              ✨ Shake
-            </button>
+            {/* No shake button in AR. What the controls are for here is
+                getting around the globe, not rattling it. */}
             <button
               onClick={() => setArHeading((heading) => heading + Math.PI / 12)}
               style={arControlStyle}

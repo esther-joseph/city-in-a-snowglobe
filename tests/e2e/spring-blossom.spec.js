@@ -45,19 +45,35 @@ test.describe('Spring blossom', () => {
     await page.waitForTimeout(2500)
 
     const offGrass = await page.evaluate(async () => {
+      const THREE = await import('/node_modules/.vite/deps/three.js')
       const { fitsOnGrass } = await import('/src/utils/parkLayout.js')
+      const { getDaisyGeometry } = await import('/src/utils/daisy.js')
+
+      // The beds are daisies in instanced meshes now, one instance per bed,
+      // so the matrices are what carries a bed's position and size.
+      const sizes = new Set(
+        Object.values(getDaisyGeometry()).map((geometry) => geometry.attributes.position.count)
+      )
+      const matrix = new THREE.Matrix4()
+      const place = new THREE.Vector3()
+      const scale = new THREE.Vector3()
       const bad = []
       let counted = 0
+
       window.__snowGlobeScene.traverse((object) => {
-        if (!object.isMesh) return
-        const parameters = object.geometry?.parameters
-        if (!parameters || parameters.radialSegments !== 6) return
-        if (parameters.height === undefined || parameters.height > 0.1) return
-        counted += 1
-        // The park sits inside a scaled group, so the bed's own local
-        // position is what the layout rule is written against.
-        const { x, z } = object.position
-        if (!fitsOnGrass(x, z, parameters.radiusTop)) bad.push({ x, z })
+        if (!object.isInstancedMesh) return
+        if (!sizes.has(object.geometry.attributes.position.count)) return
+        for (let i = 0; i < object.count; i += 1) {
+          object.getMatrixAt(i, matrix)
+          place.setFromMatrixPosition(matrix)
+          scale.setFromMatrixScale(matrix)
+          counted += 1
+          // The park sits inside a scaled group, so the instance's own local
+          // position is what the layout rule is written against.
+          if (!fitsOnGrass(place.x, place.z, scale.x)) {
+            bad.push({ x: +place.x.toFixed(2), z: +place.z.toFixed(2) })
+          }
+        }
       })
       return { counted, bad }
     })
@@ -82,10 +98,13 @@ test.describe('Spring blossom', () => {
       const { SEASON_PALETTES, SEASONS } = await import('/src/utils/seasons.js')
       return SEASON_PALETTES[SEASONS.SPRING].flowers
     })
-    expect(palette.length).toBeGreaterThanOrEqual(8)
+    // Five, derived from the canopy rather than typed out. It used to be ten
+    // hand-picked ones, and the count is not the point: the spread is.
+    expect(palette.length).toBeGreaterThanOrEqual(4)
+    expect(new Set(palette).size, 'no two the same').toBe(palette.length)
 
-    // At least one bed that is clearly not a pink or a white: something with
-    // a dominant green or blue channel.
+    // At least one flower that is clearly not a pink or a white: something
+    // with a dominant green or blue channel.
     const hasOtherHues = palette.some((hex) => {
       const value = parseInt(hex.slice(1), 16)
       const r = (value >> 16) & 255
