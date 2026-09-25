@@ -8,10 +8,11 @@
  *
  * Positions are derived from the park's own dimensions rather than typed in,
  * so that moving a path or widening the grass moves the viewpoints with it.
- * The exceptions are the benches and the tree ring, which are placed by hand
- * in City.jsx; the constants below have to match, and say so.
+ * The bench is read from the list that places it. The tree ring is still
+ * City.jsx's own, and the constant below has to match it.
  */
 import { FOUNTAIN_RING } from './parkLayout'
+import { BENCHES } from './parkFurniture'
 
 export const AR_VIEWS = {
   OBSERVATIONAL: 'observational',
@@ -19,11 +20,15 @@ export const AR_VIEWS = {
 }
 
 /**
- * The bench on the north-east diagonal, as City.jsx places it: the group sits
- * at 0.25 with the seat 0.5 above that, and it is turned to face the fountain.
- * Hand-placed there, so these have to match.
+ * The bench on the north-east diagonal, read from the one list that holds
+ * them. Its group sits at 0.25 with the seat half a metre above that, and it
+ * is already turned to face the fountain.
  */
-const BENCH = { x: 6, z: 6, seat: 0.75 }
+const BENCH = {
+  x: BENCHES[0].position[0],
+  z: BENCHES[0].position[2],
+  seat: BENCHES[0].position[1] + BENCHES[0].seat - 0.25
+}
 
 /** Eye above the seat, sitting upright. */
 const SEATED_EYE = 0.75
