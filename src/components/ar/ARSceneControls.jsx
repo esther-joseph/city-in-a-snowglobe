@@ -56,7 +56,10 @@ ARButton.propTypes = {
 
 function ARSceneControls({ onShake, onExit }) {
   return (
-    <group position={[0, 0.78, 0.55]} rotation={[-0.32, 0, 0]}>
+    // Placed in the viewer's own frame, not the world's: -Z is the direction
+    // they are facing, so this is half a metre ahead of them and below eye
+    // level, tipped up to meet a downward glance.
+    <group position={[0, 0.78, -0.55]} rotation={[-0.32, 0, 0]}>
       <ARButton position={[-0.16, 0, 0]} label="Shake" onClick={onShake} />
       <ARButton position={[0.16, 0, 0]} label="Exit AR" onClick={onExit} />
     </group>

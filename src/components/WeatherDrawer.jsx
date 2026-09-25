@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import WeatherUI from './WeatherUI'
 import ModeToggle from './ModeToggle'
 import AdSlot from './ads/AdSlot'
+import ARViewpoints from './ar/ARViewpoints'
 
 function WeatherDrawer({
   weatherData,
@@ -24,6 +25,10 @@ function WeatherDrawer({
   forceRain,
   renderMode,
   onRenderModeChange,
+  arView,
+  arSpot,
+  onArViewChange,
+  onArSpotChange,
   weatherService,
   initiallyOpen = false
 }) {
@@ -103,6 +108,16 @@ function WeatherDrawer({
               setIsOpen(false)
             }} 
           />
+          {/* Only while AR is actually running: in 3D these would be three
+              buttons that do nothing visible. */}
+          {renderMode === 'ar' && (
+            <ARViewpoints
+              view={arView}
+              spot={arSpot}
+              onViewChange={onArViewChange}
+              onSpotChange={onArSpotChange}
+            />
+          )}
           {/* Foot of the scroll: nothing below it to be pushed out of reach. */}
           <AdSlot name="drawer-footer" renderMode={renderMode} />
           {/* A new tab, so following it does not tear down the scene. */}

@@ -14,6 +14,10 @@ import { createGlowTexture } from '../utils/glowTexture'
 export const SNOW_GLOBE_CONTENT_SCALE = 0.28
 const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
 
+/** The wooden base, and how far the city's ground sits above the globe's origin. */
+export const SNOW_GLOBE_BASE_HEIGHT = 3.2
+export const SNOW_GLOBE_CITY_Y = Math.max(0.22, SNOW_GLOBE_BASE_HEIGHT * 0.07)
+
 /**
  * Fluted geometries are shared across mounts.
  *
@@ -175,7 +179,7 @@ function SnowGlobe({
   cityName = 'CITY',
   scale = DEFAULT_SCALE,
   baseRadius = 13.5,
-  baseHeight = 3.2,
+  baseHeight = SNOW_GLOBE_BASE_HEIGHT,
   upperBaseHeight = 1.05,
   domeRadius = 14.5,
   glassOpacity = 0.22,
