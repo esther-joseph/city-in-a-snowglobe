@@ -191,15 +191,38 @@ function ReflectingPool({ radius, color, alpha, drift, waves, resolution, isNigh
         'vec4 mvPosition = modelViewMatrix * vec4( swell, 1.0 );'
       )
 
-    // Every other frame. A reflection of a scene that has barely moved is
-    // worth half the frames it costs, and at sixty of them nobody sees the
-    // one it skipped.
+    // What the reflection is allowed to cost.
+    //
+    // Two things, and the second one is the whole difference between this
+    // being usable and not. Every other frame, because a reflection of a
+    // scene that has barely moved is worth half the frames it costs. And in
+    // silhouette: the scene is handed an override material for the
+    // reflection pass, so the second render compiles one shader instead of
+    // one per mesh.
+    //
+    // That is not a micro-optimisation. This city is built mesh by mesh and
+    // every one of them carries its own material — four and a half thousand
+    // of them — and a render into a target needs a program variant for each,
+    // because tone mapping applies to the canvas and not to the target.
+    // Rendering the real scene into the pool cost nine seconds of shader
+    // compilation on first paint, which is most of a loading screen.
+    //
+    // What comes back is the sky, with everything standing in it as a dark
+    // mass. Which, in a pool this size, is what a reflection looks like.
+    const silhouette = new THREE.MeshBasicMaterial({
+      color: isNight ? '#0f1726' : '#6d8298',
+      fog: Boolean(scene.fog)
+    })
+
     const reflect = instance.onBeforeRender
     let frame = 0
     instance.onBeforeRender = (renderer, sceneToRender, camera) => {
       frame += 1
       if (frame % 2 === 0) return
+      const previous = sceneToRender.overrideMaterial
+      sceneToRender.overrideMaterial = silhouette
       reflect(renderer, sceneToRender, camera)
+      sceneToRender.overrideMaterial = previous
     }
 
     return instance
