@@ -13,6 +13,10 @@ import {
 import SeasonalFall from './city/SeasonalFall'
 import { getSeasonPalette, SEASONS } from '../utils/seasons'
 import FlowerBeds from './city/FlowerBeds'
+import Rocks from './city/Rocks'
+import { furnitureObstacles, BENCHES, LAMP_POSTS } from '../utils/parkFurniture'
+import { getViewpoints } from '../utils/arViewpoints'
+import { getRockGeometries } from '../utils/rocks'
 
 const WINDOW_DAY_COLOR = '#4a90e2' // Reflective blue for daytime
 const WINDOW_NIGHT_COLOR = '#0b1623'
@@ -596,6 +600,15 @@ function Building({
   )
 }
 
+/**
+ * How much room to leave around a spot an AR viewer is put down in.
+ *
+ * Shoulders, and then enough that a bush is beside them rather than through
+ * them. The three viewpoints are fixed and the planting is random, so it is
+ * the planting that has to give way.
+ */
+const VIEWER_SPACE = 0.9
+
 function Bench({ position, rotation }) {
   return (
     <group position={position} rotation={rotation}>
@@ -1029,19 +1042,30 @@ function City({
   const generatedBuildings = cityLayout.buildings || []
   const generatedBridges = cityLayout.bridges || []
 
-  // Benches placed diagonally between paths so they don't block walkways
-  const benches = useMemo(
-    () => [
-      { position: [6.0, 0.25,  6.0], rotation: [0,  Math.PI * 1.25, 0] }, // NE → faces SW
-      { position: [-6.0, 0.25, 6.0], rotation: [0,  Math.PI * 0.75, 0] }, // NW → faces SE
-      { position: [-6.0, 0.25,-6.0], rotation: [0,  Math.PI * 0.25, 0] }, // SW → faces NE
-      { position: [ 6.0, 0.25,-6.0], rotation: [0, -Math.PI * 0.25, 0] }, // SE → faces NW
-    ],
-    []
-  )
+  // Placed diagonally between the paths so they do not block a walkway, and
+  // read from the one place that holds them, since the planting and the AR
+  // viewpoints both have to agree about where they are.
+  const benches = BENCHES
 
-  const trees = useMemo(() => {
-    const treeArray = []
+  /**
+   * Everything planted on the grass, worked out together.
+   *
+   * It used to be three lists that knew nothing about each other, and each of
+   * them only knew about the paving: bushes grew through bench arms, stones
+   * were dropped at the foot of lamp posts, and the two spots an AR viewer
+   * stands in could both end up inside a shrub. So the park is planted in one
+   * pass now, and each thing put down joins the list of things the next one
+   * has to clear.
+   *
+   * Trees are the exception to that in one direction: they clear the
+   * furniture and the buildings, but not each other. A stand of trees has
+   * interlocking crowns, and spacing them by their canopies would leave a
+   * thin ring of lollipops.
+   */
+  const planting = useMemo(() => {
+    const trees = []
+    const bushes = []
+    const rocks = []
 
     const clearOfBuildings = (x, z, radius) =>
       !generatedBuildings.some((building) => {
@@ -1052,41 +1076,142 @@ function City({
         return Math.hypot(dx, dz) < footprint + radius
       })
 
-    // Outer ring — full-size trees around the vegetation band. The nominal
+    const viewpoints = getViewpoints()
+
+    // Benches and lamp posts. The AR viewpoints are deliberately absent from
+    // this one: placeOnGrass clears an obstacle by the whole crown, and the
+    // tree spot is a spot under a tree, so holding the canopies off it by
+    // their own width would leave the viewer standing under open sky. None of
+    // the three can land inside a trunk anyway. Two of them sit well inside
+    // the tree rings, and the third is derived from the ring itself, a fixed
+    // step sideways from a trunk.
+    const furniture = furnitureObstacles()
+
+    // Grows as the park fills. Trees contribute their trunk rather than their
+    // crown: a bush under a canopy is a park, a bush inside a trunk is not.
+    const standing = furnitureObstacles({
+      extra: viewpoints.map((spot) => [spot.position[0], spot.position[2], VIEWER_SPACE])
+    })
+
+    const plantTree = (key, { angle, distance, foliageScale, trunkHeight }) => {
+      const radius = canopyRadius(foliageScale)
+      const spot = placeOnGrass(angle, distance, radius, furniture)
+      if (!spot || !clearOfBuildings(spot[0], spot[1], radius)) return
+      trees.push({ position: [spot[0], 0, spot[1]], trunkHeight, foliageScale, key })
+      standing.push([spot[0], spot[1], 0.22 * foliageScale + 0.2])
+    }
+
+    // Outer ring: full-size trees around the vegetation band. The nominal
     // radius is what the ring wants; placeOnGrass is what the paths allow.
     const outerCount = 28
-    for (let i = 0; i < outerCount; i++) {
-      const angle = (i / outerCount) * Math.PI * 2
-      const foliageScale = 2.0 + Math.random() * 0.9
-      const radius = canopyRadius(foliageScale)
-      const spot = placeOnGrass(angle, 14.6 + (Math.random() - 0.5) * 1.6, radius)
-      if (!spot || !clearOfBuildings(spot[0], spot[1], radius)) continue
-      treeArray.push({
-        position: [spot[0], 0, spot[1]],
-        trunkHeight: 2.4 + Math.random() * 1.4,
-        foliageScale,
-        key: `tree-outer-${i}`
+    for (let i = 0; i < outerCount; i += 1) {
+      plantTree(`tree-outer-${i}`, {
+        angle: (i / outerCount) * Math.PI * 2,
+        distance: 14.6 + (Math.random() - 0.5) * 1.6,
+        foliageScale: 2.0 + Math.random() * 0.9,
+        trunkHeight: 2.4 + Math.random() * 1.4
       })
     }
 
-    // Inner cluster — smaller accent trees around the park interior
-    const innerCount = 12
-    for (let i = 0; i < innerCount; i++) {
-      const angle = (i / innerCount) * Math.PI * 2 + Math.PI / innerCount
-      const foliageScale = 1.3 + Math.random() * 0.5
-      const radius = canopyRadius(foliageScale)
-      const spot = placeOnGrass(angle, 10.5 + (Math.random() - 0.5) * 1.0, radius)
-      if (!spot) continue
-      treeArray.push({
-        position: [spot[0], 0, spot[1]],
-        trunkHeight: 1.5 + Math.random() * 0.8,
-        foliageScale,
-        key: `tree-inner-${i}`
+    // A second ring inside it, of younger trees. The band between the big
+    // ring and the accent trees was the emptiest part of the park.
+    const midCount = 18
+    for (let i = 0; i < midCount; i += 1) {
+      plantTree(`tree-mid-${i}`, {
+        angle: (i / midCount) * Math.PI * 2 + Math.PI / midCount,
+        distance: 12.2 + (Math.random() - 0.5) * 1.1,
+        foliageScale: 1.15 + Math.random() * 0.45,
+        trunkHeight: 1.4 + Math.random() * 0.7
       })
     }
 
-    return treeArray
+    // Accent trees around the park interior.
+    const innerCount = 16
+    for (let i = 0; i < innerCount; i += 1) {
+      plantTree(`tree-inner-${i}`, {
+        angle: (i / innerCount) * Math.PI * 2 + Math.PI / innerCount,
+        distance: 10.5 + (Math.random() - 0.5) * 1.0,
+        foliageScale: 1.3 + Math.random() * 0.5,
+        trunkHeight: 1.5 + Math.random() * 0.8
+      })
+    }
+
+    // A bush reaches about 0.6 of its scale: the lobes sit 0.34 out with 0.26
+    // of their own, and the grass disc at the foot reaches 0.55.
+    const bushRadius = (scale) => scale * 0.6
+
+    const plantBush = (key, { angle, distance, scale }) => {
+      const radius = bushRadius(scale)
+      const spot = placeOnGrass(angle, distance, radius, standing)
+      if (!spot || !clearOfBuildings(spot[0], spot[1], radius)) return
+      bushes.push({ position: [spot[0], 0.4, spot[1]], scale, key })
+      standing.push([spot[0], spot[1], radius])
+    }
+
+    // Three bands of them: fringing the trees, through the middle, and a few
+    // low ones near the fountain ring.
+    const bushBands = [
+      { count: 44, distance: 13.5, spread: 1.2, min: 0.9, range: 0.6, jitter: 0.18 },
+      { count: 26, distance: 8.5, spread: 1.5, min: 0.6, range: 0.4, jitter: 0.12 },
+      { count: 12, distance: 7.0, spread: 0.8, min: 0.45, range: 0.3, jitter: 0.22 }
+    ]
+
+    bushBands.forEach((band, bandIndex) => {
+      for (let i = 0; i < band.count; i += 1) {
+        plantBush(`bush-${bandIndex}-${i}`, {
+          angle: (i / band.count) * Math.PI * 2 + Math.random() * band.jitter,
+          distance: band.distance + (Math.random() - 0.5) * band.spread,
+          scale: band.min + Math.random() * band.range
+        })
+      }
+    })
+
+    // And the stones. Some at the foot of a tree, where they gather; the rest
+    // scattered through the grass.
+    const shapes = getRockGeometries()
+    const dropRock = (key, { angle, distance, shape, scale }) => {
+      const radius = shape.radius * scale
+      const spot = placeOnGrass(angle, distance, radius, standing)
+      if (!spot || !clearOfBuildings(spot[0], spot[1], radius)) return
+      rocks.push({
+        key,
+        shape: shape.id,
+        position: [spot[0], spot[1]],
+        scale,
+        // Turned and stretched, so three shapes do not read as three shapes.
+        stretch: 0.8 + Math.random() * 0.5,
+        yaw: Math.random() * Math.PI * 2,
+        tilt: (Math.random() - 0.5) * 0.25
+      })
+      standing.push([spot[0], spot[1], radius])
+    }
+
+    trees.forEach((tree, i) => {
+      if (i % 3 !== 0) return
+      const angle = Math.atan2(tree.position[2], tree.position[0]) + (Math.random() - 0.5) * 0.3
+      const distance = Math.hypot(tree.position[0], tree.position[2]) + 1.1 + Math.random() * 0.6
+      dropRock(`rock-tree-${i}`, {
+        angle,
+        distance,
+        shape: shapes[i % shapes.length],
+        scale: 0.5 + Math.random() * 0.5
+      })
+    })
+
+    const looseRocks = 14
+    for (let i = 0; i < looseRocks; i += 1) {
+      dropRock(`rock-loose-${i}`, {
+        angle: (i / looseRocks) * Math.PI * 2 + Math.random() * 0.4,
+        distance: 7.5 + Math.random() * 7,
+        shape: shapes[(i + 1) % shapes.length],
+        scale: 0.45 + Math.random() * 0.75
+      })
+    }
+
+    return { trees, bushes, rocks }
   }, [generatedBuildings])
+
+  const { trees, bushes, rocks } = planting
 
   // Where petals and leaves come from: roughly the middle of each canopy.
   const fallSources = useMemo(
@@ -1098,52 +1223,6 @@ function City({
       })),
     [trees]
   )
-
-  const bushes = useMemo(() => {
-    const bushArray = []
-
-    // A bush reaches about 0.6 of its scale: the lobes sit 0.34 out with 0.26
-    // of their own, and the grass disc at the foot reaches 0.55.
-    const bushRadius = (scale) => scale * 0.6
-
-    // Outer bush ring (fringing the vegetation band)
-    const outerCount = 32
-    for (let i = 0; i < outerCount; i++) {
-      const angle = (i / outerCount) * Math.PI * 2 + Math.random() * 0.18
-      const scale = 0.9 + Math.random() * 0.6
-      const spot = placeOnGrass(angle, 13.5 + (Math.random() - 0.5) * 1.2, bushRadius(scale))
-      if (!spot) continue
-      const tooClose = generatedBuildings.some((building) => {
-        const dx = spot[0] - building.basePosition[0]
-        const dz = spot[1] - building.basePosition[2]
-        const footprint =
-          (building.footprintRadius || Math.max(building.width, building.depth) * 0.5) + 0.7
-        return Math.hypot(dx, dz) < footprint + 1.5
-      })
-      if (tooClose) continue
-      bushArray.push({
-        position: [spot[0], 0.4, spot[1]],
-        scale,
-        key: `bush-outer-${i}`
-      })
-    }
-
-    // Inner scattered bushes filling the park interior
-    const innerCount = 16
-    for (let i = 0; i < innerCount; i++) {
-      const angle = (i / innerCount) * Math.PI * 2 + (Math.PI / innerCount) * 0.7
-      const scale = 0.6 + Math.random() * 0.4
-      const spot = placeOnGrass(angle, 8.5 + (Math.random() - 0.5) * 1.5, bushRadius(scale))
-      if (!spot) continue
-      bushArray.push({
-        position: [spot[0], 0.4, spot[1]],
-        scale,
-        key: `bush-inner-${i}`
-      })
-    }
-
-    return bushArray
-  }, [generatedBuildings])
 
   /**
    * Flower beds, laid out like everything else in the park: on the grass and
@@ -1267,6 +1346,9 @@ function City({
           <Bench key={`bench-${index}`} position={bench.position} rotation={bench.rotation} />
         ))}
 
+        {/* Stones in the grass, under and around the planting. */}
+        <Rocks stones={rocks} />
+
         {/* Vegetation */}
         <VegetationRing
           trees={trees}
@@ -1290,15 +1372,8 @@ function City({
           />
         )}
 
-        {/* Light posts — 4 total, one beside each bench end (not blocking the view) */}
-        {[
-          // Each post is offset ~1.6 units perpendicular to the bench/fountain line,
-          // placing it at the side of the bench rather than directly in front.
-          [ 7.4, 0,  5.2],   // beside NE bench [6,0,6], shifted toward +x
-          [-5.2, 0,  7.4],   // beside NW bench [-6,0,6], shifted toward +z
-          [-7.4, 0, -5.2],   // beside SW bench [-6,0,-6], shifted toward -x
-          [ 5.2, 0, -7.4],   // beside SE bench [6,0,-6], shifted toward -z
-        ].map((pos, index) => (
+        {/* One beside each bench, off to the side rather than in front of it. */}
+        {LAMP_POSTS.map((pos, index) => (
           <LightPost key={`lightpost-${index}`} position={pos} isNight={isNight} />
         ))}
 
