@@ -6,6 +6,14 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { buildHeightField } from '../utils/surfaceHeightField'
 import { USDZ_ROOT_NAME } from '../utils/usdzExport'
 import { starGeometry } from '../utils/starGeometry'
+import {
+  CloudFieldContext,
+  createCloudField,
+  publishCloud,
+  sampleUnderCloud,
+  seedUnderClouds,
+  useCloudField
+} from '../utils/cloudField'
 
 const DOWN_VECTOR = new THREE.Vector3(0, -1, 0)
 
@@ -42,6 +50,8 @@ const SHAKE_TUMBLE_DURATION = 3200
 
 function RainParticles({ performanceScale = 1 }) {
   const instancedMeshRef = useRef()
+  const field = useCloudField()
+  const seeded = useRef(false)
   const rippleRefs = useRef([])
   const count = Math.max(500, Math.round(1600 * performanceScale))
   const rippleCount = performanceScale < 0.85 ? 6 : 10
@@ -78,6 +88,8 @@ function RainParticles({ performanceScale = 1 }) {
       return [Math.cos(theta) * radius, Math.sin(theta) * radius]
     }
     
+    // Where they start before the first frame has told anyone where the
+    // clouds are. They are recycled under one within a second of falling.
     for (let i = 0; i < count; i++) {
       const [x, z] = sampleXZ()
       positions[i * 3] = x
@@ -88,6 +100,21 @@ function RainParticles({ performanceScale = 1 }) {
 
     return { positions, velocities, sampleXZ, verticalSpan, baseHeight, domeRadius }
   }, [count, domeRadius])
+
+  /**
+   * Where the next drop comes from.
+   *
+   * Out of a cloud, if there is one: rain that falls from clear sky beside
+   * the cloud it is supposed to be coming from is the thing being fixed here.
+   * The old patch of sky is the fallback, for forced rain with the clouds
+   * turned off, which still has to rain.
+   */
+  const spawn = useCallback(() => {
+    const under = sampleUnderCloud(field)
+    if (under) return under
+    const [x, z] = particles.sampleXZ()
+    return { x, y: particles.verticalSpan + particles.baseHeight, z }
+  }, [field, particles])
 
   const ripplePool = useMemo(() => {
     const pool = []
@@ -131,18 +158,22 @@ function RainParticles({ performanceScale = 1 }) {
 
   useFrame(() => {
     if (!instancedMeshRef.current) return
-    
+
     const positions = particles.positions
-    
+
+    // The first frame that knows where the clouds are fills the column under
+    // them, rather than leaving the sky full of drops that started nowhere.
+    if (!seeded.current) seeded.current = seedUnderClouds(field, positions, count)
+
     for (let i = 0; i < count; i++) {
       positions[i * 3 + 1] -= particles.velocities[i]
       
       if (positions[i * 3 + 1] < 0) {
         triggerRipple(positions[i * 3], positions[i * 3 + 2])
-        positions[i * 3 + 1] = particles.verticalSpan + particles.baseHeight
-        const [x, z] = particles.sampleXZ()
-        positions[i * 3] = x
-        positions[i * 3 + 2] = z
+        const from = spawn()
+        positions[i * 3] = from.x
+        positions[i * 3 + 1] = from.y
+        positions[i * 3 + 2] = from.z
       }
     }
     
@@ -232,6 +263,8 @@ const LANDING_RAY_REACH = 12
 
 function SnowParticles({ performanceScale = 1 }) {
   const points = useRef()
+  const field = useCloudField()
+  const seeded = useRef(false)
   const settledPoints = useRef()
   const scene = useThree((state) => state.scene)
   const count = Math.max(900, Math.round(2600 * performanceScale))
@@ -292,7 +325,20 @@ function SnowParticles({ performanceScale = 1 }) {
     }
   }, [scene, particles.horizontalSpan, performanceScale])
 
+  /**
+   * Put a flake back in the sky it came from.
+   *
+   * Out of a cloud where there is one, and otherwise over the old patch of
+   * sky, which is what forced snow with the clouds turned off falls from.
+   */
   const recycle = (positions, index) => {
+    const under = sampleUnderCloud(field)
+    if (under) {
+      positions[index * 3] = under.x
+      positions[index * 3 + 1] = under.y
+      positions[index * 3 + 2] = under.z
+      return
+    }
     positions[index * 3] = (Math.random() - 0.5) * particles.horizontalSpan
     positions[index * 3 + 1] = particles.verticalSpan + 5
     positions[index * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
@@ -323,6 +369,7 @@ function SnowParticles({ performanceScale = 1 }) {
     if (!points.current) return
 
     const positions = points.current.geometry.attributes.position.array
+    if (!seeded.current) seeded.current = seedUnderClouds(field, positions, count)
     const time = state.clock.elapsedTime
     const field = heightField.current
     let settledChanged = false
@@ -413,6 +460,8 @@ function SnowParticles({ performanceScale = 1 }) {
 }
 
 function ThunderboltParticles({ performanceScale = 1 }) {
+  const field = useCloudField()
+  const seeded = useRef(false)
   const instancedMeshRef = useRef()
   const count = Math.max(10, Math.round(25 * performanceScale))
   const lightningModel = useLoader(
@@ -518,6 +567,11 @@ function ThunderboltParticles({ performanceScale = 1 }) {
       baseHeight,
       vanishThreshold
     } = particles
+    if (!seeded.current) {
+      // Below the cloud that throws it, not the ground: a bolt lives in the
+      // few units under a cloud and vanishes well before it lands.
+      seeded.current = seedUnderClouds(field, positions, count, { floor: vanishThreshold })
+    }
     const time = state.clock.elapsedTime
     const color = new THREE.Color()
     
@@ -527,9 +581,11 @@ function ThunderboltParticles({ performanceScale = 1 }) {
       positions[i * 3 + 1] -= velocities[i]
       
       if (positions[i * 3 + 1] < vanishThreshold) {
-        positions[i * 3 + 1] = verticalSpan + baseHeight
-        positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
-        positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
+        // Out of a cloud. A bolt that starts in clear sky is a flare.
+        const from = sampleUnderCloud(field)
+        positions[i * 3] = from ? from.x : (Math.random() - 0.5) * horizontalSpan
+        positions[i * 3 + 1] = from ? from.y : verticalSpan + baseHeight
+        positions[i * 3 + 2] = from ? from.z : (Math.random() - 0.5) * horizontalSpan
         velocities[i] = Math.random() * 0.12 + 0.06
         intensities[i] = 1
       } else if (Math.random() < 0.012) {
@@ -623,15 +679,20 @@ function CloudLayer({
       8,
       Math.round((12 + density * 18) * (performanceScale < 1 ? 0.85 : densityBoost))
     )
-    const baseRadius = 40
-    const radiusJitter = 11
+    // Over the whole sky, not a ring around the edge of it. They used to be
+    // placed at a radius of forty-odd, which put every cloud out by the glass
+    // with nothing above the city — and now that the rain comes out of them,
+    // that would have left the city dry and rained on the dome.
+    const spread = 46
     // Raise clouds higher when raining to be above rain particles (rain is at y=25-50)
     const isRaining = weatherType.includes('rain') || weatherType.includes('drizzle')
     const minHeight = isRaining ? 35 : 28
     const heightJitter = 10
     return Array.from({ length: cloudCount }).map((_, index) => {
       const angle = (index / cloudCount) * Math.PI * 2 + Math.random() * 0.4
-      const radius = baseRadius + Math.random() * radiusJitter
+      // Rooted, so they spread evenly across the disc rather than crowding
+      // its rim.
+      const radius = Math.sqrt(Math.random()) * spread
       const height = minHeight + Math.random() * heightJitter
       const baseScale = 2 + Math.random() * 1.4 * density
       const puffCount = 5 + Math.floor(Math.random() * 4 + density * 3)
@@ -677,6 +738,7 @@ function CloudLayer({
   )
 
   const driftVector = useMemo(() => ({ x: windVector.x, z: windVector.z }), [windVector])
+  const field = useCloudField()
 
   useFrame((state, delta) => {
     const step = Math.min(delta, MAX_FRAME_SECONDS)
@@ -716,7 +778,12 @@ function CloudLayer({
 
       cloud.position.x = wrapCoordinate(cloud.position.x, wrapRadius)
       cloud.position.z = wrapCoordinate(cloud.position.z, wrapRadius)
+
+      // Where this one is now, for whatever is falling out of it.
+      publishCloud(field, index, cloud, config.scale)
     })
+
+    if (field) field.clouds.length = cloudRefs.length
   })
 
 
@@ -894,6 +961,10 @@ function WeatherEffects({
   const shakeGroupRef = useRef()
   const shakeStateRef = useRef({ active: false, start: 0, duration: 0 })
 
+  // Where the clouds are, written by the cloud layer every frame and read by
+  // everything that falls out of them.
+  const cloudField = useMemo(() => createCloudField(), [])
+
   useEffect(() => {
     if (!shakeTrigger) return
     // Timed from the trigger stamp, not from now: the scene remounts on every
@@ -926,34 +997,36 @@ function WeatherEffects({
   })
 
   return (
-    <group ref={shakeGroupRef}>
-      {(hasRain || forceRain) && <RainParticles performanceScale={performanceScale} />}
-      {(hasSnow || forceSnow) && <SnowParticles performanceScale={performanceScale} />}
-      {hasCuteClouds && (
-        <CloudLayer
-          weatherType={weatherType}
-          windDirection={windDirection}
-          windSpeed={windSpeed}
-          weatherData={weatherData}
-          performanceScale={performanceScale}
-        />
-      )}
-      {(hasThunderstorm || forceThunder) && (
-        <Thunderbolts 
-          weatherType={weatherType} 
-          weatherDescription={weatherDescription} 
-          forceThunder={forceThunder}
-          performanceScale={thunderPerformanceScale}
-        />
-      )}
-      {enableNightStars && (
-        <StarLayer
-          windDirection={windDirection}
-          windSpeed={windSpeed}
-          performanceScale={starPerformanceScale}
-        />
-      )}
-    </group>
+    <CloudFieldContext.Provider value={cloudField}>
+      <group ref={shakeGroupRef}>
+        {(hasRain || forceRain) && <RainParticles performanceScale={performanceScale} />}
+        {(hasSnow || forceSnow) && <SnowParticles performanceScale={performanceScale} />}
+        {hasCuteClouds && (
+          <CloudLayer
+            weatherType={weatherType}
+            windDirection={windDirection}
+            windSpeed={windSpeed}
+            weatherData={weatherData}
+            performanceScale={performanceScale}
+          />
+        )}
+        {(hasThunderstorm || forceThunder) && (
+          <Thunderbolts
+            weatherType={weatherType}
+            weatherDescription={weatherDescription}
+            forceThunder={forceThunder}
+            performanceScale={thunderPerformanceScale}
+          />
+        )}
+        {enableNightStars && (
+          <StarLayer
+            windDirection={windDirection}
+            windSpeed={windSpeed}
+            performanceScale={starPerformanceScale}
+          />
+        )}
+      </group>
+    </CloudFieldContext.Provider>
   )
 }
 
