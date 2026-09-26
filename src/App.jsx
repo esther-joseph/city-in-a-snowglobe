@@ -39,6 +39,7 @@ import {
   enterARWhenReady,
   watchARSession
 } from './utils/arSession'
+import { useARGestures } from './utils/arGestures'
 import LoadingScreen from './components/LoadingScreen'
 import PropTypes from 'prop-types'
 import CityClock from './components/CityClock'
@@ -1002,6 +1003,16 @@ function App() {
    * of geometry at all.
    */
   const [arDomOverlay, setArDomOverlay] = useState(false)
+
+  /**
+   * Turning and resizing the globe with a finger.
+   *
+   * There is no orbit control in AR: the camera is the phone, and moving it
+   * means walking. So one finger turns the globe on its axis and two resize
+   * it, which are the two things anyone tries on an object on a table.
+   */
+  const arGesture = useARGestures({ enabled: renderMode === 'ar' })
+  const resetGesture = arGesture.reset
   // Where the viewer is, once a WebXR session is running: either outside the
   // globe looking in, or standing at one of the three spots in the park.
   const [arView, setArView] = useState(AR_VIEWS.OBSERVATIONAL)
@@ -1149,12 +1160,13 @@ function App() {
    * looking straight down.
    */
   const leaveAR = useCallback(() => {
+    resetGesture()
     setPreparing(PREPARING_3D)
     endARSession(xrStore)
     setArMode(null)
     setRenderMode('3d')
     setSceneKey((key) => key + 1)
-  }, [])
+  }, [resetGesture])
 
   const handleRenderModeChange = useCallback(
     async (nextMode) => {
@@ -1770,7 +1782,11 @@ function App() {
           >
             <DeviceOrientationCamera onHeading={setArHeading} />
             <Suspense fallback={null}>
-              <group position={[0, -0.3, -1.4]} rotation={[0, arHeading, 0]}>
+              <group
+                position={[0, -0.3, -1.4]}
+                rotation={[0, arHeading + arGesture.spin, 0]}
+                scale={arGesture.scale}
+              >
                 <FitToMeters targetDiameter={0.45}>
                   <ShakeableScene shakeTrigger={shakeTrigger}>
                     <BaseScene includeSky={false} {...sceneProps} />
@@ -1829,7 +1845,14 @@ function App() {
                     </ShakeableScene>
                   </LightsAtScale>
                 ) : (
-                  <group position={OBSERVATIONAL_PLACEMENT}>
+                  <group
+                    position={OBSERVATIONAL_PLACEMENT}
+                    // Turned and resized by the gestures. Both ride on the
+                    // outside of the fit, so the fit itself is still measured
+                    // once, against the globe's own size.
+                    rotation={[0, arGesture.spin, 0]}
+                    scale={arGesture.scale}
+                  >
                     <FitToMeters targetDiameter={OBSERVATIONAL_DIAMETER}>
                       <ShakeableScene shakeTrigger={shakeTrigger}>
                         <BaseScene includeSky={false} {...sceneProps} />
@@ -1918,6 +1941,23 @@ function App() {
             }}
             data-testid="ar-controls"
           >
+            {/* Said once, and only until someone has done it: a hint that
+                stays up after it has been taken is a label. */}
+            {!arGesture.touched && (
+              <span
+                style={{
+                  width: '100%',
+                  textAlign: 'center',
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: '13px',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                  paddingBottom: '2px'
+                }}
+                data-testid="ar-gesture-hint"
+              >
+                Drag to turn · pinch to resize
+              </span>
+            )}
             {/* Where to stand. Only in a real session: the camera fallback
                 holds the globe at arm's length and there is nowhere to go. */}
             {arMode === AR_MODES.WEBXR &&
