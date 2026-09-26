@@ -84,22 +84,27 @@ test.describe('A scene that arrives in stages', () => {
     expect(stages.DETAIL).toBeGreaterThan(stages.UNDERGROWTH)
   })
 
-  test('every stage waits for the one before it to be drawn', async ({ page }) => {
+  test('the stages count rendered frames, not page frames', async ({ page }) => {
     await open(page)
 
     const behaviour = await page.evaluate(async () => {
-      const { useStages } = await import('/src/utils/useStages.js')
-      const source = useStages.toString()
+      const source = await (await fetch('/src/utils/useStages.js')).text()
       return {
-        // Two frames, not one: a single frame schedules the next stage
-        // before the last one has been painted, which is the thing the
-        // staging exists to avoid.
-        frames: (source.match(/requestAnimationFrame/g) || []).length,
-        cleansUp: source.includes('cancelAnimationFrame')
+        // The renderer's loop, not the page's. A running immersive session
+        // drives its own frames and stops calling the page's, so a hook
+        // built on window frames stalls the moment AR opens and the park
+        // never finishes arriving.
+        rendererLoop: source.includes('useFrame'),
+        // Called, rather than merely named: the comment above it explains
+        // why it is not used.
+        pageLoop: /requestAnimationFrame\s*\(/.test(source),
+        // Two frames per stage, not one.
+        gap: Number((source.match(/framesPerStage = (\d+)/) || [])[1])
       }
     })
 
-    expect(behaviour.frames).toBeGreaterThanOrEqual(2)
-    expect(behaviour.cleansUp, 'a scene torn down mid-stage cancels its frames').toBe(true)
+    expect(behaviour.rendererLoop).toBe(true)
+    expect(behaviour.pageLoop, 'nothing that stops inside a session').toBe(false)
+    expect(behaviour.gap).toBeGreaterThanOrEqual(2)
   })
 })
