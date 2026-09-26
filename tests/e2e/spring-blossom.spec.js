@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp } from './support/app.js'
+import { gotoApp, waitForPark } from './support/app.js'
 
 /**
  * Spring: a blossoming crown rather than a green one with flowers stuck on,
@@ -9,10 +9,7 @@ import { gotoApp } from './support/app.js'
 test.describe('Spring blossom', () => {
   test('crowns are white or pink, one colour per tree', async ({ page }) => {
     await gotoApp(page, '/?season=spring')
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 20000 })
-      .toBe(true)
-    await page.waitForTimeout(2500)
+    await waitForPark(page)
 
     const crowns = await page.evaluate(() => {
       // A canopy lobe is a sphere; the crown colours are the pale ones.
@@ -39,10 +36,7 @@ test.describe('Spring blossom', () => {
 
   test('flower beds sit on the grass, clear of the paving', async ({ page }) => {
     await gotoApp(page, '/?season=spring')
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 20000 })
-      .toBe(true)
-    await page.waitForTimeout(2500)
+    await waitForPark(page)
 
     const offGrass = await page.evaluate(async () => {
       const THREE = await import('/node_modules/.vite/deps/three.js')

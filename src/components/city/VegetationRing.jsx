@@ -2,6 +2,8 @@ import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import PropTypes from 'prop-types'
 import { getSeasonPalette, SEASONS } from '../../utils/seasons'
+import { standardMaterial } from '../../utils/sharedMaterial'
+import { unitColumn, unitSphere } from '../../utils/sharedGeometry'
 
 // Richer, multi-layer tree with rounded canopy tiers
 function Tree({
@@ -85,10 +87,14 @@ function Tree({
   return (
     <group position={position} rotation={[0, randomRotation, 0]}>
       {/* Trunk */}
-      <mesh castShadow receiveShadow position={[0, trunkHeight / 2, 0]}>
-        <cylinderGeometry args={[trunkWidth * 0.6, trunkWidth, trunkHeight, 7]} />
-        <meshStandardMaterial color={palette.trunk} roughness={0.85} metalness={0.0} />
-      </mesh>
+      <mesh
+        castShadow
+        receiveShadow
+        position={[0, trunkHeight / 2, 0]}
+        material={standardMaterial({ color: palette.trunk, roughness: 0.85, metalness: 0 })}
+        geometry={unitColumn(0.6, 7)}
+        scale={[trunkWidth, trunkHeight, trunkWidth]}
+      />
 
       {/* Canopy — 5 overlapping spheres for a full, rounded crown. In winter
           the crown is replaced by bare limbs. */}
@@ -96,55 +102,74 @@ function Tree({
         {palette.bareTrees ? (
           branches.map((branch) => (
             <group key={branch.key} rotation={branch.rotation}>
-              <mesh castShadow position={[0, branch.length / 2, 0]}>
-                <cylinderGeometry args={[trunkWidth * 0.12, trunkWidth * 0.34, branch.length, 5]} />
-                <meshStandardMaterial color={palette.trunk} roughness={0.9} metalness={0.0} />
-              </mesh>
+              <mesh
+                castShadow
+                position={[0, branch.length / 2, 0]}
+                material={standardMaterial({ color: palette.trunk, roughness: 0.9, metalness: 0 })}
+                geometry={unitColumn(0.35, 5)}
+                scale={[trunkWidth * 0.34, branch.length, trunkWidth * 0.34]}
+              />
             </group>
           ))
         ) : (
           <>
         {/* Main central sphere */}
-        <mesh castShadow position={[0, 0, 0]}>
-          <sphereGeometry args={[r * 1.05, 7, 6]} />
-          <meshStandardMaterial color={g(1)} roughness={0.82} metalness={0.0} />
-        </mesh>
+        <mesh
+          castShadow
+          position={[0, 0, 0]}
+          material={standardMaterial({ color: g(1), roughness: 0.82, metalness: 0 })}
+          geometry={unitSphere(7, 6)}
+          scale={r * 1.05}
+        />
         {/* Four offset side lobes for a lush, irregular silhouette */}
         {[0, 1, 2, 3].map((i) => {
           const a = (i / 4) * Math.PI * 2
           return (
-            <mesh key={i} castShadow position={[Math.cos(a) * r * 0.55, -r * 0.15, Math.sin(a) * r * 0.55]}>
-              <sphereGeometry args={[r * 0.82, 6, 5]} />
-              <meshStandardMaterial color={g(i)} roughness={0.85} metalness={0.0} />
-            </mesh>
+            <mesh
+              key={i}
+              castShadow
+              position={[Math.cos(a) * r * 0.55, -r * 0.15, Math.sin(a) * r * 0.55]}
+              material={standardMaterial({ color: g(i), roughness: 0.85, metalness: 0 })}
+              geometry={unitSphere(6, 5)}
+              scale={r * 0.82}
+            />
           )
         })}
         {/* Top highlight lobe — slightly lighter */}
-        <mesh castShadow position={[0, r * 0.65, 0]}>
-          <sphereGeometry args={[r * 0.6, 6, 5]} />
-          <meshStandardMaterial color={g(4)} roughness={0.78} metalness={0.0} />
-        </mesh>
+        <mesh
+          castShadow
+          position={[0, r * 0.65, 0]}
+          material={standardMaterial({ color: g(4), roughness: 0.78, metalness: 0 })}
+          geometry={unitSphere(6, 5)}
+          scale={r * 0.6}
+        />
         {/* Spring blossom clusters dotted over the crown */}
         {blossoms.map((blossom) => (
-          <mesh key={blossom.key} position={blossom.position}>
-            <sphereGeometry args={[blossom.size, 5, 4]} />
-            <meshStandardMaterial
-              color={blossom.color}
-              roughness={0.6}
-              emissive={blossom.color}
-              emissiveIntensity={0.18}
-            />
-          </mesh>
+          <mesh
+            key={blossom.key}
+            position={blossom.position}
+            material={standardMaterial({
+              color: blossom.color,
+              roughness: 0.6,
+              emissive: blossom.color,
+              emissiveIntensity: 0.18
+            })}
+            geometry={unitSphere(5, 4)}
+            scale={blossom.size}
+          />
         ))}
           </>
         )}
       </group>
 
       {/* Grass tuft at base */}
-      <mesh receiveShadow position={[0, 0.04, 0]}>
-        <cylinderGeometry args={[trunkWidth * 3.5, trunkWidth * 4, 0.08, 7]} />
-        <meshStandardMaterial color={palette.grassTuft} roughness={0.95} metalness={0.0} />
-      </mesh>
+      <mesh
+        receiveShadow
+        position={[0, 0.04, 0]}
+        material={standardMaterial({ color: palette.grassTuft, roughness: 0.95, metalness: 0 })}
+        geometry={unitColumn(0.875, 7)}
+        scale={[trunkWidth * 4, 0.08, trunkWidth * 4]}
+      />
     </group>
   )
 }
@@ -167,26 +192,41 @@ function Bush({ position, scale, season = SEASONS.SUMMER }) {
   return (
     <group position={position}>
       {/* Central body */}
-      <mesh castShadow receiveShadow position={[0, scale * 0.32, 0]}>
-        <sphereGeometry args={[scale * 0.38, 7, 6]} />
-        <meshStandardMaterial color={greens[1]} roughness={0.88} metalness={0.0} />
-      </mesh>
+      <mesh
+        castShadow
+        receiveShadow
+        position={[0, scale * 0.32, 0]}
+        material={standardMaterial({ color: greens[1], roughness: 0.88, metalness: 0 })}
+        geometry={unitSphere(7, 6)}
+        scale={scale * 0.38}
+      />
       {/* Outer lobes */}
       {[...Array(lobeCount)].map((_, i) => {
         const a = (i / lobeCount) * Math.PI * 2
         const r = scale * 0.28 + (i % 2) * scale * 0.06
         return (
-          <mesh key={i} castShadow position={[Math.cos(a) * r, scale * 0.22, Math.sin(a) * r]}>
-            <sphereGeometry args={[scale * 0.26, 6, 5]} />
-            <meshStandardMaterial color={greens[i % greens.length]} roughness={0.9} metalness={0.0} />
-          </mesh>
+          <mesh
+            key={i}
+            castShadow
+            position={[Math.cos(a) * r, scale * 0.22, Math.sin(a) * r]}
+            material={standardMaterial({
+              color: greens[i % greens.length],
+              roughness: 0.9,
+              metalness: 0
+            })}
+            geometry={unitSphere(6, 5)}
+            scale={scale * 0.26}
+          />
         )
       })}
       {/* Ground disc */}
-      <mesh receiveShadow position={[0, 0.03, 0]}>
-        <cylinderGeometry args={[scale * 0.55, scale * 0.55, 0.06, 7]} />
-        <meshStandardMaterial color={palette.grassTuft} roughness={0.95} metalness={0.0} />
-      </mesh>
+      <mesh
+        receiveShadow
+        position={[0, 0.03, 0]}
+        material={standardMaterial({ color: palette.grassTuft, roughness: 0.95, metalness: 0 })}
+        geometry={unitColumn(1, 7)}
+        scale={[scale * 0.55, 0.06, scale * 0.55]}
+      />
     </group>
   )
 }

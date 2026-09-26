@@ -121,3 +121,115 @@ test.describe('Fountain water', () => {
     expect(shape.taperedEnd).toBeGreaterThan(0)
   })
 })
+
+/**
+ * The pools reflect, and the tiers pour.
+ *
+ * The docs point at two: Water, which is the flat mirror trick on WebGL, and
+ * WaterMesh, which is the same idea rewritten in TSL for WebGPU. This scene
+ * draws through WebGL, so it is the first one, and only for the basin: it
+ * costs a second render of the scene per frame, and the two dishes are a
+ * fifth of the width and seen from above.
+ */
+test.describe('Reflections and overflow', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+    await expect
+      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
+      .toBe(true)
+  })
+
+  test('the basin reflects, and every pool is translucent', async ({ page }) => {
+    const pools = await page.evaluate(() => {
+      const found = []
+      window.__snowGlobeScene.traverse((object) => {
+        if (!object.isMesh) return
+        const parameters = object.geometry?.parameters
+        // A pool is a ring from nothing to its full radius.
+        if (!parameters || parameters.innerRadius === undefined) return
+        if (parameters.innerRadius > 0.01) return
+        found.push({
+          radius: parameters.outerRadius,
+          reflects: object.isWater === true,
+          transparent: object.material.transparent === true,
+          alpha:
+            object.material.uniforms?.alpha?.value ??
+            object.material.opacity,
+          // Enough vertices in from the rim to carry a wave.
+          rings: parameters.phiSegments
+        })
+      })
+      return found.sort((a, b) => b.radius - a.radius)
+    })
+
+    expect(pools.length, 'three pools').toBe(3)
+
+    const [basin, middle, upper] = pools
+    expect(basin.reflects, 'the basin reflects').toBe(true)
+    expect(middle.reflects, 'the middle dish does not').toBe(false)
+    expect(upper.reflects, 'nor the top one').toBe(false)
+
+    for (const pool of pools) {
+      // Translucent: the floor of the basin shows faintly through, which is
+      // the difference between water and enamel.
+      expect(pool.transparent, `${pool.radius} blends`).toBe(true)
+      expect(pool.alpha).toBeGreaterThan(0.6)
+      expect(pool.alpha).toBeLessThan(0.95)
+      expect(pool.rings, 'rings of vertices to raise into a wave').toBeGreaterThan(8)
+    }
+  })
+
+  test('each tier pours over its whole rim', async ({ page }) => {
+    const curtains = await page.evaluate(() => {
+      const found = []
+      window.__snowGlobeScene.traverse((object) => {
+        if (!object.isMesh) return
+        const parameters = object.geometry?.parameters
+        if (!parameters || parameters.openEnded !== true) return
+        if (parameters.radialSegments < 24) return
+        // A curtain is wider at the bottom than the top and hangs down.
+        if (parameters.radiusBottom <= parameters.radiusTop) return
+        // And it is water rather than masonry: the basin wall is the same
+        // shape, and the difference is that a curtain has holes in it.
+        if (!object.material.alphaMap) return
+        found.push({
+          top: parameters.radiusTop,
+          bottom: parameters.radiusBottom,
+          height: parameters.height,
+          around: parameters.thetaLength ?? Math.PI * 2,
+          transparent: object.material.transparent === true,
+          scrolls: Boolean(object.material.alphaMap)
+        })
+      })
+      return found.sort((a, b) => b.top - a.top)
+    })
+
+    // One from the middle dish into the basin, one from the top dish into
+    // the middle. Six jets around a circle were six jets around a circle.
+    expect(curtains.length).toBe(2)
+
+    for (const curtain of curtains) {
+      expect(curtain.around, 'the whole way round').toBeCloseTo(Math.PI * 2, 3)
+      expect(curtain.bottom, 'carries outward as it falls').toBeGreaterThan(curtain.top)
+      expect(curtain.height, 'reaches the water below').toBeGreaterThan(0.3)
+      expect(curtain.transparent).toBe(true)
+      expect(curtain.scrolls, 'broken up rather than a sheet of glass').toBe(true)
+    }
+
+    // The wide one falls furthest: the basin is a long way under the middle
+    // dish, and the top dish is just above it.
+    expect(curtains[0].height).toBeGreaterThan(curtains[1].height)
+  })
+
+  test('the waves know where the water comes in', async ({ page }) => {
+    const field = await page.evaluate(async () => {
+      const { WATER_HEIGHT_GLSL } = await import('/src/utils/waterSurface.js')
+      return WATER_HEIGHT_GLSL
+    })
+
+    // Points where a jet lands, and a ring where a rim pours.
+    expect(field).toContain('uRipples')
+    expect(field).toContain('uRing')
+    expect(field).toContain('length(p) - uRing.x')
+  })
+})

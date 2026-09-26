@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp, openDrawer } from './support/app.js'
+import { gotoApp, openDrawer, waitForPark } from './support/app.js'
 
 /**
  * The three places to stand.
@@ -152,9 +152,7 @@ test.describe('AR viewpoints, against the park as it is built', () => {
    * actually got built.
    */
   const measure = async (page) => {
-    await expect
-      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
-      .toBe(true)
+    await waitForPark(page)
     return page.evaluate(async () => {
       const THREE = await import('/node_modules/.vite/deps/three.js')
       const { getViewpoints } = await import('/src/utils/arViewpoints.js')

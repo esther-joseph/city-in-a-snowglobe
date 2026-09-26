@@ -82,6 +82,25 @@ export function fitsOnGrass(x, z, radius) {
 }
 
 /**
+ * Is a circle of this radius clear of everything already standing there?
+ *
+ * The obstacles are circles of their own: benches, lamp posts, whatever has
+ * been planted already. Two circles clear each other when the gap between
+ * their middles is more than their radii together.
+ *
+ * @param {number} x
+ * @param {number} z
+ * @param {number} radius
+ * @param {Array<[number, number, number]>} obstacles - [x, z, radius]
+ * @returns {boolean}
+ */
+export function clearOfObstacles(x, z, radius, obstacles = []) {
+  return obstacles.every(
+    ([ox, oz, oradius]) => Math.hypot(x - ox, z - oz) > radius + oradius
+  )
+}
+
+/**
  * Find a spot near the one asked for that a circle of this radius fits in.
  *
  * The distance from the centre is clamped into the grass band first, then the
@@ -92,9 +111,12 @@ export function fitsOnGrass(x, z, radius) {
  * @param {number} angle
  * @param {number} distance
  * @param {number} radius
+ * @param {Array<[number, number, number]>} [obstacles] - Circles to stay out
+ *   of, as [x, z, radius]. The walk widens around them the same way it walks
+ *   around the paths.
  * @returns {[number, number]|null} [x, z]
  */
-export function placeOnGrass(angle, distance, radius) {
+export function placeOnGrass(angle, distance, radius, obstacles = []) {
   const clearance = radius + PLANTING_MARGIN
   const nearest = Math.max(
     GRASS_BAND.inner + clearance,
@@ -104,13 +126,41 @@ export function placeOnGrass(angle, distance, radius) {
   if (nearest - clearance < GRASS_BAND.inner) return null
   if (nearest + clearance > GRASS_BAND.outer) return null
 
+  // Only the obstacles this walk could possibly reach. The walk stays within
+  // a metre of the ring it was asked for, so anything further in or out than
+  // that cannot be hit, and checking it against every candidate is the bulk
+  // of what planting a park costs: a hundred and eighty placements, each
+  // trying a couple of hundred spots, against a list that grows as the park
+  // fills.
+  const reach = clearance + 1.6
+  const nearby = obstacles.filter(([x, z, radius]) => {
+    const distance = Math.hypot(x, z)
+    return Math.abs(distance - nearest) < radius + reach
+  })
+
   const stepSize = Math.PI / 90 // two degrees
+  // A step in or out as well as around. Walking in angle alone gets past a
+  // path, which runs the whole depth of the grass, but a bench is a small
+  // thing in the middle of it and stepping past it sideways drags a bush a
+  // long way around the park when half a metre further out would have done.
+  const nudges = [0, 0.7, -0.7]
+
   for (let step = 0; step <= 45; step += 1) {
     for (const direction of step === 0 ? [1] : [1, -1]) {
       const candidate = angle + direction * step * stepSize
-      const x = Math.cos(candidate) * nearest
-      const z = Math.sin(candidate) * nearest
-      if (clearOfRadialPaths(x, z, clearance)) return [x, z]
+      for (const nudge of nudges) {
+        const radial = nearest + nudge
+        if (radial - clearance < GRASS_BAND.inner) continue
+        if (radial + clearance > GRASS_BAND.outer) continue
+        const x = Math.cos(candidate) * radial
+        const z = Math.sin(candidate) * radial
+        if (
+          clearOfRadialPaths(x, z, clearance) &&
+          clearOfObstacles(x, z, clearance, nearby)
+        ) {
+          return [x, z]
+        }
+      }
     }
   }
   return null

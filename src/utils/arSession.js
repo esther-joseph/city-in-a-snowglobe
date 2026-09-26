@@ -51,3 +51,52 @@ export async function enterARWhenReady(store, { timeoutMs = ENTER_AR_TIMEOUT_MS,
 
   throw lastError
 }
+
+/**
+ * End the session, whoever asked.
+ *
+ * Exiting AR means ending the XRSession, not merely switching the app back to
+ * its 3D view. A session that is still running holds the camera and keeps
+ * drawing, and the app draws its own scene underneath it.
+ *
+ * @param {{ getState?: () => { session?: XRSession } }} store
+ * @returns {Promise<boolean>} Whether there was a session to end.
+ */
+export async function endARSession(store) {
+  const session = store?.getState?.().session
+  if (!session) return false
+  try {
+    await session.end()
+  } catch {
+    // Already ending, or ended by the system a moment ago. Either way the
+    // caller's next step is the same.
+  }
+  return true
+}
+
+/**
+ * Call back when a running session goes away, however it went.
+ *
+ * A session does not only end because the app asked. The headset's own menu
+ * ends it, the system back gesture ends it, walking out of the guardian ends
+ * it, and on a phone so does switching apps. Until the app hears about that
+ * it keeps rendering an AR view with no camera behind it, which is what left
+ * anyone leaving AR by the back button staring straight down at the fountain
+ * from a foot above it.
+ *
+ * @param {{ subscribe: (listener: (state: any) => void) => () => void,
+ *   getState: () => { session?: XRSession } }} store
+ * @param {() => void} onEnd
+ * @returns {() => void} Unsubscribe.
+ */
+export function watchARSession(store, onEnd) {
+  if (!store?.subscribe) return () => {}
+
+  let had = Boolean(store.getState?.().session)
+
+  return store.subscribe((state) => {
+    const has = Boolean(state?.session)
+    if (had && !has) onEnd()
+    had = has
+  })
+}

@@ -33,7 +33,7 @@ import {
 import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
-import { enterARWhenReady } from './utils/arSession'
+import { endARSession, enterARWhenReady, watchARSession } from './utils/arSession'
 import LoadingScreen from './components/LoadingScreen'
 import PropTypes from 'prop-types'
 import CityClock from './components/CityClock'
@@ -43,7 +43,25 @@ import CityClock from './components/CityClock'
 // dom-overlay, plane/mesh detection, anchors, etc. all as OPTIONAL features,
 // so the session still starts on devices that lack some of them — which is
 // what makes it work on both ARCore (Android) and ARKit (iOS 17+ Safari).
-const xrStore = createXRStore()
+/**
+ * The headset emulator is off unless it is asked for.
+ *
+ * @react-three/xr injects an emulated Meta Quest 3 whenever the page is served
+ * from localhost, which is every local run and every test. Two things come
+ * with it: a device panel that covers the page and eats taps meant for the
+ * app, and a bundled copy of three old enough to call `material.onBuild`,
+ * which three no longer has. The second one throws on every frame of the AR
+ * canvas, so entering AR locally left a dead screen behind the cover.
+ *
+ * It is genuinely useful, so it is kept, behind ?xr-emulator. A phone or a
+ * headset reaching a dev server over the network was never getting it anyway:
+ * the hostname is not localhost there.
+ */
+const wantsXREmulator =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).has('xr-emulator')
+
+const xrStore = createXRStore({ emulate: wantsXREmulator ? 'metaQuest3' : false })
 
 // Observational AR: the globe as an object in the room. Roughly the size of a
 // real snow globe, set down about an arm's length ahead at the height of a
@@ -79,6 +97,19 @@ const SHAKE_SPIN_DURATION = 1400
  * regardless, error state and all, rather than leaving anyone watching a bar
  * that will never fill — so it has to sit above the floor, not below it.
  */
+/**
+ * The two covers over a mode change, and how long they are held.
+ *
+ * Switching between the 3D view and AR tears one scene down and builds
+ * another, and on a phone that takes long enough to be seen happening. The
+ * cover is not decoration: going into AR it stands in front of the permission
+ * prompts and the session handshake, and coming out of it, it hides a canvas
+ * being rebuilt from nothing.
+ */
+const PREPARING_AR = { message: 'Opening a window into the park\u2026', progress: 0.4 }
+const PREPARING_3D = { message: 'Setting the globe back down\u2026', progress: 0.55 }
+const PREPARING_HOLD_MS = 1400
+
 const COVER_MINIMUM_MS = 7000
 const COVER_HAND_OVER_MS = 12000
 
@@ -956,6 +987,11 @@ function App() {
   const [arSpot, setArSpot] = useState('fountain')
   const sceneRef = useRef(null)
   const [arSessionKey, setArSessionKey] = useState(0)
+  // Bumped every time the app comes back from AR, so the 3D canvas is built
+  // again from nothing rather than resumed.
+  const [sceneKey, setSceneKey] = useState(0)
+  // A short cover over a mode change, so neither view is seen half built.
+  const [preparing, setPreparing] = useState(null)
   const [shakeTrigger, setShakeTrigger] = useState(0)
   const contentScale = SNOW_GLOBE_CONTENT_SCALE
 
@@ -1081,15 +1117,37 @@ function App() {
    * path is gated on a real capability check, so ARCore and Android XR keep
    * the WebXR session while iOS gets Quick Look or the camera fallback.
    */
+  /**
+   * Come back to the 3D view, from wherever AR got to.
+   *
+   * One way out, used by the exit button, by the session ending on its own,
+   * by the back button and by the app being sent to the background. It ends
+   * the session if one is still running, covers the change over, and builds
+   * the 3D canvas again from nothing: resuming it left the camera wherever
+   * the session had put it, which on a phone was a foot above the fountain
+   * looking straight down.
+   */
+  const leaveAR = useCallback(() => {
+    setPreparing(PREPARING_3D)
+    endARSession(xrStore)
+    setArMode(null)
+    setRenderMode('3d')
+    setSceneKey((key) => key + 1)
+  }, [])
+
   const handleRenderModeChange = useCallback(
     async (nextMode) => {
       setArNotice(null)
 
       if (nextMode !== 'ar') {
-        setRenderMode('3d')
-        setArMode(null)
+        leaveAR()
         return
       }
+
+      // Up before anything else. Everything below this either takes a moment
+      // or asks the reader for something, and the cover is what says the app
+      // heard the tap.
+      setPreparing(PREPARING_AR)
 
       const capability = await getARCapability()
 
@@ -1105,13 +1163,15 @@ function App() {
           setArNotice(
             'Your device would not start an AR session. Check that the site has camera permission, then try again.'
           )
-          setArMode(null)
-          setRenderMode('3d')
+          leaveAR()
         })
         return
       }
 
       if (capability.mode === AR_MODES.QUICK_LOOK) {
+        // Quick Look hands off to the system viewer and the app stays where
+        // it is, so there is nothing here to cover.
+        setPreparing(null)
         await launchQuickLook()
         return
       }
@@ -1119,6 +1179,7 @@ function App() {
       if (capability.mode === AR_MODES.CAMERA) {
         const cameraGranted = await requestCameraPermission()
         if (!cameraGranted) {
+          setPreparing(null)
           setArNotice('AR mode needs camera access. Enable it in your browser settings and try again.')
           return
         }
@@ -1131,9 +1192,10 @@ function App() {
         return
       }
 
+      setPreparing(null)
       setArNotice(capability.message)
     },
-    [launchQuickLook]
+    [launchQuickLook, leaveAR]
   )
 
   // Reload page on first launch
@@ -1182,9 +1244,77 @@ function App() {
    */
   useEffect(() => {
     if (renderMode === 'ar') return undefined
-    xrStore.getState().session?.end().catch(() => {})
+    endARSession(xrStore)
     return undefined
   }, [renderMode])
+
+  /**
+   * However the session ends, the app follows it out.
+   *
+   * A session does not only end because the exit button was pressed. The
+   * system back gesture ends it, the headset's own menu ends it, and the
+   * browser ends it when the tab goes away. Until this was here the app kept
+   * rendering its AR view with nothing behind it, and since that view's
+   * camera sits at standing height in the middle of a globe-sized park, what
+   * anyone pressing back actually got was a close-up of the fountain from
+   * directly overhead.
+   */
+  useEffect(() => {
+    if (renderMode !== 'ar') return undefined
+    return watchARSession(xrStore, () => leaveAR())
+  }, [renderMode, leaveAR])
+
+  /**
+   * The back button leaves AR rather than the site.
+   *
+   * Entering AR pushes a history entry, so the gesture that would otherwise
+   * navigate away pops that instead and lands here. The entry is taken back
+   * when AR is left by any other route, or the button would have to be
+   * pressed twice to get anywhere.
+   */
+  useEffect(() => {
+    if (renderMode !== 'ar') return undefined
+
+    window.history.pushState({ snowGlobeAR: true }, '')
+    let popped = false
+
+    const onPop = () => {
+      popped = true
+      leaveAR()
+    }
+
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (!popped && window.history.state?.snowGlobeAR) window.history.back()
+    }
+  }, [renderMode, leaveAR])
+
+  /** Leaving the screen leaves AR: a session nobody is looking at is a drain. */
+  useEffect(() => {
+    if (renderMode !== 'ar') return undefined
+
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') leaveAR()
+    }
+
+    document.addEventListener('visibilitychange', onHide)
+    return () => document.removeEventListener('visibilitychange', onHide)
+  }, [renderMode, leaveAR])
+
+  /**
+   * The mode cover lets go once the view behind it is standing.
+   *
+   * A fixed hold rather than a readiness signal: what is being waited for is
+   * a canvas mounting and a session attaching, neither of which reports back,
+   * and a cover that outstays the thing it is hiding is better than one that
+   * lifts too early.
+   */
+  useEffect(() => {
+    if (!preparing) return undefined
+    const id = setTimeout(() => setPreparing(null), PREPARING_HOLD_MS)
+    return () => clearTimeout(id)
+  }, [preparing])
 
   useEffect(() => {
     if (renderMode !== '3d') return
@@ -1493,6 +1623,11 @@ function App() {
           progress={loadingStage.progress}
         />
       )}
+      {/* The launch cover and this one are never up together: by the time a
+          mode can be changed the first has long gone. */}
+      {preparing && (
+        <LoadingScreen visible message={preparing.message} progress={preparing.progress} />
+      )}
       <WeatherDrawer
         weatherData={weatherData}
         hourlyForecast={hourlyForecast}
@@ -1539,7 +1674,8 @@ function App() {
           />
         )}
         {renderMode === '3d' ? (
-      <Canvas
+          <Canvas
+            key={`scene-${sceneKey}`}
             camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}
             onCreated={({ gl }) => {
               // Optimize for mobile performance
