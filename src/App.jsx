@@ -983,9 +983,10 @@ function App() {
   const [city, setCity] = useState(launch.city || 'New York')
   const [timeTick, setTimeTick] = useState(Date.now())
   const [manualHour, setManualHour] = useState(null)
-  const [forceThunder, setForceThunder] = useState(false)
-  const [forceSnow, setForceSnow] = useState(false)
-  const [forceRain, setForceRain] = useState(false)
+  // ?weather= forces a condition, for looking at one that is not happening.
+  const [forceThunder, setForceThunder] = useState(launch.weather === 'thunder')
+  const [forceSnow, setForceSnow] = useState(launch.weather === 'snow')
+  const [forceRain, setForceRain] = useState(launch.weather === 'rain')
   const [renderMode, setRenderMode] = useState('3d')
   // Which AR implementation the current device resolved to: a WebXR session
   // (ARCore, Android XR, visionOS Safari) or the camera fallback. Quick Look
@@ -1505,6 +1506,7 @@ function App() {
             forceThunder={forceThunder}
             forceSnow={forceSnow}
             forceRain={forceRain}
+            forceClouds={launch.weather === 'clouds'}
             shakeTrigger={shakeTrigger}
             performanceTier={renderMode === 'ar' ? 'mobile-ar' : 'default'}
           />

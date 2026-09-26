@@ -162,3 +162,132 @@ test.describe('Falling out of a cloud', () => {
     expect(source).toContain('Math.sqrt(Math.random()) * spread')
   })
 })
+
+/**
+ * And none of it outside the glass.
+ *
+ * The dome is a ball sitting most of the way above the floor, so it is a good
+ * deal narrower where the rain lands than where it starts: fifty-one units
+ * across up among the clouds, thirty-eight down at the ground. Rain was
+ * falling from as far out as forty-six, so whole columns of it came down
+ * outside the ornament and ran past the rim and the wooden base.
+ */
+test.describe('Contained by the glass', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+  })
+
+  test('the glass is narrower at the floor than at the clouds', async ({ page }) => {
+    const glass = await page.evaluate(async () => {
+      const { glassRadiusAt, FALL_RADIUS, GLASS } = await import('/src/utils/globeInterior.js')
+      return {
+        atFloor: glassRadiusAt(0),
+        atClouds: glassRadiusAt(35),
+        aboveTheTop: glassRadiusAt(GLASS.centreY + GLASS.radius + 1),
+        fall: FALL_RADIUS
+      }
+    })
+
+    expect(glass.atFloor).toBeGreaterThan(0)
+    expect(glass.atClouds, 'wider up where the clouds are').toBeGreaterThan(glass.atFloor)
+    expect(glass.aboveTheTop, 'nothing at all above the dome').toBe(0)
+
+    // What falls is measured against the floor, because a drop falls straight
+    // down: a column that fits where it starts but not where it lands still
+    // ends up outside.
+    expect(glass.fall).toBeLessThan(glass.atFloor)
+    expect(glass.fall).toBeGreaterThan(glass.atFloor - 5)
+  })
+
+  test('a cloud that overhangs the glass rains on the city anyway', async ({ page }) => {
+    const rained = await page.evaluate(async () => {
+      const { sampleUnderCloud, createCloudField } = await import('/src/utils/cloudField.js')
+      const { FALL_RADIUS } = await import('/src/utils/globeInterior.js')
+
+      // A cloud sitting right out at the edge, where the dome is wide.
+      const field = createCloudField(FALL_RADIUS)
+      field.clouds = [{ x: FALL_RADIUS + 6, y: 34, z: 0, radius: 8 }]
+
+      const points = Array.from({ length: 200 }, () => sampleUnderCloud(field))
+      return {
+        limit: FALL_RADIUS,
+        furthest: Math.max(...points.map((point) => Math.hypot(point.x, point.z))),
+        // Still under the cloud it came from, rather than dropped in the middle.
+        nearest: Math.min(...points.map((point) => Math.hypot(point.x, point.z)))
+      }
+    })
+
+    expect(rained.furthest).toBeLessThanOrEqual(rained.limit + 1e-9)
+    expect(rained.nearest, 'pulled in, not moved to the middle').toBeGreaterThan(
+      rained.limit * 0.5
+    )
+  })
+
+  test('a point already inside is left where it is', async ({ page }) => {
+    const held = await page.evaluate(async () => {
+      const { containToFall, insideGlass, FALL_RADIUS, GLASS } = await import(
+        '/src/utils/globeInterior.js'
+      )
+      const inside = { x: 3, y: 20, z: -4 }
+      return {
+        untouched: containToFall(inside),
+        pulled: containToFall({ x: FALL_RADIUS * 3, y: 20, z: 0 }),
+        middle: insideGlass(0, GLASS.centreY, 0),
+        wayOut: insideGlass(GLASS.radius + 10, 0, 0),
+        throughTheSide: insideGlass(glassSide(GLASS), 1, 0)
+      }
+
+      function glassSide(glassShape) {
+        return glassShape.radius + 1
+      }
+    })
+
+    expect(held.untouched).toEqual({ x: 3, y: 20, z: -4 })
+    expect(Math.hypot(held.pulled.x, held.pulled.z)).toBeCloseTo(held.pulled.x, 5)
+    // The height is not touched: only how far out it is.
+    expect(held.pulled.y).toBe(20)
+    expect(held.middle).toBe(true)
+    expect(held.wayOut).toBe(false)
+    expect(held.throughTheSide).toBe(false)
+  })
+
+  test('every drop in the scene is inside the glass', async ({ page }) => {
+    // The forced condition, which is what the parameter is for.
+    await gotoApp(page, '/?weather=rain')
+    await expect
+      .poll(() => page.evaluate(() => Boolean(window.__snowGlobeScene)), { timeout: 30000 })
+      .toBe(true)
+    await page.waitForTimeout(3000)
+
+    const drops = await page.evaluate(async () => {
+      const THREE = await import('/node_modules/.vite/deps/three.js')
+      const { insideGlass } = await import('/src/utils/globeInterior.js')
+
+      const matrix = new THREE.Matrix4()
+      const place = new THREE.Vector3()
+      let counted = 0
+      let outside = 0
+      let lowest = Infinity
+
+      window.__snowGlobeScene.traverse((object) => {
+        // A raindrop is an extruded teardrop, which nothing else in the
+        // scene is.
+        if (!object.isInstancedMesh || object.geometry?.type !== 'ExtrudeGeometry') return
+        for (let i = 0; i < object.count; i += 1) {
+          object.getMatrixAt(i, matrix)
+          place.setFromMatrixPosition(matrix)
+          counted += 1
+          lowest = Math.min(lowest, place.y)
+          if (!insideGlass(place.x, place.y, place.z)) outside += 1
+        }
+      })
+
+      return { counted, outside, lowest }
+    })
+
+    expect(drops.counted, 'it is raining').toBeGreaterThan(100)
+    expect(drops.outside, 'none of it outside the ornament').toBe(0)
+    // And none of it below the floor it lands on, running down the base.
+    expect(drops.lowest).toBeGreaterThan(-1)
+  })
+})

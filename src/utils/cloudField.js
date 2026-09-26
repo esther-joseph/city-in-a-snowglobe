@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo } from 'react'
+import { containToFall } from './globeInterior'
 
 /**
  * Where the clouds are, for the things that fall out of them.
@@ -21,8 +22,13 @@ import { createContext, useContext, useMemo } from 'react'
 export const CloudFieldContext = createContext(null)
 
 /** @returns {{ clouds: Array<{x: number, y: number, z: number, radius: number}> }} */
-export function createCloudField() {
-  return { clouds: [] }
+/**
+ * @param {number} [limit] - How far from the middle anything may fall. The
+ *   glass is narrower at the floor than at the clouds, and a drop falls
+ *   straight down, so a column that starts inside can still land outside.
+ */
+export function createCloudField(limit = Infinity) {
+  return { clouds: [], limit }
 }
 
 export function useCloudField() {
@@ -85,11 +91,17 @@ export function sampleUnderCloud(field, random = Math.random) {
   const angle = random() * Math.PI * 2
   const reach = Math.sqrt(random()) * cloud.radius
 
-  return {
-    x: cloud.x + Math.cos(angle) * reach,
-    y: cloud.y,
-    z: cloud.z + Math.sin(angle) * reach
-  }
+  // Held inside the glass. A cloud can overhang it — the dome is far wider up
+  // where the clouds are than down where the rain lands — and what falls out
+  // of the overhanging part would fall past the ornament altogether.
+  return containToFall(
+    {
+      x: cloud.x + Math.cos(angle) * reach,
+      y: cloud.y,
+      z: cloud.z + Math.sin(angle) * reach
+    },
+    field.limit
+  )
 }
 
 /**

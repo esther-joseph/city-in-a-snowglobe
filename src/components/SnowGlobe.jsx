@@ -17,6 +17,15 @@ const DEFAULT_SCALE = SNOW_GLOBE_CONTENT_SCALE
 
 /** The wooden base, and how far the city's ground sits above the globe's origin. */
 export const SNOW_GLOBE_BASE_HEIGHT = 3.2
+
+/**
+ * The glass: how big the dome is, and how far above the city floor its middle
+ * sits. Exported because what happens inside the globe has to know where the
+ * inside ends — rain that falls outside the glass is rain falling past the
+ * ornament it is supposed to be inside.
+ */
+export const SNOW_GLOBE_DOME_RADIUS = 14.5
+export const SNOW_GLOBE_DOME_RISE = 9.8
 export const SNOW_GLOBE_CITY_Y = Math.max(0.22, SNOW_GLOBE_BASE_HEIGHT * 0.07)
 
 /**
@@ -103,7 +112,7 @@ function SnowGlobe({
   baseRadius = 13.5,
   baseHeight = SNOW_GLOBE_BASE_HEIGHT,
   upperBaseHeight = 1.05,
-  domeRadius = 14.5,
+  domeRadius = SNOW_GLOBE_DOME_RADIUS,
   glassOpacity = 0.22,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
@@ -118,7 +127,7 @@ function SnowGlobe({
   // Plain collar and foot that cap the fluting, sized to the reed circumference.
   const plateHeight = Math.max(0.3, baseHeight * 0.13)
   const cityYOffset = Math.max(0.22, baseHeight * 0.07)
-  const domeCenterY = cityYOffset + 9.8
+  const domeCenterY = cityYOffset + SNOW_GLOBE_DOME_RISE
   const labelY = baseHeight / 2 + upperBaseHeight * 0.4
   const labelRadius = baseRadius * 1.12
 

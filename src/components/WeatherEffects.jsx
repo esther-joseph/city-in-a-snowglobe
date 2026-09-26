@@ -6,6 +6,7 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
 import { buildHeightField } from '../utils/surfaceHeightField'
 import { USDZ_ROOT_NAME } from '../utils/usdzExport'
 import { starGeometry } from '../utils/starGeometry'
+import { FALL_RADIUS, insideGlass } from '../utils/globeInterior'
 import {
   CloudFieldContext,
   createCloudField,
@@ -82,9 +83,12 @@ function RainParticles({ performanceScale = 1 }) {
     const verticalSpan = 45
     const baseHeight = 35
 
+    // Inside the glass, on the off chance there are no clouds to fall from:
+    // forced rain with the clouds suppressed still has to rain somewhere.
+    const reach = Math.min(domeRadius, FALL_RADIUS)
     const sampleXZ = () => {
       const theta = Math.random() * Math.PI * 2
-      const radius = Math.sqrt(Math.random()) * domeRadius
+      const radius = Math.sqrt(Math.random()) * reach
       return [Math.cos(theta) * radius, Math.sin(theta) * radius]
     }
     
@@ -263,7 +267,7 @@ const LANDING_RAY_REACH = 12
 
 function SnowParticles({ performanceScale = 1 }) {
   const points = useRef()
-  const field = useCloudField()
+  const clouds = useCloudField()
   const seeded = useRef(false)
   const settledPoints = useRef()
   const scene = useThree((state) => state.scene)
@@ -282,9 +286,11 @@ function SnowParticles({ performanceScale = 1 }) {
     const verticalSpan = 45
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
+      const angle = Math.random() * Math.PI * 2
+      const reach = Math.sqrt(Math.random()) * FALL_RADIUS
+      positions[i * 3] = Math.cos(angle) * reach
       positions[i * 3 + 1] = Math.random() * verticalSpan + 5
-      positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
+      positions[i * 3 + 2] = Math.sin(angle) * reach
       velocities[i] = Math.random() * 0.18 + 0.06
     }
 
@@ -332,16 +338,18 @@ function SnowParticles({ performanceScale = 1 }) {
    * sky, which is what forced snow with the clouds turned off falls from.
    */
   const recycle = (positions, index) => {
-    const under = sampleUnderCloud(field)
+    const under = sampleUnderCloud(clouds)
     if (under) {
       positions[index * 3] = under.x
       positions[index * 3 + 1] = under.y
       positions[index * 3 + 2] = under.z
       return
     }
-    positions[index * 3] = (Math.random() - 0.5) * particles.horizontalSpan
+    const angle = Math.random() * Math.PI * 2
+    const reach = Math.sqrt(Math.random()) * FALL_RADIUS
+    positions[index * 3] = Math.cos(angle) * reach
     positions[index * 3 + 1] = particles.verticalSpan + 5
-    positions[index * 3 + 2] = (Math.random() - 0.5) * particles.horizontalSpan
+    positions[index * 3 + 2] = Math.sin(angle) * reach
   }
 
   /**
@@ -369,7 +377,7 @@ function SnowParticles({ performanceScale = 1 }) {
     if (!points.current) return
 
     const positions = points.current.geometry.attributes.position.array
-    if (!seeded.current) seeded.current = seedUnderClouds(field, positions, count)
+    if (!seeded.current) seeded.current = seedUnderClouds(clouds, positions, count)
     const time = state.clock.elapsedTime
     const field = heightField.current
     let settledChanged = false
@@ -411,7 +419,15 @@ function SnowParticles({ performanceScale = 1 }) {
         }
       }
 
-      if (positions[i * 3 + 1] < -5) recycle(positions, i)
+      // Out through the side rather than the bottom: a flake sways as it
+      // falls, and a long enough fall in a steady sway carries it into the
+      // glass. Put it back under a cloud.
+      if (
+        positions[i * 3 + 1] < -5 ||
+        !insideGlass(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+      ) {
+        recycle(positions, i)
+      }
     }
 
     points.current.geometry.attributes.position.needsUpdate = true
@@ -519,9 +535,11 @@ function ThunderboltParticles({ performanceScale = 1 }) {
     const vanishThreshold = -5 // halfway past globe equator
     
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * horizontalSpan
+      const angle = Math.random() * Math.PI * 2
+      const reach = Math.sqrt(Math.random()) * FALL_RADIUS
+      positions[i * 3] = Math.cos(angle) * reach
       positions[i * 3 + 1] = Math.random() * verticalSpan + baseHeight
-      positions[i * 3 + 2] = (Math.random() - 0.5) * horizontalSpan
+      positions[i * 3 + 2] = Math.sin(angle) * reach
       velocities[i] = Math.random() * 0.12 + 0.06
       intensities[i] = 0
       flashPhase[i] = Math.random() * Math.PI * 2
@@ -583,9 +601,11 @@ function ThunderboltParticles({ performanceScale = 1 }) {
       if (positions[i * 3 + 1] < vanishThreshold) {
         // Out of a cloud. A bolt that starts in clear sky is a flare.
         const from = sampleUnderCloud(field)
-        positions[i * 3] = from ? from.x : (Math.random() - 0.5) * horizontalSpan
+        const angle = Math.random() * Math.PI * 2
+        const reach = Math.sqrt(Math.random()) * FALL_RADIUS
+        positions[i * 3] = from ? from.x : Math.cos(angle) * reach
         positions[i * 3 + 1] = from ? from.y : verticalSpan + baseHeight
-        positions[i * 3 + 2] = from ? from.z : (Math.random() - 0.5) * horizontalSpan
+        positions[i * 3 + 2] = from ? from.z : Math.sin(angle) * reach
         velocities[i] = Math.random() * 0.12 + 0.06
         intensities[i] = 1
       } else if (Math.random() < 0.012) {
@@ -679,11 +699,12 @@ function CloudLayer({
       8,
       Math.round((12 + density * 18) * (performanceScale < 1 ? 0.85 : densityBoost))
     )
-    // Over the whole sky, not a ring around the edge of it. They used to be
+    // Over the city, not a ring around the edge of the sky. They used to be
     // placed at a radius of forty-odd, which put every cloud out by the glass
-    // with nothing above the city — and now that the rain comes out of them,
-    // that would have left the city dry and rained on the dome.
-    const spread = 46
+    // with nothing above the city; now that the rain comes out of them, a
+    // cloud out there is a column of rain falling past the ornament. So they
+    // are kept over the ground the rain is allowed to land on.
+    const spread = FALL_RADIUS * 0.82
     // Raise clouds higher when raining to be above rain particles (rain is at y=25-50)
     const isRaining = weatherType.includes('rain') || weatherType.includes('drizzle')
     const minHeight = isRaining ? 35 : 28
@@ -963,7 +984,9 @@ function WeatherEffects({
 
   // Where the clouds are, written by the cloud layer every frame and read by
   // everything that falls out of them.
-  const cloudField = useMemo(() => createCloudField(), [])
+  // Nothing may fall outside the glass, and the glass is at its narrowest
+  // down where the rain lands rather than up where it starts.
+  const cloudField = useMemo(() => createCloudField(FALL_RADIUS), [])
 
   useEffect(() => {
     if (!shakeTrigger) return
