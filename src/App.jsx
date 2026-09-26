@@ -22,7 +22,7 @@ import {
 import CameraFeedBackground from './components/ar/CameraFeedBackground'
 import DeviceOrientationCamera from './components/ar/DeviceOrientationCamera'
 import ARSceneControls from './components/ar/ARSceneControls'
-import FitToMeters from './components/ar/FitToMeters'
+import FitToMeters, { LightsAtScale } from './components/ar/FitToMeters'
 import { AR_VIEWS, getViewpoint, getViewpoints, originFor } from './utils/arViewpoints'
 import {
   AR_MODES,
@@ -33,7 +33,12 @@ import {
 import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
-import { endARSession, enterARWhenReady, watchARSession } from './utils/arSession'
+import {
+  compositesDom,
+  endARSession,
+  enterARWhenReady,
+  watchARSession
+} from './utils/arSession'
 import LoadingScreen from './components/LoadingScreen'
 import PropTypes from 'prop-types'
 import CityClock from './components/CityClock'
@@ -799,6 +804,13 @@ const arControlStyle = {
   boxShadow: '0 6px 16px rgba(0,0,0,0.45)'
 }
 
+/** The one you are standing in, in the same amber the rest of the app uses. */
+const arControlStyleActive = {
+  ...arControlStyle,
+  border: '1px solid rgba(240, 191, 85, 0.9)',
+  color: '#f0bf55'
+}
+
 /**
  * Everything inside the canvas: sky, lights, and the globe.
  *
@@ -981,6 +993,15 @@ function App() {
   const [arMode, setArMode] = useState(null)
   const [arNotice, setArNotice] = useState(null)
   const [arHeading, setArHeading] = useState(0)
+  /**
+   * Whether the running session draws the page's own HTML over the camera.
+   *
+   * On a phone it does: ARCore's dom-overlay hands the session an element and
+   * composites it, which is how the drawer keeps working inside AR. A headset
+   * browser does not, which is the whole reason there are controls built out
+   * of geometry at all.
+   */
+  const [arDomOverlay, setArDomOverlay] = useState(false)
   // Where the viewer is, once a WebXR session is running: either outside the
   // globe looking in, or standing at one of the three spots in the park.
   const [arView, setArView] = useState(AR_VIEWS.OBSERVATIONAL)
@@ -1263,6 +1284,25 @@ function App() {
     if (renderMode !== 'ar') return undefined
     return watchARSession(xrStore, () => leaveAR())
   }, [renderMode, leaveAR])
+
+  /**
+   * Ask the session, once it is running, whether it is compositing the page.
+   *
+   * The answer decides which set of controls is drawn, and it cannot be
+   * guessed from the device: dom-overlay is requested as optional, so a
+   * phone that refuses it needs the in-scene ones too.
+   */
+  useEffect(() => {
+    if (renderMode !== 'ar') {
+      setArDomOverlay(false)
+      return undefined
+    }
+
+    const read = () => setArDomOverlay(compositesDom(xrStore.getState().session))
+
+    read()
+    return xrStore.subscribe(read)
+  }, [renderMode])
 
   /**
    * The back button leaves AR rather than the site.
@@ -1783,11 +1823,11 @@ function App() {
               <XROrigin position={arOrigin.position} rotation={arOrigin.rotation} />
               <Suspense fallback={null}>
                 {arView === AR_VIEWS.IMMERSIVE ? (
-                  <group scale={LIFE_SIZE}>
+                  <LightsAtScale factor={LIFE_SIZE}>
                     <ShakeableScene shakeTrigger={shakeTrigger}>
                       <BaseScene includeSky={false} {...sceneProps} />
                     </ShakeableScene>
-                  </group>
+                  </LightsAtScale>
                 ) : (
                   <group position={OBSERVATIONAL_PLACEMENT}>
                     <FitToMeters targetDiameter={OBSERVATIONAL_DIAMETER}>
@@ -1800,14 +1840,21 @@ function App() {
                 {/* The controls travel with the viewer. At park scale a panel
                     fixed to the world would be left standing in the fountain
                     the moment they moved to another spot. */}
-                <group position={arOrigin.position} rotation={arOrigin.rotation}>
-                  <ARSceneControls
-                    spots={arViewpoints}
-                    activeSpot={arView === AR_VIEWS.IMMERSIVE ? arSpot : null}
-                    onSelectSpot={goToSpot}
-                    onExit={() => handleRenderModeChange('3d')}
-                  />
-                </group>
+                {/* Only where the page itself cannot be drawn. On a phone
+                    these are half a metre from a camera with a narrow field
+                    of view, which fills the screen with three black slabs and
+                    leaves them hanging in the room when it turns. The same
+                    buttons are HTML down there instead. */}
+                {!arDomOverlay && (
+                  <group position={arOrigin.position} rotation={arOrigin.rotation}>
+                    <ARSceneControls
+                      spots={arViewpoints}
+                      activeSpot={arView === AR_VIEWS.IMMERSIVE ? arSpot : null}
+                      onSelectSpot={goToSpot}
+                      onExit={() => handleRenderModeChange('3d')}
+                    />
+                  </group>
+                )}
               </Suspense>
             </XR>
       </Canvas>
@@ -1851,7 +1898,11 @@ function App() {
             </button>
           </div>
         )}
-        {renderMode === 'ar' && arMode === AR_MODES.CAMERA && (
+        {/* The controls, as HTML, wherever HTML can be drawn: the camera
+            fallback, and any session compositing the page over its own view.
+            A phone holds them at the bottom of the screen where a thumb is,
+            at a size a thumb can hit, and they stay there when it turns. */}
+        {renderMode === 'ar' && (arMode === AR_MODES.CAMERA || arDomOverlay) && (
           <div
             style={{
               position: 'fixed',
@@ -1859,22 +1910,43 @@ function App() {
               left: 0,
               right: 0,
               display: 'flex',
-              gap: '10px',
+              gap: '8px',
               justifyContent: 'center',
               flexWrap: 'wrap',
               padding: '0 12px',
               zIndex: 60
             }}
+            data-testid="ar-controls"
           >
+            {/* Where to stand. Only in a real session: the camera fallback
+                holds the globe at arm's length and there is nowhere to go. */}
+            {arMode === AR_MODES.WEBXR &&
+              arViewpoints.map((spot) => {
+                const here = arView === AR_VIEWS.IMMERSIVE && arSpot === spot.id
+                return (
+                  <button
+                    key={spot.id}
+                    onClick={() => goToSpot(spot.id)}
+                    aria-pressed={here}
+                    data-testid={`ar-go-${spot.id}`}
+                    style={here ? arControlStyleActive : arControlStyle}
+                  >
+                    {spot.label}
+                  </button>
+                )
+              })}
+
             {/* No shake button in AR. What the controls are for here is
                 getting around the globe, not rattling it. */}
-            <button
-              onClick={() => setArHeading((heading) => heading + Math.PI / 12)}
-              style={arControlStyle}
-              aria-label="Rotate the globe into view"
-            >
-              ↻ Recenter
-            </button>
+            {arMode === AR_MODES.CAMERA && (
+              <button
+                onClick={() => setArHeading((heading) => heading + Math.PI / 12)}
+                style={arControlStyle}
+                aria-label="Rotate the globe into view"
+              >
+                ↻ Recenter
+              </button>
+            )}
             <button onClick={() => handleRenderModeChange('3d')} style={arControlStyle}>
               ✕ Exit AR
             </button>

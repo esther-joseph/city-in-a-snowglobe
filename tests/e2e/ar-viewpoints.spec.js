@@ -341,6 +341,53 @@ test.describe('The controls inside the session', () => {
   })
 })
 
+test.describe('Which controls a device gets', () => {
+  /**
+   * A headset browser composites no HTML, so its controls have to be
+   * geometry. A phone does composite it — that is how the drawer keeps
+   * working inside a session — and geometry is the wrong tool there: half a
+   * metre from a camera with a narrow field of view, three black slabs fill
+   * the screen and hang in the room when the phone turns.
+   *
+   * So the app asks the session which it is, and the answer decides.
+   */
+  test('the session is asked, rather than the device guessed', async ({ page }) => {
+    await gotoApp(page)
+
+    const answers = await page.evaluate(async () => {
+      const { compositesDom } = await import('/src/utils/arSession.js')
+      return {
+        // A phone, with the feature granted.
+        phone: compositesDom({ domOverlayState: { type: 'screen' } }),
+        // A headset: no overlay, so the controls have to be geometry.
+        headset: compositesDom({}),
+        // A phone that refused the feature, which is why this cannot be
+        // decided from the device: dom-overlay is requested as optional.
+        refused: compositesDom({ domOverlayState: null }),
+        noSession: compositesDom(undefined)
+      }
+    })
+
+    expect(answers.phone).toBe(true)
+    expect(answers.headset).toBe(false)
+    expect(answers.refused).toBe(false)
+    expect(answers.noSession).toBe(false)
+  })
+
+  test('the same places to stand, whichever set is drawn', async ({ page }) => {
+    await gotoApp(page)
+
+    const labels = await page.evaluate(async () => {
+      const { getViewpoints } = await import('/src/utils/arViewpoints.js')
+      return getViewpoints().map((spot) => spot.label)
+    })
+
+    // Both sets of controls are built from this one list, so they cannot
+    // drift apart: the column renders it, and so does the bar.
+    expect(labels).toEqual(['Fountain', 'Bench', 'Under the trees'])
+  })
+})
+
 test.describe('AR viewpoint panel', () => {
   test.skip(({ isMobile }) => !isMobile, 'the panel only appears once AR is running')
 

@@ -100,3 +100,22 @@ export function watchARSession(store, onEnd) {
     had = has
   })
 }
+
+/**
+ * Does this session draw the page's own HTML over its view?
+ *
+ * On a phone it does: ARCore's dom-overlay hands the session an element and
+ * composites it, which is how the drawer keeps working inside AR. A headset
+ * browser does not, which is the whole reason there are controls built out of
+ * geometry at all.
+ *
+ * It has to be asked rather than guessed. dom-overlay is requested as an
+ * optional feature, so a phone that refuses it needs the in-scene controls
+ * too, and no amount of reading the user agent will say which happened.
+ *
+ * @param {{ domOverlayState?: { type?: string } }} [session]
+ * @returns {boolean}
+ */
+export function compositesDom(session) {
+  return Boolean(session?.domOverlayState?.type)
+}
