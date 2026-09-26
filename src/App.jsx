@@ -22,7 +22,7 @@ import {
 import CameraFeedBackground from './components/ar/CameraFeedBackground'
 import DeviceOrientationCamera from './components/ar/DeviceOrientationCamera'
 import ARSceneControls from './components/ar/ARSceneControls'
-import FitToMeters from './components/ar/FitToMeters'
+import FitToMeters, { LightsAtScale } from './components/ar/FitToMeters'
 import { AR_VIEWS, getViewpoint, getViewpoints, originFor } from './utils/arViewpoints'
 import {
   AR_MODES,
@@ -1823,11 +1823,11 @@ function App() {
               <XROrigin position={arOrigin.position} rotation={arOrigin.rotation} />
               <Suspense fallback={null}>
                 {arView === AR_VIEWS.IMMERSIVE ? (
-                  <group scale={LIFE_SIZE}>
+                  <LightsAtScale factor={LIFE_SIZE}>
                     <ShakeableScene shakeTrigger={shakeTrigger}>
                       <BaseScene includeSky={false} {...sceneProps} />
                     </ShakeableScene>
-                  </group>
+                  </LightsAtScale>
                 ) : (
                   <group position={OBSERVATIONAL_PLACEMENT}>
                     <FitToMeters targetDiameter={OBSERVATIONAL_DIAMETER}>
