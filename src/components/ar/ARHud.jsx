@@ -74,9 +74,11 @@ function ARHud({
   city,
   temperature,
   condition,
-  spots,
+  // Defaults as parameters rather than defaultProps, which React 19 ignores
+  // on a function component.
+  spots = [],
   activeSpot,
-  onSelectSpot,
+  onSelectSpot = () => {},
   onExit,
   onRecenter,
   drawerOpen,
@@ -264,11 +266,6 @@ ARHud.propTypes = {
   drawerOpen: PropTypes.bool,
   onToggleDrawer: PropTypes.func.isRequired,
   showHint: PropTypes.bool
-}
-
-ARHud.defaultProps = {
-  spots: [],
-  onSelectSpot: () => {}
 }
 
 export default ARHud
