@@ -8,6 +8,9 @@
  *
  * Heights are stored in the local space of the reference object, so the map
  * stays valid when the whole globe is rotated or shaken.
+ *
+ * Anything marked `userData.transient` is left out of it, which is how the
+ * weather keeps out of its own map.
  */
 import * as THREE from 'three'
 
@@ -36,6 +39,31 @@ export function buildHeightField(reference, target, options = {}) {
   reference.updateWorldMatrix(true, false)
   target.updateWorldMatrix(true, true)
 
+  /**
+   * Only the solid things.
+   *
+   * Raycasting the city wholesale walks into its sprites — the lamp halos,
+   * the glow behind the lettering — and a sprite works out where it is from
+   * the camera, which a raycaster used like this does not have. It threw on
+   * the first one it met, so the whole map came back unbuilt and snow has
+   * been falling through the city rather than settling on it.
+   *
+   * Nothing wants to land on a halo anyway.
+   */
+  const solid = []
+  const pending = [target]
+  while (pending.length > 0) {
+    const object = pending.pop()
+    if (!object.visible) continue
+    // The weather is not a surface. It is inside the city group like
+    // everything else, so a map built from the whole group has the rain in
+    // it: a drop finds another drop overhead, calls it the ground, and lands
+    // on it. The next one spawns above that, and the shower climbs the sky.
+    if (object.userData?.transient) continue
+    if (object.isMesh) solid.push(object)
+    for (let i = 0; i < object.children.length; i += 1) pending.push(object.children[i])
+  }
+
   let built = 0
   for (let ix = 0; ix < resolution; ix += 1) {
     for (let iz = 0; iz < resolution; iz += 1) {
@@ -43,7 +71,7 @@ export function buildHeightField(reference, target, options = {}) {
       reference.localToWorld(origin)
       raycaster.set(origin, DOWN)
 
-      const intersections = raycaster.intersectObject(target, true)
+      const intersections = raycaster.intersectObjects(solid, false)
       if (intersections.length > 0) {
         hit.copy(intersections[0].point)
         reference.worldToLocal(hit)

@@ -1,9 +1,14 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react'
+import PropTypes from 'prop-types'
 import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import { Icosahedron, Sphere } from '@react-three/drei'
 import * as THREE from 'three'
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader'
-import { buildHeightField } from '../utils/surfaceHeightField'
+import {
+  SurfaceFieldContext,
+  useBuiltSurfaceField,
+  useSurfaceField
+} from '../utils/surfaceField'
 import { USDZ_ROOT_NAME } from '../utils/usdzExport'
 import { starGeometry } from '../utils/starGeometry'
 import { FALL_RADIUS, insideGlass } from '../utils/globeInterior'
@@ -46,16 +51,26 @@ export function wrapCoordinate(value, limit) {
   return (((value + limit) % span) + span) % span - limit
 }
 
+/**
+ * The map of what is underneath: how wide it reaches and how fine it is.
+ *
+ * Wide enough to cover the ground the weather is allowed to land on, and fine
+ * enough that a roof is a roof rather than a smudge. Every cell is a raycast
+ * against the whole city, so this is a square of them, not a number to raise
+ * without reason.
+ */
+const SURFACE_SPAN = 80
+const SURFACE_RESOLUTION = 44
+
 // How long the snow tumbles after a shake.
 const SHAKE_TUMBLE_DURATION = 3200
 
 function RainParticles({ performanceScale = 1 }) {
   const instancedMeshRef = useRef()
   const field = useCloudField()
+  const surface = useSurfaceField()
   const seeded = useRef(false)
-  const rippleRefs = useRef([])
   const count = Math.max(500, Math.round(1600 * performanceScale))
-  const rippleCount = performanceScale < 0.85 ? 6 : 10
   const domeRadius = performanceScale < 0.85 ? 28 : 32
 
   const dropGeometry = useMemo(() => {
@@ -115,24 +130,92 @@ function RainParticles({ performanceScale = 1 }) {
    */
   const spawn = useCallback(() => {
     const under = sampleUnderCloud(field)
-    if (under) return under
-    const [x, z] = particles.sampleXZ()
-    return { x, y: particles.verticalSpan + particles.baseHeight, z }
-  }, [field, particles])
-
-  const ripplePool = useMemo(() => {
-    const pool = []
-    for (let i = 0; i < rippleCount; i++) {
-      pool.push({
-        active: false,
-        start: 0,
-        duration: 1200,
-        radius: 0.5,
-        mesh: null
-      })
+    const from = under || {
+      x: particles.sampleXZ()[0],
+      y: particles.verticalSpan + particles.baseHeight,
+      z: particles.sampleXZ()[1]
     }
-    return pool
-  }, [rippleCount])
+
+    // Above whatever is under it. A cloud can hang lower than the rooftops
+    // it is over — on a clear day with the rain forced on, they sit at
+    // twenty-eight and the towers reach twenty-four — and a drop born inside
+    // a tower has already landed. It lands again on the very next frame, and
+    // the next, so a few hundred drops stuck like that fill the whole ripple
+    // pool every frame and the rain stops reading as rain.
+    const roof = surface?.current ? surface.current.sample(from.x, from.z) : 0
+    return from.y > roof + 2 ? from : { ...from, y: roof + 4 }
+  }, [field, particles, surface])
+
+  /**
+   * The rings a drop leaves where it lands.
+   *
+   * There used to be ten of them, taken in turn, which for sixteen hundred
+   * drops meant almost every one landed without a mark. And they all appeared
+   * at the same height, on the ground, whatever the drop had actually hit.
+   *
+   * They are instanced now — one mesh, hundreds of rings, one draw call — and
+   * each one is placed at the height of whatever stopped the drop, so the
+   * rain marks the rooftops and the canopy and the water in the fountain as
+   * well as the street.
+   */
+  const rippleCount = Math.max(120, Math.round(420 * performanceScale))
+  const rippleMeshRef = useRef()
+  const ripples = useMemo(
+    () => ({
+      // How far through its life each ring is. Past one, it is not drawn.
+      age: new Float32Array(rippleCount).fill(2),
+      position: new Float32Array(rippleCount * 3),
+      spread: new Float32Array(rippleCount),
+      // A ring buffer: at this rate the oldest ring is always the one worth
+      // giving up, and a free-slot search would be a scan per landing.
+      next: 0
+    }),
+    [rippleCount]
+  )
+
+  const rippleAlpha = useMemo(() => new Float32Array(rippleCount), [rippleCount])
+
+  const rippleGeometry = useMemo(() => {
+    // Thin: a ring of disturbed water, not a washer.
+    const ring = new THREE.RingGeometry(0.78, 1, 14)
+    ring.rotateX(-Math.PI / 2)
+    ring.setAttribute('aAlpha', new THREE.InstancedBufferAttribute(rippleAlpha, 1))
+    return ring
+  }, [rippleAlpha])
+
+  /**
+   * Unlit, and one alpha per ring.
+   *
+   * A ring that fades has to carry its own transparency, and a material's
+   * opacity is one number for every instance sharing it. So the fade rides on
+   * an instanced attribute, which is the cheapest way to have hundreds of
+   * them fading independently.
+   */
+  const rippleMaterial = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: { uColor: { value: new THREE.Color('#bfeaff') } },
+        vertexShader: /* glsl */ `
+          attribute float aAlpha;
+          varying float vAlpha;
+          void main() {
+            vAlpha = aAlpha;
+            gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform vec3 uColor;
+          varying float vAlpha;
+          void main() {
+            if (vAlpha <= 0.0) discard;
+            gl_FragColor = vec4(uColor, vAlpha);
+          }
+        `
+      }),
+    []
+  )
 
   useEffect(() => {
     if (!instancedMeshRef.current) return
@@ -150,15 +233,23 @@ function RainParticles({ performanceScale = 1 }) {
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
   }, [particles, count])
 
-  const triggerRipple = useCallback((x, z) => {
-    const now = performance.now()
-    const ripple = ripplePool.find((r) => !r.active)
-    if (!ripple) return
-    ripple.active = true
-    ripple.start = now
-    ripple.radius = 0.65 + Math.random() * 0.35
-    ripple.position = [x, 0.05, z]
-  }, [ripplePool])
+  /** Start a ring where a drop stopped, on whatever stopped it. */
+  const triggerRipple = useCallback(
+    (x, y, z) => {
+      const slot = ripples.next
+      ripples.next = (slot + 1) % rippleCount
+      ripples.age[slot] = 0
+      ripples.position[slot * 3] = x
+      // A hair above the surface, or it fights the surface for every pixel.
+      ripples.position[slot * 3 + 1] = y + 0.05
+      ripples.position[slot * 3 + 2] = z
+      // Not every drop lands the same way. Small: this is one drop, not a
+      // stone in a pond, and at a metre and a half across they read as
+      // puddles opening in the grass.
+      ripples.spread[slot] = 0.22 + Math.random() * 0.18
+    },
+    [ripples, rippleCount]
+  )
 
   useFrame(() => {
     if (!instancedMeshRef.current) return
@@ -172,11 +263,22 @@ function RainParticles({ performanceScale = 1 }) {
     for (let i = 0; i < count; i++) {
       positions[i * 3 + 1] -= particles.velocities[i]
       
-      if (positions[i * 3 + 1] < 0) {
-        triggerRipple(positions[i * 3], positions[i * 3 + 2])
+      // Whatever is under this drop: a roof, a canopy, a bench, the water in
+      // the fountain, or the street. Falling to zero and marking the ground
+      // put every ripple under the thing the drop had actually hit.
+      const ground = surface?.current
+        ? surface.current.sample(positions[i * 3], positions[i * 3 + 2])
+        : 0
+
+      if (positions[i * 3 + 1] <= ground) {
+        triggerRipple(positions[i * 3], ground, positions[i * 3 + 2])
         const from = spawn()
         positions[i * 3] = from.x
-        positions[i * 3 + 1] = from.y
+        // A little way back up inside the cloud, by a different amount each
+        // time. Sent back to exactly the same height, the whole shower falls
+        // in step: every drop lands on the same frame, every ring appears and
+        // fades together, and between those bursts nothing lands at all.
+        positions[i * 3 + 1] = from.y - Math.random() * 6
         positions[i * 3 + 2] = from.z
       }
     }
@@ -191,29 +293,47 @@ function RainParticles({ performanceScale = 1 }) {
     instancedMeshRef.current.instanceMatrix.needsUpdate = true
   })
 
-  useFrame(() => {
-    ripplePool.forEach((ripple, index) => {
-      if (!rippleRefs.current[index]) return
-      const mesh = rippleRefs.current[index]
-      if (!mesh) return
-      if (!ripple.active) {
-        mesh.visible = false
-        return
+  const rippleMatrix = useMemo(() => new THREE.Matrix4(), [])
+  const rippleScale = useMemo(() => new THREE.Vector3(), [])
+
+  useFrame((state, delta) => {
+    const mesh = rippleMeshRef.current
+    if (!mesh) return
+
+    // A ring lives under a second: long enough to read as a splash, short
+    // enough that the pool comes round again before the rain outruns it.
+    const step = delta / 0.75
+    let live = 0
+
+    for (let i = 0; i < rippleCount; i += 1) {
+      const age = ripples.age[i]
+      if (age >= 1) {
+        rippleAlpha[i] = 0
+        continue
       }
-      const now = performance.now()
-      const elapsed = now - ripple.start
-      if (elapsed > ripple.duration) {
-        ripple.active = false
-        mesh.visible = false
-        return
-      }
-      const progress = elapsed / ripple.duration
-      const scale = ripple.radius + progress * 1.35
-      mesh.visible = true
-      mesh.position.set(ripple.position[0], ripple.position[1], ripple.position[2])
-      mesh.scale.set(scale, scale, scale)
-      mesh.material.opacity = 0.35 * (1 - progress)
-    })
+
+      const next = age + step
+      ripples.age[i] = next
+      live += 1
+
+      // Spreading out and dying away as it goes, the way a ring on water
+      // loses height as the square of how far it has travelled.
+      const reach = 0.05 + next * ripples.spread[i]
+      rippleScale.set(reach, 1, reach)
+      rippleMatrix.identity()
+      rippleMatrix.setPosition(
+        ripples.position[i * 3],
+        ripples.position[i * 3 + 1],
+        ripples.position[i * 3 + 2]
+      )
+      rippleMatrix.scale(rippleScale)
+      mesh.setMatrixAt(i, rippleMatrix)
+      rippleAlpha[i] = Math.max(0, (1 - next) * (1 - next)) * 0.75
+    }
+
+    mesh.instanceMatrix.needsUpdate = true
+    mesh.geometry.attributes.aAlpha.needsUpdate = true
+    mesh.count = live > 0 ? rippleCount : 0
   })
 
   return (
@@ -230,19 +350,11 @@ function RainParticles({ performanceScale = 1 }) {
           toneMapped={false}
         />
       </instancedMesh>
-      {ripplePool.map((_, index) => (
-        <mesh
-          key={`rain-ripple-${index}`}
-          ref={(ref) => {
-            rippleRefs.current[index] = ref
-          }}
-          rotation={[-Math.PI / 2, 0, 0]}
-          visible={false}
-        >
-          <ringGeometry args={[0.35, 0.5, 32]} />
-          <meshBasicMaterial color="#9adfff" transparent opacity={0.35} />
-        </mesh>
-      ))}
+      <instancedMesh
+        ref={rippleMeshRef}
+        args={[rippleGeometry, rippleMaterial, rippleCount]}
+        frustumCulled={false}
+      />
     </>
   )
 }
@@ -273,7 +385,7 @@ function SnowParticles({ performanceScale = 1 }) {
   const scene = useThree((state) => state.scene)
   const count = Math.max(900, Math.round(2600 * performanceScale))
   const settledCapacity = Math.max(600, Math.round(1600 * performanceScale))
-  const heightField = useRef(null)
+  const heightField = useSurfaceField()
   const surfaceTarget = useRef(null)
   const landingRay = useMemo(() => new THREE.Raycaster(), [])
   const rayOrigin = useMemo(() => new THREE.Vector3(), [])
@@ -311,25 +423,13 @@ function SnowParticles({ performanceScale = 1 }) {
     node?.geometry.setDrawRange(0, 0)
   }
 
-  // Sample the city once the scene has settled. The city group is named for the
-  // USDZ exporter; falling back to the whole scene still works, just slower.
+  // The city, for the confirming raycast on a cell where the surface jumps.
   useEffect(() => {
-    let cancelled = false
     const timer = setTimeout(() => {
-      const target = scene.getObjectByName(USDZ_ROOT_NAME) || scene
-      if (cancelled || !points.current) return
-      surfaceTarget.current = target
-      heightField.current = buildHeightField(points.current, target, {
-        span: particles.horizontalSpan,
-        resolution: performanceScale < 1 ? 32 : 44
-      })
+      surfaceTarget.current = scene.getObjectByName(USDZ_ROOT_NAME) || scene
     }, 1200)
-
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [scene, particles.horizontalSpan, performanceScale])
+    return () => clearTimeout(timer)
+  }, [scene])
 
   /**
    * Put a flake back in the sky it came from.
@@ -933,6 +1033,35 @@ function CuteStarInstance({ config, driftVector, wrapRadius }) {
   )
 }
 
+/**
+ * One map of what is underneath, for everything that lands on it.
+ *
+ * Built against an anchor of its own, so the heights are measured in the same
+ * space the falling things live in, and only while something is actually
+ * falling: it is two thousand raycasts against the whole city, and a clear
+ * day has no use for it.
+ */
+function SurfaceFieldProvider({ active, children }) {
+  const anchor = useRef()
+  const field = useBuiltSurfaceField({
+    anchor,
+    span: SURFACE_SPAN,
+    resolution: SURFACE_RESOLUTION
+  })
+
+  return (
+    <SurfaceFieldContext.Provider value={active ? field : null}>
+      <group ref={anchor} />
+      {children}
+    </SurfaceFieldContext.Provider>
+  )
+}
+
+SurfaceFieldProvider.propTypes = {
+  active: PropTypes.bool,
+  children: PropTypes.node
+}
+
 function WeatherEffects({
   weatherData,
   forceClouds = false,
@@ -988,6 +1117,12 @@ function WeatherEffects({
   // down where the rain lands rather than up where it starts.
   const cloudField = useMemo(() => createCloudField(FALL_RADIUS), [])
 
+  // A dev aid: lets a test ask what the sky is doing without reaching into
+  // the scene graph for it.
+  useEffect(() => {
+    if (import.meta.env.DEV) window.__cloudField = cloudField
+  }, [cloudField])
+
   useEffect(() => {
     if (!shakeTrigger) return
     // Timed from the trigger stamp, not from now: the scene remounts on every
@@ -1021,34 +1156,38 @@ function WeatherEffects({
 
   return (
     <CloudFieldContext.Provider value={cloudField}>
-      <group ref={shakeGroupRef}>
-        {(hasRain || forceRain) && <RainParticles performanceScale={performanceScale} />}
-        {(hasSnow || forceSnow) && <SnowParticles performanceScale={performanceScale} />}
-        {hasCuteClouds && (
-          <CloudLayer
-            weatherType={weatherType}
-            windDirection={windDirection}
-            windSpeed={windSpeed}
-            weatherData={weatherData}
-            performanceScale={performanceScale}
-          />
-        )}
-        {(hasThunderstorm || forceThunder) && (
-          <Thunderbolts
-            weatherType={weatherType}
-            weatherDescription={weatherDescription}
-            forceThunder={forceThunder}
-            performanceScale={thunderPerformanceScale}
-          />
-        )}
-        {enableNightStars && (
-          <StarLayer
-            windDirection={windDirection}
-            windSpeed={windSpeed}
-            performanceScale={starPerformanceScale}
-          />
-        )}
-      </group>
+      <SurfaceFieldProvider active={hasRain || forceRain || hasSnow || forceSnow}>
+        {/* Not a surface: the map of what is underneath has to be built
+            without the weather in it, or the rain lands on itself. */}
+        <group ref={shakeGroupRef} userData={{ transient: true }}>
+          {(hasRain || forceRain) && <RainParticles performanceScale={performanceScale} />}
+          {(hasSnow || forceSnow) && <SnowParticles performanceScale={performanceScale} />}
+          {hasCuteClouds && (
+            <CloudLayer
+              weatherType={weatherType}
+              windDirection={windDirection}
+              windSpeed={windSpeed}
+              weatherData={weatherData}
+              performanceScale={performanceScale}
+            />
+          )}
+          {(hasThunderstorm || forceThunder) && (
+            <Thunderbolts
+              weatherType={weatherType}
+              weatherDescription={weatherDescription}
+              forceThunder={forceThunder}
+              performanceScale={thunderPerformanceScale}
+            />
+          )}
+          {enableNightStars && (
+            <StarLayer
+              windDirection={windDirection}
+              windSpeed={windSpeed}
+              performanceScale={starPerformanceScale}
+            />
+          )}
+        </group>
+      </SurfaceFieldProvider>
     </CloudFieldContext.Provider>
   )
 }

@@ -20,6 +20,7 @@ import { furnitureObstacles, BENCHES, LAMP_POSTS } from '../utils/parkFurniture'
 import { getViewpoints } from '../utils/arViewpoints'
 import { getRockGeometries } from '../utils/rocks'
 import { scatterFlowers } from '../utils/flowerClusters'
+import { CITY_SURFACE_NAME } from '../utils/surfaceField'
 import { useStages } from '../utils/useStages'
 import { placeBedPlots, plantBeds } from '../utils/flowerBeds'
 import { standardMaterial } from '../utils/sharedMaterial'
@@ -1245,7 +1246,9 @@ function City({
 
   return (
     <SnowGlobe cityName={cityName} weatherType={weatherType} tintColor={glassTint}>
-      <group position={[0, 0.02, 0]}>
+      {/* Named, so the map of what the weather lands on can be built from
+          the city and nothing else — not the glass around it. */}
+      <group name={CITY_SURFACE_NAME} position={[0, 0.02, 0]}>
         {(stage >= STAGE.SKYLINE ? generatedBuildings : []).map((building) =>
           building.isLandmark ? (
             <LandmarkModel key={building.key} data={building} />
@@ -1367,7 +1370,11 @@ function City({
         {(stage >= STAGE.SKYLINE ? generatedBridges : []).map((bridge) => (
           <BridgeModel key={bridge.key} data={bridge} />
         ))}
-        {extraElements}
+        {/* The sky, and the weather in it: the sun, the moon, the stars, the
+            clouds and whatever is falling out of them. None of it is a
+            surface, and a map of what the weather lands on that has the moon
+            in it says the ground is seventy units up. */}
+        <group userData={{ transient: true }}>{extraElements}</group>
     </group>
     </SnowGlobe>
   )
