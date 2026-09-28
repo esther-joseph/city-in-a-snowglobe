@@ -1,0 +1,85 @@
+/*
+ * The written pages: about, how it works, the seasons, AR, privacy.
+ *
+ * One stylesheet rather than a copy in the head of each, so a change to the
+ * type or the rules lands everywhere. The pages are plain HTML on purpose —
+ * they are the part of the site that has to be readable without running a
+ * WebGL canvas first, and a reader on a slow phone should get the words
+ * before anything else arrives.
+ */
+:root {
+  --ink: #e8ecf8;
+  --muted: #a2abc8;
+  --ground: #0b1026;
+  --panel: #141a33;
+  --rule: rgba(255, 255, 255, 0.1);
+  --gold: #f0bf55;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.5rem 5rem; }
+a { color: var(--gold); }
+
+h1 { font-size: 2rem; line-height: 1.2; margin-bottom: 0.5rem; }
+h2 { font-size: 1.25rem; margin: 2.5rem 0 0.75rem; }
+h3 { font-size: 1rem; margin: 1.75rem 0 0.5rem; color: var(--ink); }
+p, ul, ol { margin-bottom: 1rem; color: var(--muted); }
+li { margin-bottom: 0.4rem; }
+ul, ol { padding-left: 1.25rem; }
+strong { color: var(--ink); font-weight: 600; }
+code {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.9em;
+}
+
+.lede { color: var(--ink); font-size: 1.05rem; }
+.updated { color: var(--muted); font-size: 0.9rem; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+}
+.card p:last-child, .card ul:last-child { margin-bottom: 0; }
+
+table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.95rem; }
+th, td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--rule); }
+th { color: var(--ink); font-weight: 600; }
+td { color: var(--muted); }
+
+/* The bar of links that runs across the top of every written page. */
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  padding: 1rem 0 0.9rem;
+  margin-bottom: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  align-items: baseline;
+}
+.masthead .wordmark { color: var(--ink); font-weight: 600; text-decoration: none; }
+.masthead a { text-decoration: none; font-size: 0.93rem; }
+.masthead a:hover { text-decoration: underline; }
+.masthead .spacer { flex: 1; }
+
+footer { border-top: 1px solid var(--rule); margin-top: 3rem; padding-top: 1.5rem; }
+footer p { margin-bottom: 0.5rem; }
+
+
+@media (max-width: 30rem) {
+  main { padding-top: 1rem; }
+  h1 { font-size: 1.6rem; }
+}

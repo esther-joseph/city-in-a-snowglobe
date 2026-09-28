@@ -60,7 +60,7 @@ test.describe('Privacy policy', () => {
     await gotoApp(page)
     await openDrawer(page)
 
-    const link = page.getByRole('link', { name: /Privacy Policy/i })
+    const link = page.getByRole('link', { name: /^Privacy$/i })
     await expect(link).toHaveAttribute('href', '/privacy')
     // A new tab, so following it does not tear down the scene.
     await expect(link).toHaveAttribute('target', '_blank')

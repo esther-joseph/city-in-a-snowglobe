@@ -48,8 +48,8 @@ function openWeatherProxy(apiKey) {
  * Serves the standalone HTML pages in public/ at their extensionless URLs.
  *
  * Vercel does this itself with "cleanUrls": true, but Vite's dev server hands
- * /privacy to the SPA fallback instead, so the link in the app would open the
- * globe in development and the policy in production. Same trick as the weather
+ * /seasons to the SPA fallback instead, so a link in the app would open the
+ * globe in development and the page in production. Same trick as the weather
  * proxy above: make dev behave like the deployment rather than remember the
  * difference.
  */
@@ -73,48 +73,31 @@ function cleanUrlPages(pages) {
   }
 }
 
-/**
- * Puts the AdSense loader in the built page — but only for the web build.
- *
- * AdSense is a website product: serving it inside the Play Store build would
- * breach its programme policies, and the Android wrapper ships this same
- * index.html. Injecting at build time keeps the tag out of the app binary
- * while leaving it statically present in dist/index.html, which is what
- * AdSense's own site verification looks for.
- */
-function adsenseTag({ client, enabled }) {
-  return {
-    name: 'adsense-tag',
-    transformIndexHtml(html) {
-      if (!enabled || !client) return html
-      return html.replace(
-        '</head>',
-        `    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${client}"\n            crossorigin="anonymous"></script>\n</head>`
-      )
-    }
-  }
-}
-
 export default defineConfig(({ mode }) => {
   // Read .env files for the dev proxy only. On Vercel the function reads the
   // key from process.env instead.
   const env = loadEnv(mode, process.cwd(), '')
   const apiKey = process.env.OPENWEATHER_API_KEY || env.OPENWEATHER_API_KEY
 
-  // The Android build sets SNOWGLOBE_PLATFORM=native, which drops the AdSense
-  // loader; that build monetises through AdMob instead.
-  const platform = process.env.SNOWGLOBE_PLATFORM || env.SNOWGLOBE_PLATFORM || 'web'
-  // Same publisher as public/ads.txt. Overridable so a fork can point the
-  // build at its own account.
-  const adClient =
-    process.env.VITE_ADSENSE_CLIENT || env.VITE_ADSENSE_CLIENT || 'ca-pub-4752576373489354'
+  // No AdSense loader is injected into the app page, on any build.
+  //
+  // It used to be, and that is half of why the site was turned down: the tag
+  // was on a screen with no publisher content, where Auto ads promptly tried
+  // to place a unit. The loader now lives in the written pages in public/,
+  // which are the pages that have something on them, and the Android build
+  // monetises through AdMob rather than either.
 
   return {
     plugins: [
       react(),
       openWeatherProxy(apiKey),
-      cleanUrlPages({ '/privacy': 'public/privacy.html' }),
-      adsenseTag({ client: adClient, enabled: platform !== 'native' })
+      cleanUrlPages({
+        '/how-it-works': 'public/how-it-works.html',
+        '/seasons': 'public/seasons.html',
+        '/augmented-reality': 'public/augmented-reality.html',
+        '/about': 'public/about.html',
+        '/privacy': 'public/privacy.html'
+      }),
     ],
     server: {
       port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
