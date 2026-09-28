@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About, City In A Snowglobe</title>
+  <meta name="description" content="A weather app that answers with a place rather than a number: what it is, how it is built, and what it does not collect.">
+  <link rel="canonical" href="https://www.city-in-a-snowglobe.com/about">
+  <meta name="theme-color" content="#0b1026">
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="stylesheet" href="/pages.css">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4752576373489354" crossorigin="anonymous"></script>
+</head>
+<body>
+  <main>
+    <nav class="masthead">
+      <a class="wordmark" href="/">City In A Snowglobe</a>
+      <span class="spacer"></span>
+      <a href="/how-it-works">How it works</a>
+      <a href="/seasons">Seasons</a>
+      <a href="/augmented-reality">AR</a>
+      <a href="/about">About</a>
+    </nav>
+    <h1>About City In A Snowglobe</h1>
+    <p class="updated">What it is, how it is built, and who made it</p>
+
+    <p class="lede">City In A Snowglobe is a weather app that answers with a place rather than a
+    number. Type a city and it builds that city inside a snow globe, in that city's weather, at
+    that city's hour, in that city's season — and then lets you pick the globe up and put it on
+    your own table.</p>
+
+    <h2>Why build the weather instead of listing it</h2>
+    <p>A forecast tells you it is 6°C and overcast with a twelve mile an hour wind from the
+    south-west. That is accurate and it is hard to picture. A globe showing a grey afternoon over
+    a city you know, with the clouds all running one way and the lamps already on, tells you the
+    same thing in a form you can read at a glance.</p>
+    <p>So the readings are still there — temperature, feels-like, humidity, pressure, visibility,
+    wind, sunrise, sunset, a six-day outlook and the next forty-eight hours — in a panel you can
+    pull out. But the first answer is the picture.</p>
+
+    <h2>How it is put together</h2>
+    <ul>
+      <li><strong>The scene</strong> is three.js through React Three Fiber, drawn with WebGL.
+      Everything in the city is modelled rather than imported: the buildings, the park, the
+      fountain, the weather and the globe itself.</li>
+      <li><strong>The weather</strong> is OpenWeather, fetched through this site's own endpoint
+      so the key is never shipped to the browser, and cached for fifteen minutes.</li>
+      <li><strong>The sun and the moon</strong> are placed with the standard solar and lunar
+      position formulas from the city's latitude, longitude and local time, rather than being
+      parked somewhere convenient.</li>
+      <li><strong>Augmented reality</strong> is WebXR where the device has it, with a camera
+      fallback and Quick Look for iOS.</li>
+      <li><strong>The Android app</strong> is the same site wrapped with Capacitor.</li>
+    </ul>
+
+
+    <h2>Things worth knowing</h2>
+    <ul>
+      <li><strong>No account, ever.</strong> There is nothing to sign in to and nothing is
+      collected about you. The <a href="/privacy">privacy policy</a> is short and specific.</li>
+      <li><strong>Your location is never requested.</strong> Weather is looked up by the city
+      name you type.</li>
+      <li><strong>The same city always builds the same city.</strong> The skyline is generated
+      from the name, so it does not shuffle between visits.</li>
+      <li><strong>It works offline, briefly.</strong> A cached reading up to a day old is shown
+      if the network is gone, rather than an error.</li>
+    </ul>
+
+    <h2>Reading further</h2>
+    <ul>
+      <li><a href="/how-it-works">How the globe reads the weather</a> — which field of the
+      observation drives which part of the scene.</li>
+      <li><a href="/seasons">Seasons in the park</a> — how the season is chosen, and what each
+      one changes.</li>
+      <li><a href="/augmented-reality">Standing inside the globe</a> — what your device can do,
+      and how to use it.</li>
+    </ul>
+
+    <h2>Credits</h2>
+    <ul>
+      <li>Weather data by <a href="https://openweathermap.org" rel="noopener">OpenWeather</a>.</li>
+      <li>Condition icons from the <a href="https://github.com/basmilius/weather-icons" rel="noopener">Meteocons</a> set.</li>
+      <li>Built with <a href="https://threejs.org" rel="noopener">three.js</a>,
+      <a href="https://r3f.docs.pmnd.rs" rel="noopener">React Three Fiber</a> and
+      <a href="https://capacitorjs.com" rel="noopener">Capacitor</a>; hosted on
+      <a href="https://vercel.com" rel="noopener">Vercel</a>.</li>
+    </ul>
+
+    <h2>Contact</h2>
+    <p>Corrections, bug reports and requests:
+    <a href="mailto:literaryquery23@gmail.com">literaryquery23@gmail.com</a></p>
+    <footer>
+      <p><a href="/">Open the snow globe →</a></p>
+      <p><a href="/how-it-works">How it works</a> · <a href="/seasons">Seasons</a> ·
+      <a href="/augmented-reality">Augmented reality</a> · <a href="/about">About</a> ·
+      <a href="/privacy">Privacy</a></p>
+    </footer>
+  </main>
+</body>
+</html>

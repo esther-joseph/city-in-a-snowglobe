@@ -137,15 +137,28 @@ function WeatherDrawer({
           )}
           {/* Foot of the scroll: nothing below it to be pushed out of reach. */}
           <AdSlot name="drawer-footer" renderMode={renderMode} />
-          {/* A new tab, so following it does not tear down the scene. */}
-          <a
-            href="/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-white/40 hover:text-white/70 transition-colors self-center pb-2"
-          >
-            Privacy Policy
-          </a>
+          {/* The written pages: what the globe is showing, how the seasons
+              are chosen, how AR works. New tabs, so following one does not
+              tear down the scene. */}
+          <nav className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-white/40 pb-2">
+            {[
+              ['/how-it-works', 'How it works'],
+              ['/seasons', 'Seasons'],
+              ['/augmented-reality', 'AR guide'],
+              ['/about', 'About'],
+              ['/privacy', 'Privacy']
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white/70 transition-colors"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
         </div>
       </div>
     </>

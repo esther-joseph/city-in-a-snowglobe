@@ -22,18 +22,32 @@ export function adPlatform() {
 }
 
 /**
- * Ads are off when the reader has opted out, when a test or a screenshot run
- * asks for a clean page, or while the camera is showing: an ad laid over a
- * live AR view invites the accidental clicks that get a publisher account
- * suspended, and it covers the thing the reader pointed the camera at.
+ * Ads are off on the web app screen entirely, off when the reader has opted
+ * out, off when a test or a screenshot run asks for a clean page, and off
+ * while the camera is showing: an ad laid over a live AR view invites the
+ * accidental clicks that get a publisher account suspended, and it covers the
+ * thing the reader pointed the camera at.
  *
  * @param {Object} [context]
  * @param {string} [context.renderMode] - '3d' or 'ar'.
+ * @param {string} [context.platform] - Injectable, for the tests.
  * @returns {boolean}
  */
-export function adsEnabled({ renderMode = '3d' } = {}) {
+export function adsEnabled({ renderMode = '3d', platform = adPlatform() } = {}) {
   if (typeof window === 'undefined') return false
   if (renderMode === 'ar') return false
+
+  // Never on the web app's own screen.
+  //
+  // That screen is a canvas and a panel of readings: a tool, with no
+  // publisher content on it, and AdSense does not allow its ads on screens
+  // without any — which is the finding that cost this site its approval. The
+  // written pages carry the advertising now, and they carry it in their own
+  // markup rather than through here.
+  //
+  // The packaged Android app is a different product under different rules, so
+  // the native path is left alone.
+  if (platform === 'web') return false
 
   try {
     if (new URLSearchParams(window.location.search).get('ads') === 'off') return false

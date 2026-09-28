@@ -2,11 +2,14 @@ import { test, expect } from '@playwright/test'
 import { gotoApp, openDrawer, temperature } from './support/app.js'
 
 /**
- * The ad slots, the client-side weather cache and the launch parameters.
+ * Advertising, the client-side weather cache and the launch parameters.
  *
- * The slots carry no ad unit ids in this checkout, so what is asserted here is
- * placement and policy — that a slot appears where it should, disappears where
- * it must, and never sits between the reader and the globe.
+ * The slots used to sit in the weather panel, and that is what cost the site
+ * its AdSense approval: the app screen is a canvas and a panel of readings,
+ * with no publisher content on it, and Google does not allow its ads on a
+ * screen like that. The advertising moved to the written pages, which is
+ * where site-content.spec.js checks it. What is left here is that the app
+ * screen asks for none of it.
  */
 
 const SLOTS = ['ad-slot-drawer-banner', 'ad-slot-drawer-footer']
@@ -21,45 +24,43 @@ function countProxyCalls(page) {
 }
 
 test.describe('Ad slots', () => {
-  test('sit inside the weather panel, not over the globe', async ({ page }) => {
+  test('none of them render on the globe screen', async ({ page }) => {
     await gotoApp(page)
     await openDrawer(page)
 
     for (const slot of SLOTS) {
-      await expect(page.getByTestId(slot)).toBeVisible()
+      await expect(page.getByTestId(slot), `${slot} is not drawn`).toHaveCount(0)
     }
 
-    // Each is labelled, which the AdSense policies require.
-    await expect(page.getByText('Advertisement', { exact: true })).toHaveCount(SLOTS.length)
+    // And nothing else has put an ad on the page either: the loader is not
+    // in this document at all, so Auto ads cannot place one.
+    await expect(page.locator('ins.adsbygoogle')).toHaveCount(0)
+    await expect(page.locator('script[src*="adsbygoogle"]')).toHaveCount(0)
 
     // The scene is still there and still on top of nothing.
     await expect(page.locator('canvas').first()).toBeAttached()
   })
 
-  test('are parked off-screen until the panel is opened', async ({ page }) => {
-    await gotoApp(page)
-    // The panel is translated out of the viewport rather than unmounted, so
-    // the question is where the slot is, not whether it exists.
-    for (const slot of SLOTS) {
-      const box = await page.getByTestId(slot).boundingBox()
-      expect(box.x + box.width).toBeLessThanOrEqual(0)
-    }
-  })
-
-  test('can be switched off with ?ads=off', async ({ page }) => {
+  test('?ads=off still holds, for the pages that do carry them', async ({ page }) => {
     await gotoApp(page, '/?ads=off')
-    await openDrawer(page)
-    for (const slot of SLOTS) {
-      await expect(page.getByTestId(slot)).toHaveCount(0)
-    }
+    const off = await page.evaluate(async () => {
+      const { adsEnabled } = await import('/src/services/ads/adProvider.js')
+      return adsEnabled({ platform: 'native' })
+    })
+    expect(off, 'the opt-out is honoured whatever the platform').toBe(false)
   })
 
   test('never run while the camera is showing', async ({ page }) => {
     await gotoApp(page)
     const inAR = await page.evaluate(async () => {
       const { adsEnabled } = await import('/src/services/ads/adProvider.js')
-      return { ar: adsEnabled({ renderMode: 'ar' }), scene: adsEnabled({ renderMode: '3d' }) }
+      return {
+        ar: adsEnabled({ renderMode: 'ar', platform: 'native' }),
+        scene: adsEnabled({ renderMode: '3d', platform: 'native' })
+      }
     })
+    // An ad over a live camera view invites the accidental clicks that get a
+    // publisher account suspended, on any platform.
     expect(inAR.ar).toBe(false)
     expect(inAR.scene).toBe(true)
   })

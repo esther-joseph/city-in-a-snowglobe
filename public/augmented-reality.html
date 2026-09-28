@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Augmented reality, City In A Snowglobe</title>
+  <meta name="description" content="Put the globe in your room, or stand inside the park at its own size. What each device can do, the two ways of looking, and the touch gestures.">
+  <link rel="canonical" href="https://www.city-in-a-snowglobe.com/augmented-reality">
+  <meta name="theme-color" content="#0b1026">
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="stylesheet" href="/pages.css">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4752576373489354" crossorigin="anonymous"></script>
+</head>
+<body>
+  <main>
+    <nav class="masthead">
+      <a class="wordmark" href="/">City In A Snowglobe</a>
+      <span class="spacer"></span>
+      <a href="/how-it-works">How it works</a>
+      <a href="/seasons">Seasons</a>
+      <a href="/augmented-reality">AR</a>
+      <a href="/about">About</a>
+    </nav>
+    <h1>Standing inside the globe</h1>
+    <p class="updated">Augmented reality, and what your device can do with it</p>
+
+    <p class="lede">AR mode takes the globe off the screen and puts it in the room you are
+    sitting in. On a recent Android phone it goes further than that: you can leave it on the
+    table at the size of a real ornament, or drop the park to its own scale and stand in it,
+    beside the fountain or under the trees.</p>
+
+    <h2>What your device will do</h2>
+    <table>
+      <tr><th>Device</th><th>What happens</th></tr>
+      <tr>
+        <td>Android, Chrome, with ARCore</td>
+        <td>A full WebXR session. The globe is placed in the room, you can walk around it, and
+        you can switch to standing inside the park.</td>
+      </tr>
+      <tr>
+        <td>iPhone and iPad</td>
+        <td>Safari has no WebXR, so the globe is drawn over the camera feed and follows the
+        phone as you turn. On iOS 17 and later the model can also be opened in Quick Look.</td>
+      </tr>
+      <tr>
+        <td>A headset browser</td>
+        <td>A full session, with the controls drawn as panels in the scene rather than as part
+        of the page, because a headset browser does not composite the page over its view.</td>
+      </tr>
+      <tr>
+        <td>Desktop</td>
+        <td>No AR. The button explains why rather than failing quietly.</td>
+      </tr>
+    </table>
+
+    <h2>The two ways of looking</h2>
+    <h3>Observational</h3>
+    <p>The globe as an object: about the size a real snow globe is, an arm's length away, sitting
+    where you left it. Walking around the room walks around it. This is where AR starts.</p>
+
+    <h3>Immersive</h3>
+    <p>The same city, at its own size. The shrink the globe applies to the park is undone, so a
+    bench is a bench and the dome overhead is a sky. You do not walk there — the park is bigger
+    than your room — so there are three places to stand, and choosing one puts you in it.</p>
+    <ul>
+      <li><strong>Fountain.</strong> Beside the water, with the skyline behind it.</li>
+      <li><strong>Bench.</strong> Sat down, at seat height, looking across at the fountain.</li>
+      <li><strong>Under the trees.</strong> At the drip line of one of the big ring trees,
+      looking up through the canopy at the towers and the sky. Standing against the trunk would
+      put the crown between you and everything worth seeing.</li>
+    </ul>
+
+
+    <h2>Turning it and sizing it</h2>
+    <p>There is no orbit control in AR: the camera is your phone, and moving it means walking. So
+    the gestures move the globe instead.</p>
+    <ul>
+      <li><strong>One finger, dragged sideways</strong> turns the globe on its axis. A full turn
+      takes about one screen width.</li>
+      <li><strong>Two fingers</strong> resize it, between roughly half and four times.</li>
+      <li><strong>A vertical drag does nothing</strong>, deliberately. Tipping a snow globe over
+      is not something anyone wants, and a vertical component in a one-finger drag is almost
+      always someone trying to scroll.</li>
+    </ul>
+    <p>A pinch never turns it and a drag never resizes it, even though a hand opening rotates a
+    little as it goes.</p>
+
+    <h2>Leaving</h2>
+    <p>Exit AR, the system back gesture, the headset's own menu, or putting the phone down: all
+    four end the session and bring the 3D view back where it started. That was worth saying
+    because for a while only the button worked, and leaving any other way left the app drawing
+    an AR view with nothing behind it — which, since that view's camera stands at eye height in
+    the middle of a globe-sized park, looked like a close-up of the fountain from directly
+    overhead.</p>
+
+    <h2>If something looks wrong</h2>
+    <ul>
+      <li><strong>The button is disabled.</strong> The device has no AR route at all. The button
+      says which.</li>
+      <li><strong>Nothing starts after you tap.</strong> The session needs camera permission.
+      Check it in the browser's site settings and try again.</li>
+      <li><strong>The globe is somewhere odd.</strong> Point the phone at a textured, well-lit
+      surface for a second or two: the tracking needs something to hold on to, and a blank wall
+      in a dark room gives it nothing.</li>
+      <li><strong>No ads appear in AR.</strong> That is on purpose. An advert over a live camera
+      view invites accidental taps and covers the thing you pointed the camera at.</li>
+    </ul>
+
+    <div class="card">
+      <p><strong>A note on privacy:</strong> the camera image is drawn behind the globe on your
+      own device. It is never recorded, uploaded or sent anywhere. The
+      <a href="/privacy">privacy policy</a> says so in full.</p>
+    </div>
+    <footer>
+      <p><a href="/">Open the snow globe →</a></p>
+      <p><a href="/how-it-works">How it works</a> · <a href="/seasons">Seasons</a> ·
+      <a href="/augmented-reality">Augmented reality</a> · <a href="/about">About</a> ·
+      <a href="/privacy">Privacy</a></p>
+    </footer>
+  </main>
+</body>
+</html>

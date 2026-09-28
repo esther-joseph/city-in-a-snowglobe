@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How the globe reads the weather, City In A Snowglobe</title>
+  <meta name="description" content="Every cloud, shadow and falling flake in the globe comes from a field in the weather report. Which field does what, and how the sun and moon are placed.">
+  <link rel="canonical" href="https://www.city-in-a-snowglobe.com/how-it-works">
+  <meta name="theme-color" content="#0b1026">
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="stylesheet" href="/pages.css">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4752576373489354" crossorigin="anonymous"></script>
+</head>
+<body>
+  <main>
+    <nav class="masthead">
+      <a class="wordmark" href="/">City In A Snowglobe</a>
+      <span class="spacer"></span>
+      <a href="/how-it-works">How it works</a>
+      <a href="/seasons">Seasons</a>
+      <a href="/augmented-reality">AR</a>
+      <a href="/about">About</a>
+    </nav>
+    <h1>How the globe reads the weather</h1>
+    <p class="updated">A guide to what you are looking at</p>
+
+    <p class="lede">City In A Snowglobe takes an ordinary weather observation — the sort of
+    reading a forecast turns into a number and an icon — and builds it into a small world
+    instead. Nothing in the globe is decorative. Every cloud, every falling thing and every
+    shadow comes from a field in that observation. This page says which field does what, so you
+    can read the globe back.</p>
+
+    <h2>Where the reading comes from</h2>
+    <p>The weather is OpenWeather's current-conditions report for the city you typed, fetched
+    through this site's own endpoint so the API key stays on the server. A report is cached for
+    fifteen minutes; going back to a city you have already looked at costs nothing and shows the
+    same reading rather than a slightly different one.</p>
+    <p>The report carries rather more than a temperature: a condition code, a written
+    description, cloud cover as a percentage, wind speed and bearing, humidity, pressure,
+    visibility, the time of the observation, the city's offset from UTC, and its latitude and
+    longitude. All of it is used.</p>
+
+    <h2>The sky</h2>
+
+    <h3>Clouds</h3>
+    <p>Cloud cover arrives as a percentage, and it sets how many clouds there are and how tightly
+    they are packed. A clear reading gives a handful drifting near the glass; an overcast one
+    fills the dome. Their colour comes from the condition rather than the cover: rain and
+    thunder darken a cloud to slate, snow only dulls it, and anything else leaves it white.</p>
+    <p>They drift. The direction is the wind bearing from the report and the speed follows the
+    wind speed, so on a still day they barely move and in a gale they cross the dome. When one
+    reaches the edge it wraps round to the other side, carrying on rather than piling up — which
+    is a thing it used to do, all of them stacking into one bank on the downwind side.</p>
+
+    <h3>Rain, snow and lightning</h3>
+    <p>What falls is decided by the condition code: rain and drizzle give rain, snow and sleet
+    give snow, a thunderstorm gives both cloud-to-ground bolts and the dark cloud they come out
+    of.</p>
+    <p>All of it falls <strong>out of the clouds</strong>, which is less obvious than it sounds.
+    Each emitter used to have its own patch of sky and its own fixed height, so it rained over
+    the city while the clouds sat somewhere else entirely. Now the clouds report where they are
+    on every frame — they are drifting, so it cannot be worked out once — and every drop, flake
+    and bolt starts inside the footprint of an actual cloud and just below its underside.</p>
+    <p>A drop stops when it meets something. The city is sampled into a coarse map of what is
+    highest at each point — a roof, a canopy, a bench, the water in the fountain, the street —
+    and the ring it leaves appears at that height rather than on the ground beneath whatever it
+    hit. Snow uses the same map to settle: a flake that reaches the surface height for its
+    column is copied into a second, still point cloud, and the blanket builds up over a few
+    minutes.</p>
+
+    <h3>Wind</h3>
+    <p>Beyond the clouds, the wind bends the trees. Every canopy sways on its own phase, leaning
+    with the bearing and harder as the speed rises, and the flowers in the beds bend with it
+    too — less, because a flower is a stalk rather than a branch.</p>
+
+
+    <h2>The light</h2>
+
+    <h3>Day, night, and the hour in between</h3>
+    <p>The globe runs on the city's clock, not yours. The observation carries the city's offset
+    from UTC, and that is what decides the hour: look up Tokyo at breakfast in London and you
+    get Tokyo's evening. Sunrise and sunset come with the report, so the switch from day to
+    night happens when it happens there.</p>
+
+    <h3>Where the sun and the moon actually are</h3>
+    <p>They are not stuck in the corner of the sky. Both are placed from the city's latitude and
+    longitude and the current time, using the standard solar and lunar position formulas: the
+    sun's declination and hour angle give its elevation and bearing, and the moon gets the same
+    treatment along with its phase. So the sun rises in the right part of the sky for the place,
+    tracks across at the right height for the season, and sets on the correct side — and at
+    night the moon is where the real one is, lit the way the real one is lit.</p>
+    <p>Everything else follows from that. The direction of the shadows across the park, the
+    colour of the light on the buildings, how far the street lamps have to work — all of it
+    comes from the sun's elevation rather than from a switch.</p>
+
+    <h3>Stars</h3>
+    <p>They come out when the sun is far enough below the horizon, and how many of them appear
+    depends on the cloud cover: an overcast night gets very few, because the sky over the city is
+    not actually clear.</p>
+
+    <h2>The city itself</h2>
+    <p>The skyline is generated per city from the city's own name, so the same name always builds
+    the same city: the same towers in the same places, every visit. A handful of cities have
+    hand-placed landmarks on top of that. The park in the middle is the same park everywhere —
+    a fountain, four paths, benches, lamps, beds of flowers and a couple of hundred trees and
+    bushes — planted in one pass so that nothing ends up growing through a bench.</p>
+
+    <h2>What it is not</h2>
+    <p>It is a reading, not a forecast. The globe shows the conditions reported for the last
+    observation, which may be up to an hour old, and it does not predict anything. The
+    six-day and forty-eight-hour panels in the side drawer are OpenWeather's forecast, shown as
+    numbers, and the globe does not animate them.</p>
+
+    <div class="card">
+      <p><strong>Try it:</strong> open the side panel, search for a city on the other side of the
+      world, and watch the light change as the globe picks up that city's hour. Rio in the
+      evening and Oslo at breakfast look nothing alike.</p>
+    </div>
+    <footer>
+      <p><a href="/">Open the snow globe →</a></p>
+      <p><a href="/how-it-works">How it works</a> · <a href="/seasons">Seasons</a> ·
+      <a href="/augmented-reality">Augmented reality</a> · <a href="/about">About</a> ·
+      <a href="/privacy">Privacy</a></p>
+    </footer>
+  </main>
+</body>
+</html>
