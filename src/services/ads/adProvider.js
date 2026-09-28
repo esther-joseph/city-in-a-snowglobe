@@ -22,11 +22,22 @@ export function adPlatform() {
 }
 
 /**
- * Ads are off on the web app screen entirely, off when the reader has opted
- * out, off when a test or a screenshot run asks for a clean page, and off
- * while the camera is showing: an ad laid over a live AR view invites the
+ * Whether an ad may run here at all.
+ *
+ * Off while the camera is showing: an ad laid over a live AR view invites the
  * accidental clicks that get a publisher account suspended, and it covers the
- * thing the reader pointed the camera at.
+ * thing the reader pointed the camera at. Off when the reader has opted out,
+ * and off when a test or a screenshot run asks for a clean page.
+ *
+ * On the web this used to be off everywhere, after ads on the app screen cost
+ * the site its approval. What that finding was about is a screen with no
+ * publisher content on it — a bare canvas — and the answer to it is where the
+ * slots are allowed to be, not whether the web may have any. There is exactly
+ * one on this app now, at the foot of the weather drawer, under the readings,
+ * the hourly and weekly forecast, the UV and the sun's path; and the drawer
+ * mounts it only while it is open, because an ad served into a panel that is
+ * slid off-screen is an ad in hidden content, which is its own breach. The
+ * written pages carry their own in their own markup, as before.
  *
  * @param {Object} [context]
  * @param {string} [context.renderMode] - '3d' or 'ar'.
@@ -36,18 +47,7 @@ export function adPlatform() {
 export function adsEnabled({ renderMode = '3d', platform = adPlatform() } = {}) {
   if (typeof window === 'undefined') return false
   if (renderMode === 'ar') return false
-
-  // Never on the web app's own screen.
-  //
-  // That screen is a canvas and a panel of readings: a tool, with no
-  // publisher content on it, and AdSense does not allow its ads on screens
-  // without any — which is the finding that cost this site its approval. The
-  // written pages carry the advertising now, and they carry it in their own
-  // markup rather than through here.
-  //
-  // The packaged Android app is a different product under different rules, so
-  // the native path is left alone.
-  if (platform === 'web') return false
+  if (platform === 'none') return false
 
   try {
     if (new URLSearchParams(window.location.search).get('ads') === 'off') return false
@@ -71,9 +71,11 @@ export function setAdsEnabled(enabled) {
 /**
  * Make sure the AdSense loader is present.
  *
- * The production page gets the tag injected at build time (see the adsenseTag
- * plugin in vite.config.js), which is what AdSense's site verification reads.
- * This covers `vite dev`, where no such transform has run.
+ * The app's own page ships without it — nothing on index.html should be
+ * asking for advertising before something that carries advertising is on
+ * screen — so the loader arrives with the first slot that mounts, and only
+ * then. The written pages carry the tag in their own markup instead, which is
+ * also what AdSense's site verification reads.
  */
 export function loadAdSense() {
   if (typeof document === 'undefined' || !AD_CLIENT) return

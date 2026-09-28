@@ -76,18 +76,40 @@ test.describe('Pages with something on them', () => {
   })
 })
 
-test.describe('No ads on the screen without content', () => {
-  test('the globe screen carries no ad markup', async ({ page }) => {
+test.describe('Where an ad is allowed to be', () => {
+  test('nothing on the screen itself, and two inside the drawer', async ({ page }) => {
     await gotoApp(page)
-    await openDrawer(page)
 
-    // Not hidden, not empty, not there: an AdSense unit on this screen is
-    // what the review objected to.
+    // The globe on its own is a canvas: a tool, with nothing to read on it.
+    // An AdSense unit here is what the review objected to.
     await expect(page.locator('ins.adsbygoogle')).toHaveCount(0)
     await expect(page.locator('[data-ad-client]')).toHaveCount(0)
+
+    await openDrawer(page)
+
+    // The drawer is the other thing: the readings, the forecast, the UV, the
+    // sun's path — content, with a band at the head of it and a unit at the
+    // end.
+    await expect(page.locator('[data-testid^="ad-slot-"] ins.adsbygoogle')).toHaveCount(2)
+    await expect(page.getByTestId('ad-slot-search-banner')).toBeVisible()
+    await expect(page.getByTestId('ad-slot-drawer-footer')).toBeAttached()
   })
 
-  test('and asks for none, whatever the slot config says', async ({ page }) => {
+  test('and it is gone again when the panel is shut', async ({ page }) => {
+    await gotoApp(page)
+    await openDrawer(page)
+    await expect(page.getByTestId('ad-slot-search-banner')).toHaveCount(1)
+
+    await page.getByRole('button', { name: /Close Weather Info/i }).click()
+
+    // The closed panel is still in the document, slid off to the left. An ad
+    // served into it would be an ad in hidden content, which is its own
+    // breach — so it is not merely hidden, it is not there.
+    await expect(page.getByTestId('ad-slot-search-banner')).toHaveCount(0)
+    await expect(page.locator('[data-testid^="ad-slot-"] ins.adsbygoogle')).toHaveCount(0)
+  })
+
+  test('and asks for none where there is nothing to read', async ({ page }) => {
     await gotoApp(page)
 
     const answers = await page.evaluate(async () => {
@@ -102,10 +124,12 @@ test.describe('No ads on the screen without content', () => {
       }
     })
 
-    expect(answers.web).toBe(false)
-    expect(answers.webInAR).toBe(false)
+    expect(answers.web).toBe(true)
     expect(answers.native).toBe(true)
-    // Still never over a live camera view, on any platform.
+    // Never over a live camera view, on any platform: an ad laid over what
+    // someone has pointed a camera at collects the accidental clicks that
+    // get an account suspended.
+    expect(answers.webInAR).toBe(false)
     expect(answers.nativeInAR).toBe(false)
   })
 

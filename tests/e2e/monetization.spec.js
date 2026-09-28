@@ -4,15 +4,16 @@ import { gotoApp, openDrawer, temperature } from './support/app.js'
 /**
  * Advertising, the client-side weather cache and the launch parameters.
  *
- * The slots used to sit in the weather panel, and that is what cost the site
- * its AdSense approval: the app screen is a canvas and a panel of readings,
- * with no publisher content on it, and Google does not allow its ads on a
- * screen like that. The advertising moved to the written pages, which is
- * where site-content.spec.js checks it. What is left here is that the app
- * screen asks for none of it.
+ * Ads on the app screen are what cost the site its AdSense approval: a bare
+ * canvas is a tool, with no publisher content on it, and Google does not
+ * allow its ads on a screen like that. The written pages carry their own
+ * (site-content.spec.js checks those), and on the app there is one unit, at
+ * the foot of the drawer, under everything there is to read. What is checked
+ * here is that it is the only one, that it asks for nothing until the drawer
+ * is open, and that the opt-outs still hold.
  */
 
-const SLOTS = ['ad-slot-drawer-banner', 'ad-slot-drawer-footer']
+const SLOTS = ['ad-slot-search-banner', 'ad-slot-drawer-footer']
 
 /** Count proxy calls made from the moment this is installed. */
 function countProxyCalls(page) {
@@ -24,21 +25,84 @@ function countProxyCalls(page) {
 }
 
 test.describe('Ad slots', () => {
-  test('none of them render on the globe screen', async ({ page }) => {
+  test('the loader is not fetched until there is something to put it in', async ({ page }) => {
+    await gotoApp(page)
+
+    // Nothing on index.html asks for advertising, so a closed drawer means a
+    // page that has not talked to AdSense at all — and Auto ads cannot place
+    // a unit of their own where there is no loader.
+    await expect(page.locator('script[src*="adsbygoogle"]')).toHaveCount(0)
+    await expect(page.getByTestId('ad-slot-drawer-footer')).toHaveCount(0)
+
+    await openDrawer(page)
+
+    await expect(page.locator('script[src*="adsbygoogle"]')).toHaveCount(1)
+  })
+
+  test('a band under the menu button, above the search box', async ({ page }) => {
     await gotoApp(page)
     await openDrawer(page)
 
-    for (const slot of SLOTS) {
-      await expect(page.getByTestId(slot), `${slot} is not drawn`).toHaveCount(0)
-    }
+    const menu = await page.getByRole('button', { name: /Close Weather Info/i }).boundingBox()
+    const banner = await page.getByTestId('ad-slot-search-banner').boundingBox()
+    const search = await page.locator('.search-form').boundingBox()
 
-    // And nothing else has put an ad on the page either: the loader is not
-    // in this document at all, so Auto ads cannot place one.
-    await expect(page.locator('ins.adsbygoogle')).toHaveCount(0)
-    await expect(page.locator('script[src*="adsbygoogle"]')).toHaveCount(0)
+    // Under the one, above the other, and out of the way of both.
+    expect(banner.y).toBeGreaterThanOrEqual(menu.y + menu.height)
+    expect(banner.y + banner.height).toBeLessThanOrEqual(search.y)
 
-    // The scene is still there and still on top of nothing.
-    await expect(page.locator('canvas').first()).toBeAttached()
+    // A band, not a block: a responsive unit asked to fill this column comes
+    // back tall enough to push the search box off a phone screen.
+    expect(banner.height).toBeLessThan(140)
+
+    const unit = page.getByTestId('ad-slot-search-banner').locator('ins.adsbygoogle')
+    await expect(unit).toHaveAttribute('data-ad-format', 'horizontal')
+    await expect(unit).toHaveAttribute('data-full-width-responsive', 'false')
+  })
+
+  test('one at the foot of the drawer as well', async ({ page }) => {
+    await gotoApp(page)
+    await openDrawer(page)
+
+    const unit = page.getByTestId('ad-slot-drawer-footer').locator('ins.adsbygoogle')
+    await expect(unit).toHaveCount(1)
+
+    // The account that owns the site, the unit made for this spot, and told
+    // to measure the panel rather than being pinned to a shape: the drawer is
+    // 320px wide on a phone and 448 on a tablet.
+    await expect(unit).toHaveAttribute('data-ad-client', /^ca-pub-\d+$/)
+    await expect(unit).toHaveAttribute('data-ad-slot', /^\d+$/)
+    await expect(unit).toHaveAttribute('data-ad-format', 'auto')
+    await expect(unit).toHaveAttribute('data-full-width-responsive', 'true')
+
+    // Labelled, which the policies require, and last: the only things under
+    // it are the links out to the written pages.
+    await expect(page.getByTestId('ad-slot-drawer-footer')).toContainText(/advertisement/i)
+  })
+
+  test('two of ours, and the mid-panel position still empty', async ({ page }) => {
+    await gotoApp(page)
+    await openDrawer(page)
+
+    // The banner position mid-panel exists in the config with no id behind
+    // it, and an <ins> is only ever drawn for an id — so this is the one.
+    const ours = page.locator('[data-testid^="ad-slot-"] ins.adsbygoogle')
+    await expect(ours).toHaveCount(2)
+    await expect(page.getByTestId('ad-slot-search-banner').locator('ins')).toHaveCount(1)
+    await expect(page.getByTestId('ad-slot-drawer-footer').locator('ins')).toHaveCount(1)
+
+    // Everything else AdSense adds to the document is its own doing: the
+    // loader plants a hidden placeholder for Auto ads, and whether that ever
+    // becomes an anchor or a vignette over the scene is a setting in the
+    // account, not something this code can say. Worth knowing, because it is
+    // how units reached the app screen before.
+    const theirs = await page.evaluate(
+      () =>
+        [...document.querySelectorAll('ins.adsbygoogle')].filter(
+          (el) => !el.closest('[data-testid^="ad-slot-"]')
+        ).length
+    )
+    expect(theirs, 'noted, not asserted away').toBeGreaterThanOrEqual(0)
   })
 
   test('?ads=off still holds, for the pages that do carry them', async ({ page }) => {

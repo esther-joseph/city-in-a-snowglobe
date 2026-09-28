@@ -95,6 +95,15 @@ function WeatherDrawer({
         }}
       >
         <div className={`${hud ? 'pt-24' : 'pt-20'} px-6 pb-6 flex flex-col gap-5`}>
+          {/* Head of the panel: under the menu button, above the title and
+              the search box, and a band of its own rather than something
+              sitting on the search field — an ad flush against a text input
+              reads as part of the input.
+
+              Only while the panel is out. Closed, it is still in the
+              document, slid off to the left, and an ad served into a panel
+              nobody can see is an ad in hidden content. */}
+          {isOpen && <AdSlot name="search-banner" renderMode={renderMode} className="!mt-0" />}
           {/* Weather UI Components */}
           <WeatherUI
             weatherData={weatherData}
@@ -117,6 +126,7 @@ function WeatherDrawer({
           forceRain={forceRain}
             weatherService={weatherService}
             renderMode={renderMode}
+            panelOpen={isOpen}
           />
           <ModeToggle 
             mode={renderMode} 
@@ -135,8 +145,11 @@ function WeatherDrawer({
               onSpotChange={onArSpotChange}
             />
           )}
-          {/* Foot of the scroll: nothing below it to be pushed out of reach. */}
-          <AdSlot name="drawer-footer" renderMode={renderMode} />
+          {/* Foot of the scroll: nothing below it to be pushed out of reach.
+              Only while the panel is actually out — closed, it is still in
+              the document, slid off to the left, and an ad served into a
+              panel nobody can see is an ad in hidden content. */}
+          {isOpen && <AdSlot name="drawer-footer" renderMode={renderMode} />}
           {/* The written pages: what the globe is showing, how the seasons
               are chosen, how AR works. New tabs, so following one does not
               tear down the scene. */}
