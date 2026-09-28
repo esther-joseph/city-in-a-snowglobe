@@ -22,7 +22,10 @@ import {
 import CameraFeedBackground from './components/ar/CameraFeedBackground'
 import DeviceOrientationCamera from './components/ar/DeviceOrientationCamera'
 import ARSceneControls from './components/ar/ARSceneControls'
+import ARHud from './components/ar/ARHud'
+import { AR_CAMERA } from './utils/arCamera'
 import FitToMeters, { LightsAtScale } from './components/ar/FitToMeters'
+import AnchoredGlobe from './components/ar/AnchoredGlobe'
 import { AR_VIEWS, getViewpoint, getViewpoints, originFor } from './utils/arViewpoints'
 import {
   AR_MODES,
@@ -790,28 +793,6 @@ function resolveCityProfile(cityName) {
   return cityProfiles[normalized] || defaultCityProfile
 }
 
-// The camera fallback's own controls, matched to the ones the WebXR session
-// draws inside the scene: rounded, black, and lighter at the top.
-const arControlStyle = {
-  pointerEvents: 'auto',
-  padding: '12px 22px',
-  background: 'linear-gradient(180deg, #20242e 0%, #000000 100%)',
-  color: '#fff',
-  border: '1px solid rgba(255, 255, 255, 0.16)',
-  borderRadius: '999px',
-  fontSize: '15px',
-  fontWeight: 600,
-  cursor: 'pointer',
-  boxShadow: '0 6px 16px rgba(0,0,0,0.45)'
-}
-
-/** The one you are standing in, in the same amber the rest of the app uses. */
-const arControlStyleActive = {
-  ...arControlStyle,
-  border: '1px solid rgba(240, 191, 85, 0.9)',
-  color: '#f0bf55'
-}
-
 /**
  * Everything inside the canvas: sky, lights, and the globe.
  *
@@ -1004,6 +985,23 @@ function App() {
    * of geometry at all.
    */
   const [arDomOverlay, setArDomOverlay] = useState(false)
+  // The drawer's handle lives on the HUD's top rail in AR, so its open state
+  // has to live somewhere the HUD can reach. Outside AR the drawer keeps its
+  // own, which is what every other screen wants.
+  const [hudDrawerOpen, setHudDrawerOpen] = useState(false)
+  /**
+   * Whether the HUD is the interface right now.
+   *
+   * True wherever the page can be drawn over the room: the camera fallback,
+   * and any immersive session that composites the DOM over its own view,
+   * which is every phone. A headset draws its controls in the scene instead,
+   * because there is no page in front of its eyes to draw on.
+   */
+  const hudActive = renderMode === 'ar' && (arMode === AR_MODES.CAMERA || arDomOverlay)
+
+  useEffect(() => {
+    if (!hudActive) setHudDrawerOpen(false)
+  }, [hudActive])
 
   /**
    * Turning and resizing the globe with a finger.
@@ -1683,6 +1681,11 @@ function App() {
         <LoadingScreen visible message={preparing.message} progress={preparing.progress} />
       )}
       <WeatherDrawer
+        // In AR the drawer is part of the HUD: the top rail carries its
+        // handle, and it slides out under the rail in the same glass.
+        hud={hudActive}
+        open={hudActive ? hudDrawerOpen : undefined}
+        onOpenChange={setHudDrawerOpen}
         weatherData={weatherData}
         hourlyForecast={hourlyForecast}
         weeklyForecast={weeklyForecast}
@@ -1800,7 +1803,10 @@ function App() {
         ) : (
           <Canvas
             key={`ar-session-${arSessionKey}`}
-            camera={{ position: [0, 1.6, 0], fov: 50 }}
+            // Near plane included, which is what lets the viewer lean in
+            // through the glass rather than slicing the city open. See
+            // arCamera.js.
+            camera={AR_CAMERA}
             onCreated={({ gl, scene }) => {
               // <XR> (v6) enables gl.xr and manages the session/reference space
               // itself; we only need to guarantee a transparent framebuffer so
@@ -1847,24 +1853,25 @@ function App() {
                     </ShakeableScene>
                   </LightsAtScale>
                 ) : (
-                  <group
-                    position={OBSERVATIONAL_PLACEMENT}
-                    // Turned and resized by the gestures. Both ride on the
-                    // outside of the fit, so the fit itself is still measured
-                    // once, against the globe's own size.
-                    rotation={[0, arGesture.spin, 0]}
-                    scale={arGesture.scale}
-                  >
-                    <FitToMeters targetDiameter={OBSERVATIONAL_DIAMETER}>
-                      <ShakeableScene shakeTrigger={shakeTrigger}>
-                        <BaseScene includeSky={false} {...sceneProps} />
-                      </ShakeableScene>
-                    </FitToMeters>
-                  </group>
+                  <AnchoredGlobe position={OBSERVATIONAL_PLACEMENT}>
+                    <group
+                      // Turned and resized by the gestures. Both ride on the
+                      // outside of the fit, so the fit itself is still
+                      // measured once, against the globe's own size.
+                      rotation={[0, arGesture.spin, 0]}
+                      scale={arGesture.scale}
+                    >
+                      <FitToMeters targetDiameter={OBSERVATIONAL_DIAMETER}>
+                        <ShakeableScene shakeTrigger={shakeTrigger}>
+                          <BaseScene includeSky={false} {...sceneProps} />
+                        </ShakeableScene>
+                      </FitToMeters>
+                    </group>
+                  </AnchoredGlobe>
                 )}
-                {/* The controls travel with the viewer. At park scale a panel
-                    fixed to the world would be left standing in the fountain
-                    the moment they moved to another spot. */}
+                {/* The controls go where the viewer goes: the column follows
+                    the head, with slack. Left at this origin they were stood
+                    in the fountain the moment anyone walked away from it. */}
                 {/* Only where the page itself cannot be drawn. On a phone
                     these are half a metre from a camera with a narrow field
                     of view, which fills the screen with three black slabs and
@@ -1923,76 +1930,33 @@ function App() {
             </button>
           </div>
         )}
-        {/* The controls, as HTML, wherever HTML can be drawn: the camera
+        {/* The HUD, wherever HTML can be drawn over the room: the camera
             fallback, and any session compositing the page over its own view.
-            A phone holds them at the bottom of the screen where a thumb is,
-            at a size a thumb can hit, and they stay there when it turns. */}
-        {renderMode === 'ar' && (arMode === AR_MODES.CAMERA || arDomOverlay) && (
-          <div
-            style={{
-              position: 'fixed',
-              bottom: 'clamp(12px, 4vh, 28px)',
-              left: 0,
-              right: 0,
-              display: 'flex',
-              gap: '8px',
-              justifyContent: 'center',
-              flexWrap: 'wrap',
-              padding: '0 12px',
-              zIndex: 60
-            }}
-            data-testid="ar-controls"
-          >
-            {/* Said once, and only until someone has done it: a hint that
-                stays up after it has been taken is a label. */}
-            {!arGesture.touched && (
-              <span
-                style={{
-                  width: '100%',
-                  textAlign: 'center',
-                  color: 'rgba(255,255,255,0.7)',
-                  fontSize: '13px',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-                  paddingBottom: '2px'
-                }}
-                data-testid="ar-gesture-hint"
-              >
-                Drag to turn · pinch to resize
-              </span>
-            )}
-            {/* Where to stand. Only in a real session: the camera fallback
-                holds the globe at arm's length and there is nowhere to go. */}
-            {arMode === AR_MODES.WEBXR &&
-              arViewpoints.map((spot) => {
-                const here = arView === AR_VIEWS.IMMERSIVE && arSpot === spot.id
-                return (
-                  <button
-                    key={spot.id}
-                    onClick={() => goToSpot(spot.id)}
-                    aria-pressed={here}
-                    data-testid={`ar-go-${spot.id}`}
-                    style={here ? arControlStyleActive : arControlStyle}
-                  >
-                    {spot.label}
-                  </button>
-                )
-              })}
-
-            {/* No shake button in AR. What the controls are for here is
-                getting around the globe, not rattling it. */}
-            {arMode === AR_MODES.CAMERA && (
-              <button
-                onClick={() => setArHeading((heading) => heading + Math.PI / 12)}
-                style={arControlStyle}
-                aria-label="Rotate the globe into view"
-              >
-                ↻ Recenter
-              </button>
-            )}
-            <button onClick={() => handleRenderModeChange('3d')} style={arControlStyle}>
-              ✕ Exit AR
-            </button>
-          </div>
+            A headset gets the in-scene column instead, above. */}
+        {hudActive && (
+          <ARHud
+            city={weatherData?.name || city}
+            temperature={
+              typeof weatherData?.main?.temp === 'number' ? weatherData.main.temp : null
+            }
+            condition={weatherData?.weather?.[0]?.description}
+            // Where to stand. Only in a real session: the camera fallback
+            // holds the globe at arm's length and there is nowhere to go.
+            spots={arMode === AR_MODES.WEBXR ? arViewpoints : []}
+            activeSpot={arView === AR_VIEWS.IMMERSIVE ? arSpot : null}
+            onSelectSpot={goToSpot}
+            // No shake button in AR. What the controls are for here is getting
+            // around the globe, not rattling it.
+            onRecenter={
+              arMode === AR_MODES.CAMERA
+                ? () => setArHeading((heading) => heading + Math.PI / 12)
+                : null
+            }
+            onExit={() => handleRenderModeChange('3d')}
+            drawerOpen={hudDrawerOpen}
+            onToggleDrawer={() => setHudDrawerOpen((open) => !open)}
+            showHint={!arGesture.touched}
+          />
         )}
         {arNotice && (
           <div

@@ -30,14 +30,28 @@ function WeatherDrawer({
   onArViewChange,
   onArSpotChange,
   weatherService,
-  initiallyOpen = false
+  initiallyOpen = false,
+  // In AR the drawer is a part of the HUD rather than a thing floating in
+  // front of it: the HUD carries the handle that opens it, so the open state
+  // has to be something the HUD can hold. Left alone, the drawer keeps its
+  // own, which is what every other screen wants.
+  open,
+  onOpenChange,
+  hud = false
 }) {
   // The manifest's "Change city" shortcut launches with ?panel=open.
-  const [isOpen, setIsOpen] = useState(initiallyOpen)
+  const [ownOpen, setOwnOpen] = useState(initiallyOpen)
+  const isOpen = open === undefined ? ownOpen : open
+  const setIsOpen = (next) => {
+    if (open === undefined) setOwnOpen(next)
+    onOpenChange?.(next)
+  }
 
   return (
     <>
-      {/* Toggle Button - Always visible, even in AR mode */}
+      {/* Toggle Button - Always visible, except in AR, where the HUD has its
+          own handle for this and two would be one too many. */}
+      {!hud && (
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed top-4 left-4 z-[100] bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-lg shadow-lg hover:bg-black/90 transition-all duration-200 flex items-center gap-2 border border-white/10"
@@ -57,12 +71,15 @@ function WeatherDrawer({
         </svg>
         <span className="font-medium">{isOpen ? 'Close Weather Info' : 'Open Weather Info'}</span>
       </button>
+      )}
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 left-0 h-full w-full max-w-md bg-black/45 z-[90] transform transition-transform duration-300 ease-in-out overflow-y-auto ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        data-testid="weather-drawer"
+        data-open={isOpen ? 'true' : 'false'}
+        className={`fixed top-0 left-0 h-full w-full max-w-md z-[90] transform transition-transform duration-300 ease-in-out overflow-y-auto ${
+          hud ? 'bg-black/60 border-r border-white/10' : 'bg-black/45'
+        } ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{
           // The panel itself no longer blurs its backdrop. Every card inside
           // already carries its own backdrop-filter, and stacking those inside
@@ -77,7 +94,7 @@ function WeatherDrawer({
           willChange: 'transform'
         }}
       >
-        <div className="pt-20 px-6 pb-6 flex flex-col gap-5">
+        <div className={`${hud ? 'pt-24' : 'pt-20'} px-6 pb-6 flex flex-col gap-5`}>
           {/* Weather UI Components */}
           <WeatherUI
             weatherData={weatherData}
