@@ -17,30 +17,6 @@ const env = import.meta.env ?? {}
 export const AD_CLIENT = env.VITE_ADSENSE_CLIENT || 'ca-pub-4752576373489354'
 
 export const AD_SLOTS = {
-  // The head of the drawer, above the search box: the first thing under the
-  // title, and the one position in the panel that is in view the moment it
-  // opens rather than after a scroll.
-  //
-  // It shares the footer's unit id by default. Reporting cannot tell the two
-  // apart while it does, so set VITE_ADSENSE_SLOT_SEARCH to a unit of its
-  // own once there is one.
-  'search-banner': {
-    web: {
-      slot: env.VITE_ADSENSE_SLOT_SEARCH || '8417155376',
-      // Horizontal, and pinned to that height rather than left responsive.
-      // A responsive unit measures the column and helps itself: asked to
-      // fill a 360px-wide panel it came back 419px tall, which put the title
-      // and the search box below the fold of a phone. A band is a band.
-      format: 'horizontal',
-      fullWidthResponsive: false,
-      minHeight: 90
-    },
-    native: {
-      unit: env.VITE_ADMOB_UNIT_SEARCH || null,
-      size: 'BANNER',
-      position: 'TOP_CENTER'
-    }
-  },
   // Under the metrics and the timeline, where the reader has stopped to look
   // at numbers. In-view, never over the globe.
   'drawer-banner': {
@@ -79,3 +55,16 @@ export const AD_SLOTS = {
 }
 
 export const AD_SLOT_NAMES = Object.keys(AD_SLOTS)
+
+/**
+ * Full-screen ads, which exist in the packaged app and nowhere else.
+ *
+ * There is no `web` key here and that is the point: AdSense does not permit a
+ * publisher-placed interstitial, so there is nothing for the web build to
+ * read even by accident. See nativeInterstitial.js.
+ */
+export const AD_INTERSTITIALS = {
+  // On the way out of AR: a break the person chose, with a transition to
+  // cover it and no permission waiting on the other side.
+  'ar-exit': { native: { unit: env.VITE_ADMOB_UNIT_AR_EXIT || null } }
+}

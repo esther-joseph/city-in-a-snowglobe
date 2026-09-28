@@ -33,10 +33,24 @@ export async function gotoApp(page, path = '/') {
   await expect(temperature(page)).toBeVisible({ timeout: 45000 })
 }
 
-/** Slide the weather drawer open and wait for it to settle. */
+/**
+ * Make sure the weather drawer is open, and wait for it to settle.
+ *
+ * On a wide viewport it is already out when the app loads — there is room for
+ * it beside the globe, and a landing screen with the readings on it is the
+ * point — so this opens it only if it needs opening.
+ */
 export async function openDrawer(page) {
-  await page.getByRole('button', { name: /Open Weather Info/i }).click()
+  const opener = page.getByRole('button', { name: /Open Weather Info/i })
+  if (await opener.count()) await opener.click()
   await expect(page.getByRole('button', { name: /Close Weather Info/i })).toBeVisible()
+}
+
+/** Shut it again, for the specs that care what a closed panel looks like. */
+export async function closeDrawer(page) {
+  const closer = page.getByRole('button', { name: /Close Weather Info/i })
+  if (await closer.count()) await closer.click()
+  await expect(page.getByRole('button', { name: /Open Weather Info/i })).toBeVisible()
 }
 
 /**

@@ -95,15 +95,6 @@ function WeatherDrawer({
         }}
       >
         <div className={`${hud ? 'pt-24' : 'pt-20'} px-6 pb-6 flex flex-col gap-5`}>
-          {/* Head of the panel: under the menu button, above the title and
-              the search box, and a band of its own rather than something
-              sitting on the search field — an ad flush against a text input
-              reads as part of the input.
-
-              Only while the panel is out. Closed, it is still in the
-              document, slid off to the left, and an ad served into a panel
-              nobody can see is an ad in hidden content. */}
-          {isOpen && <AdSlot name="search-banner" renderMode={renderMode} className="!mt-0" />}
           {/* Weather UI Components */}
           <WeatherUI
             weatherData={weatherData}
