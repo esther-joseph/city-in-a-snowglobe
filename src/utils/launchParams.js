@@ -26,13 +26,22 @@ export function launchParams(search = typeof window !== 'undefined' ? window.loc
   try {
     params = new URLSearchParams(search)
   } catch {
-    return { city: null, panelOpen: false, skipCover: false, view: '3d', source: null }
+    return { city: null, panelOpen: false, skipCover: false, view: '3d', source: null, weather: null }
   }
 
   const city = params.get('city')?.trim()
 
+  // ?weather=rain|snow|thunder|clouds forces a condition on top of whatever
+  // the city is actually having. The toggles that used to do this were in the
+  // side panel and are commented out; a parameter is better anyway, because
+  // it survives a reload and can be opened on a phone, which is where the
+  // weather is worth looking at.
+  const forced = params.get('weather')?.trim().toLowerCase()
+  const weather = ['rain', 'snow', 'thunder', 'clouds'].includes(forced) ? forced : null
+
   return {
     city: city || null,
+    weather,
     panelOpen: params.get('panel') === 'open',
     skipCover: params.get('cover') === 'off',
     // Always 3D: ?view=ar is accepted and ignored, for the reason above.
