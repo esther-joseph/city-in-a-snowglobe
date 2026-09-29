@@ -115,19 +115,49 @@ test.describe('A lost graphics context', () => {
       .toContain('city=Boston')
     await expect(page.locator('canvas').first()).toBeAttached()
   })
+
+  test('is heard from inside the canvas, not from outside it', async ({ page }) => {
+    await gotoApp(page)
+
+    const source = await page.evaluate(async () => {
+      const module = await import('/src/App.jsx?raw')
+      return module.default
+    })
+
+    // This is the whole of the fix for a page that reloaded itself on the way
+    // into every AR session.
+    //
+    // Unmounting a canvas ends its context too — R3F calls forceContextLoss
+    // when it tears a root down — and this app unmounts one every time
+    // somebody presses AR, because the 3D view and the AR view are different
+    // canvases. A listener attached when the canvas was created heard that
+    // deliberate loss and reloaded the page, with the HUD on screen for the
+    // second it took.
+    //
+    // R3F unmounts the React tree first and forces the loss afterwards, so a
+    // listener owned by a component inside the tree is gone before it fires.
+    expect(source).toContain('<ContextLossGuard onLost={onContextLost} />')
+    expect(source).not.toContain('watchForContextLoss')
+
+    // And both canvases are covered: a real loss in either is worth hearing.
+    expect(source.match(/<ContextLossGuard /g)?.length).toBe(2)
+  })
+
+  test('the guard lets go of the listener when it goes', async ({ page }) => {
+    await gotoApp(page)
+
+    const guard = await page.evaluate(async () => {
+      const module = await import('/src/components/ContextLossGuard.jsx?raw')
+      return module.default
+    })
+
+    // The cleanup is the point of the component. Without it this is the same
+    // bug with more steps.
+    expect(guard).toContain("canvas.addEventListener('webglcontextlost', handle)")
+    expect(guard).toContain("return () => canvas.removeEventListener('webglcontextlost', handle)")
+  })
 })
 
-/**
- * The element a session is allowed to draw the page into.
- *
- * WebXR's dom-overlay does not composite the page over the camera view. It
- * composites one element — the overlay root named when the session is
- * requested — and shows nothing else at all. Left to itself the library makes
- * an empty div for this and appends it to the body, which is what happened
- * here: the session faithfully composited an empty div while the HUD, a
- * sibling of it, was outside the only element on screen. On a phone that
- * reads as "the AR UI is missing", because it is.
- */
 test.describe('The overlay a session composites', () => {
   test.beforeEach(async ({ page }) => {
     await gotoApp(page)

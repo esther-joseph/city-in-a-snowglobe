@@ -40,6 +40,7 @@ import { launchParams } from './utils/launchParams'
 import { reloadTarget, worthWarningAbout } from './utils/arRecovery'
 import { arOverlayRoot, hudPortalTarget } from './utils/arOverlayRoot'
 import { explainSessionEnd, noteAR, shouldStartOver } from './utils/arDiagnostics'
+import ContextLossGuard from './components/ContextLossGuard'
 import { AD_INTERSTITIALS } from './services/ads/adConfig'
 import { adsEnabled } from './services/ads/adProvider'
 import { prepareInterstitial, showInterstitial } from './services/ads/nativeInterstitial'
@@ -1571,23 +1572,11 @@ function App() {
    * event because rebuilding the scene from a restore is the same work as a
    * reload with more ways to be subtly wrong.
    */
-  const watchForContextLoss = useCallback(
-    (gl) => {
-      const canvas = gl?.domElement
-      if (!canvas) return
-
-      canvas.addEventListener(
-        'webglcontextlost',
-        (event) => {
-          event.preventDefault()
-          console.warn('The graphics context was lost; reloading.')
-          window.location.replace(reloadTarget({ city }))
-        },
-        { once: true }
-      )
-    },
-    [city]
-  )
+  const onContextLost = useCallback(() => {
+    noteAR('context-lost')
+    console.warn('The graphics context was lost; reloading.')
+    window.location.replace(reloadTarget({ city }))
+  }, [city])
 
   useEffect(() => {
     const onShow = () => {
@@ -2005,7 +1994,6 @@ function App() {
             key={`scene-${sceneKey}`}
             camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}
             onCreated={({ gl }) => {
-              watchForContextLoss(gl)
               // Optimize for mobile performance
               const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
               if (isMobile) {
@@ -2020,6 +2008,10 @@ function App() {
             }}
             style={{ background: 'transparent' }}
           >
+            {/* Inside the canvas, so that unmounting this one on the way into
+                AR takes the listener with it before R3F forces the context
+                loss it always forces. See ContextLossGuard. */}
+            <ContextLossGuard onLost={onContextLost} />
             <Suspense fallback={null}>
               <SceneBridge targetRef={sceneRef} />
               <ShakeableScene shakeTrigger={shakeTrigger}>
@@ -2079,7 +2071,6 @@ function App() {
             // arCamera.js.
             camera={AR_CAMERA}
             onCreated={({ gl, scene }) => {
-              watchForContextLoss(gl)
               // <XR> (v6) enables gl.xr and manages the session/reference space
               // itself; we only need to guarantee a transparent framebuffer so
               // the camera passthrough shows through behind the scene.
@@ -2106,6 +2097,7 @@ function App() {
               preserveDrawingBuffer: false
             }}
           >
+            <ContextLossGuard onLost={onContextLost} />
             <XR store={xrStore}>
               {/* XROrigin = where the user stands. v6 normalises to the
                   'local-floor' reference space on BOTH ARCore and ARKit, so y=0
