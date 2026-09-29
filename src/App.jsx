@@ -1434,6 +1434,37 @@ function App() {
    * useful thing a phone can report. Whatever was thrown last is held here
    * and read when the session goes.
    */
+  /**
+   * The two things that end a dom-overlay session without anybody asking.
+   *
+   * Chrome puts the overlay root into something very like fullscreen for the
+   * length of the session, so an exit from fullscreen — by the system, by a
+   * gesture, by anything — takes the session with it. And a session whose own
+   * visibilityState goes to hidden has been backgrounded by the device rather
+   * than by this app.
+   *
+   * Neither leaves a trace anywhere the app can see afterwards, and both look
+   * identical from here: a session that ended by itself. Noted as they happen
+   * so the account of the ending can say which.
+   */
+  useEffect(() => {
+    if (renderMode !== 'ar') return undefined
+
+    const session = xrStore.getState?.().session
+    const onSessionVisibility = () =>
+      noteAR('session-visibility', { state: session?.visibilityState ?? null })
+    const onFullscreen = () =>
+      noteAR('fullscreen', { element: document.fullscreenElement?.id ?? null })
+
+    session?.addEventListener?.('visibilitychange', onSessionVisibility)
+    document.addEventListener('fullscreenchange', onFullscreen)
+
+    return () => {
+      session?.removeEventListener?.('visibilitychange', onSessionVisibility)
+      document.removeEventListener('fullscreenchange', onFullscreen)
+    }
+  }, [renderMode, arDomOverlay])
+
   useEffect(() => {
     if (renderMode !== 'ar') return undefined
 

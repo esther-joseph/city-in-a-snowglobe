@@ -145,7 +145,11 @@ test.describe('The overlay a session composites', () => {
         // leaks onto the ordinary app screen.
         display: style.display,
         // The room shows through everywhere the HUD is not.
-        pointerEvents: style.pointerEvents
+        pointerEvents: style.pointerEvents,
+        // Chrome fullscreens this element for the session, and the user-agent
+        // stylesheet paints a fullscreened element black. Stated, or the
+        // overlay is an opaque sheet with no camera behind it.
+        background: style.backgroundColor
       }
     })
 
@@ -154,6 +158,7 @@ test.describe('The overlay a session composites', () => {
     expect(root.position).toBe('fixed')
     expect(root.display).toBe('none')
     expect(root.pointerEvents).toBe('none')
+    expect(root.background).toMatch(/rgba\(0, 0, 0, 0\)|transparent/)
   })
 
   test('is handed to the session rather than left to the library', async ({ page }) => {
@@ -250,10 +255,12 @@ test.describe('Entering a session', () => {
       source.indexOf('}, [renderMode, leaveAR])', source.indexOf('return watchARSession'))
     )
 
-    // Two conditions, not one: the app did not end it, and nobody was
-    // watching. Either alone leaves a flag lying about to go off at some
-    // unrelated moment later.
-    expect(watcher).toContain('!arEndedByApp.current')
-    expect(watcher).toContain("document.visibilityState === 'hidden'")
+    // Both facts are gathered — who ended it, and whether anybody was
+    // looking — and the decision is left to shouldStartOver, which is where
+    // the rules are, and where ar-diagnostics.spec.js checks them. Asserting
+    // the expression here instead would only be asserting its spelling.
+    expect(watcher).toContain('endedByApp: arEndedByApp.current')
+    expect(watcher).toContain("hidden: document.visibilityState === 'hidden'")
+    expect(watcher).toContain('shouldStartOver(how)')
   })
 })
