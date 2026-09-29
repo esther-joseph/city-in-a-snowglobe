@@ -35,8 +35,15 @@ export const AD_SLOTS = {
   // scroll, so nothing is pushed out of reach.
   'drawer-footer': {
     web: {
-      slot: env.VITE_ADSENSE_SLOT_FOOTER || null,
-      format: 'rectangle',
+      // The unit from the account that owns AD_CLIENT. Still overridable, so
+      // a fork or a staging deploy points at its own inventory rather than
+      // billing impressions to this one.
+      slot: env.VITE_ADSENSE_SLOT_FOOTER || '8417155376',
+      // Responsive: AdSense measures the panel and picks the shape, which is
+      // what a column that is 320px wide on a phone and 448px on a tablet
+      // needs. A fixed rectangle would letterbox on one of them.
+      format: 'auto',
+      fullWidthResponsive: true,
       minHeight: 100
     },
     native: {
@@ -48,3 +55,16 @@ export const AD_SLOTS = {
 }
 
 export const AD_SLOT_NAMES = Object.keys(AD_SLOTS)
+
+/**
+ * Full-screen ads, which exist in the packaged app and nowhere else.
+ *
+ * There is no `web` key here and that is the point: AdSense does not permit a
+ * publisher-placed interstitial, so there is nothing for the web build to
+ * read even by accident. See nativeInterstitial.js.
+ */
+export const AD_INTERSTITIALS = {
+  // On the way out of AR: a break the person chose, with a transition to
+  // cover it and no permission waiting on the other side.
+  'ar-exit': { native: { unit: env.VITE_ADMOB_UNIT_AR_EXIT || null } }
+}

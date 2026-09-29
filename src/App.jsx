@@ -36,6 +36,10 @@ import {
 import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
+import { AD_INTERSTITIALS } from './services/ads/adConfig'
+import { adsEnabled } from './services/ads/adProvider'
+import { prepareInterstitial, showInterstitial } from './services/ads/nativeInterstitial'
+import { drawerOpensOnLoad } from './utils/drawerDefault'
 import {
   compositesDom,
   endARSession,
@@ -961,6 +965,9 @@ function App() {
   // Launched from the home-screen icon or one of its shortcuts, the URL says
   // where to start.
   const launch = useMemo(() => launchParams(), [])
+  // Settled once, at mount. A panel that opened and shut itself as a phone
+  // was turned would be worse than either state.
+  const [drawerStartsOpen] = useState(() => drawerOpensOnLoad(launch))
   const [city, setCity] = useState(launch.city || 'New York')
   const [timeTick, setTimeTick] = useState(Date.now())
   const [manualHour, setManualHour] = useState(null)
@@ -1165,6 +1172,15 @@ function App() {
     setArMode(null)
     setRenderMode('3d')
     setSceneKey((key) => key + 1)
+
+    // The packaged app's full-screen ad, in the one place it belongs: the
+    // person has finished looking, the session is closed, and the 3D view is
+    // being rebuilt behind the cover anyway. Nothing waits on it — it is not
+    // awaited, and it shows nothing at all on the web, on the first exit, or
+    // inside the frequency cap. See nativeInterstitial.js.
+    if (adsEnabled({ renderMode: '3d' })) {
+      showInterstitial(AD_INTERSTITIALS['ar-exit'].native)
+    }
   }, [resetGesture])
 
   const handleRenderModeChange = useCallback(
@@ -1186,6 +1202,14 @@ function App() {
       if (capability.mode === AR_MODES.WEBXR) {
         setArMode(AR_MODES.WEBXR)
         setRenderMode('ar')
+
+        // Fetched now so that leaving is not spent waiting on a network. It
+        // is shown on the way out, never on the way in: an immersive session
+        // has to be asked for inside a live user gesture, and a gesture does
+        // not survive someone reading an ad.
+        if (adsEnabled({ renderMode: '3d' })) {
+          prepareInterstitial(AD_INTERSTITIALS['ar-exit'].native)
+        }
 
         // The <XR> component has to connect itself to the renderer before a
         // session can attach, and that does not happen until React has
@@ -1716,7 +1740,7 @@ function App() {
         arSpot={arSpot}
         onArViewChange={setArView}
         onArSpotChange={setArSpot}
-        initiallyOpen={launch.panelOpen}
+        initiallyOpen={drawerStartsOpen}
         onRenderModeChange={handleRenderModeChange}
         weatherService={weatherService}
       />

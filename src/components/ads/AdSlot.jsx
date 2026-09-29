@@ -59,6 +59,11 @@ function AdSlot({ name, renderMode = '3d', className = '' }) {
   if (!webSlot && !import.meta.env.DEV) return null
 
   const minHeight = config.web?.minHeight ?? 90
+  // A responsive unit is measured by AdSense itself, so it is given a width
+  // and left to choose its own height. Pinning one would crop whatever it
+  // picks. The reserved space is on the container instead, which is what
+  // stops a late fill shoving the panel about.
+  const responsive = config.web?.fullWidthResponsive ?? false
 
   return (
     <div className={`w-full mt-6 px-4 pb-2 ${className}`} data-testid={`ad-slot-${name}`}>
@@ -76,11 +81,17 @@ function AdSlot({ name, renderMode = '3d', className = '' }) {
             <ins
               ref={insRef}
               className="adsbygoogle"
-              style={{ display: 'block', width: '100%', height: `${minHeight}px` }}
+              style={{
+                display: 'block',
+                width: '100%',
+                ...(responsive ? {} : { height: `${minHeight}px` })
+              }}
               data-ad-client={AD_CLIENT}
               data-ad-slot={webSlot}
               data-ad-format={config.web?.format ?? 'horizontal'}
-              data-full-width-responsive="true"
+              data-full-width-responsive={
+                (config.web?.fullWidthResponsive ?? true) ? 'true' : 'false'
+              }
               data-filled={filled ? 'true' : 'false'}
             />
           ) : (

@@ -117,6 +117,7 @@ function WeatherDrawer({
           forceRain={forceRain}
             weatherService={weatherService}
             renderMode={renderMode}
+            panelOpen={isOpen}
           />
           <ModeToggle 
             mode={renderMode} 
@@ -135,8 +136,11 @@ function WeatherDrawer({
               onSpotChange={onArSpotChange}
             />
           )}
-          {/* Foot of the scroll: nothing below it to be pushed out of reach. */}
-          <AdSlot name="drawer-footer" renderMode={renderMode} />
+          {/* Foot of the scroll: nothing below it to be pushed out of reach.
+              Only while the panel is actually out — closed, it is still in
+              the document, slid off to the left, and an ad served into a
+              panel nobody can see is an ad in hidden content. */}
+          {isOpen && <AdSlot name="drawer-footer" renderMode={renderMode} />}
           {/* The written pages: what the globe is showing, how the seasons
               are chosen, how AR works. New tabs, so following one does not
               tear down the scene. */}

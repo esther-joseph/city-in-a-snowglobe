@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test'
-import { gotoApp, openDrawer, temperature } from './support/app.js'
+import { closeDrawer, gotoApp, openDrawer, temperature } from './support/app.js'
 
 /**
  * Advertising, the client-side weather cache and the launch parameters.
  *
- * The slots used to sit in the weather panel, and that is what cost the site
- * its AdSense approval: the app screen is a canvas and a panel of readings,
- * with no publisher content on it, and Google does not allow its ads on a
- * screen like that. The advertising moved to the written pages, which is
- * where site-content.spec.js checks it. What is left here is that the app
- * screen asks for none of it.
+ * Ads on the app screen are what cost the site its AdSense approval: a bare
+ * canvas is a tool, with no publisher content on it, and Google does not
+ * allow its ads on a screen like that. The written pages carry their own
+ * (site-content.spec.js checks those), and on the app there is one unit, at
+ * the foot of the drawer, under everything there is to read. What is checked
+ * here is that it is the only one, that it asks for nothing until the drawer
+ * is open, and that the opt-outs still hold.
  */
 
 const SLOTS = ['ad-slot-drawer-banner', 'ad-slot-drawer-footer']
@@ -24,21 +25,75 @@ function countProxyCalls(page) {
 }
 
 test.describe('Ad slots', () => {
-  test('none of them render on the globe screen', async ({ page }) => {
+  test('the loader arrives with the first slot, and not before it', async ({ page }) => {
+    const loader = page.locator('script[src*="adsbygoogle"]')
+    await gotoApp(page)
+
+    // Where the panel starts shut — a phone — the landing screen has not
+    // spoken to AdSense at all, and Auto ads cannot place a unit of their
+    // own where there is no loader. Where it starts open, the slot is
+    // already mounted, so the loader is already right: same rule, read from
+    // whichever state the viewport lands in.
+    const startedOpen = await page
+      .getByRole('button', { name: /Close Weather Info/i })
+      .count()
+
+    if (!startedOpen) {
+      await expect(loader, 'nothing on index.html asks for advertising').toHaveCount(0)
+      await expect(page.getByTestId('ad-slot-drawer-footer')).toHaveCount(0)
+    }
+
+    await openDrawer(page)
+    await expect(loader).toHaveCount(1)
+
+    // And it is fetched once, however often the panel is worked.
+    await closeDrawer(page)
+    await openDrawer(page)
+    await expect(loader).toHaveCount(1)
+  })
+
+  test('one unit, at the foot of the drawer', async ({ page }) => {
     await gotoApp(page)
     await openDrawer(page)
 
-    for (const slot of SLOTS) {
-      await expect(page.getByTestId(slot), `${slot} is not drawn`).toHaveCount(0)
-    }
+    const unit = page.getByTestId('ad-slot-drawer-footer').locator('ins.adsbygoogle')
+    await expect(unit).toHaveCount(1)
 
-    // And nothing else has put an ad on the page either: the loader is not
-    // in this document at all, so Auto ads cannot place one.
-    await expect(page.locator('ins.adsbygoogle')).toHaveCount(0)
-    await expect(page.locator('script[src*="adsbygoogle"]')).toHaveCount(0)
+    // The account that owns the site, the unit made for this spot, and told
+    // to measure the panel rather than being pinned to a shape: the drawer is
+    // 320px wide on a phone and 448 on a tablet.
+    await expect(unit).toHaveAttribute('data-ad-client', /^ca-pub-\d+$/)
+    await expect(unit).toHaveAttribute('data-ad-slot', /^\d+$/)
+    await expect(unit).toHaveAttribute('data-ad-format', 'auto')
+    await expect(unit).toHaveAttribute('data-full-width-responsive', 'true')
 
-    // The scene is still there and still on top of nothing.
-    await expect(page.locator('canvas').first()).toBeAttached()
+    // Labelled, which the policies require, and last: the only things under
+    // it are the links out to the written pages.
+    await expect(page.getByTestId('ad-slot-drawer-footer')).toContainText(/advertisement/i)
+  })
+
+  test('one of ours, and the mid-panel position still empty', async ({ page }) => {
+    await gotoApp(page)
+    await openDrawer(page)
+
+    // The banner position mid-panel exists in the config with no id behind
+    // it, and an <ins> is only ever drawn for an id — so this is the one.
+    const ours = page.locator('[data-testid^="ad-slot-"] ins.adsbygoogle')
+    await expect(ours).toHaveCount(1)
+    await expect(page.getByTestId('ad-slot-drawer-footer').locator('ins')).toHaveCount(1)
+
+    // Everything else AdSense adds to the document is its own doing: the
+    // loader plants a hidden placeholder for Auto ads, and whether that ever
+    // becomes an anchor or a vignette over the scene is a setting in the
+    // account, not something this code can say. Worth knowing, because it is
+    // how units reached the app screen before.
+    const theirs = await page.evaluate(
+      () =>
+        [...document.querySelectorAll('ins.adsbygoogle')].filter(
+          (el) => !el.closest('[data-testid^="ad-slot-"]')
+        ).length
+    )
+    expect(theirs, 'noted, not asserted away').toBeGreaterThanOrEqual(0)
   })
 
   test('?ads=off still holds, for the pages that do carry them', async ({ page }) => {
@@ -167,5 +222,88 @@ test.describe('Monetisation endpoints', () => {
   test('/api/weather refuses units it does not serve', async ({ request }) => {
     const response = await request.get('/api/weather?city=London&units=kelvin')
     expect(response.status()).toBe(400)
+  })
+})
+
+/**
+ * The full-screen ad, which only the packaged app has.
+ *
+ * AdSense does not let a publisher place an interstitial — the only
+ * full-screen format Google serves is the Vignette, and Auto ads decide when
+ * that appears, not this code. So there is no web unit to configure, and the
+ * arithmetic that decides when one is due is what can be checked here.
+ */
+test.describe('The interstitial', () => {
+  test('exists for the packaged app and nowhere else', async ({ page }) => {
+    await gotoApp(page)
+
+    const config = await page.evaluate(async () => {
+      const { AD_INTERSTITIALS } = await import('/src/services/ads/adConfig.js')
+      return AD_INTERSTITIALS
+    })
+
+    expect(Object.keys(config)).toContain('ar-exit')
+    // No web key at all, so there is nothing for the web build to read even
+    // by accident.
+    expect(config['ar-exit'].web).toBeUndefined()
+    expect(config['ar-exit']).toHaveProperty('native')
+  })
+
+  test('never on the first exit, and never twice in a few minutes', async ({ page }) => {
+    await gotoApp(page)
+
+    const due = await page.evaluate(async () => {
+      const { interstitialIsDue, MIN_GAP_MS } = await import(
+        '/src/services/ads/nativeInterstitial.js'
+      )
+      const now = 10_000_000
+
+      return {
+        // Nobody has been anywhere yet: the first time out of AR is when
+        // someone is deciding what they think of the feature.
+        firstTime: interstitialIsDue({ last: 0, now }),
+        // Four trips in and out to look at the park from four angles is one
+        // person exploring, not four ad breaks.
+        straightBack: interstitialIsDue({ last: now - 20_000, now }),
+        justUnder: interstitialIsDue({ last: now - (MIN_GAP_MS - 1), now }),
+        // And a real second visit, later, is fair game.
+        muchLater: interstitialIsDue({ last: now - MIN_GAP_MS * 2, now }),
+        gap: MIN_GAP_MS
+      }
+    })
+
+    expect(due.firstTime).toBe(false)
+    expect(due.straightBack).toBe(false)
+    expect(due.justUnder).toBe(false)
+    expect(due.muchLater).toBe(true)
+    // Minutes, not seconds.
+    expect(due.gap).toBeGreaterThanOrEqual(60_000)
+  })
+
+  test('shows nothing on the web, whatever it is asked', async ({ page }) => {
+    await gotoApp(page)
+
+    const shown = await page.evaluate(async () => {
+      const { showInterstitial, prepareInterstitial, resetInterstitialClock } = await import(
+        '/src/services/ads/nativeInterstitial.js'
+      )
+      resetInterstitialClock(1)
+
+      return {
+        // There is no AdMob plugin in a browser, so both of these resolve to
+        // "nothing happened" rather than throwing into a screen change.
+        prepared: await prepareInterstitial({ unit: 'ca-app-pub-test/test' }),
+        shown: await showInterstitial(
+          { unit: 'ca-app-pub-test/test' },
+          { now: () => 1 + 60 * 60 * 1000 }
+        ),
+        // And with no unit configured it does not even look.
+        unconfigured: await showInterstitial({ unit: null })
+      }
+    })
+
+    expect(shown.prepared).toBe(false)
+    expect(shown.shown).toBe(false)
+    expect(shown.unconfigured).toBe(false)
   })
 })

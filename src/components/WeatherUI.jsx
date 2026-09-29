@@ -33,7 +33,11 @@ function WeatherUI({
   onRainToggle,
   forceRain = false,
   weatherService = null,
-  renderMode = '3d'
+  renderMode = '3d',
+  // Whether the drawer this sits in is actually out. Only the ad positions
+  // care: a unit served into a panel that is slid off-screen is an ad in
+  // hidden content.
+  panelOpen = false
 }) {
   const [city, setCity] = useState(currentCity)
   const [viewMode, setViewMode] = useState('informational')
@@ -605,8 +609,9 @@ function WeatherUI({
       )}
 
               {/* Under the numbers and the timeline, where the reader has
-                  already stopped to read. Never over the globe. */}
-              <AdSlot name="drawer-banner" renderMode={renderMode} />
+                  already stopped to read. Never over the globe, and never
+                  into a panel that is shut. */}
+              {panelOpen && <AdSlot name="drawer-banner" renderMode={renderMode} />}
 
             </>
           )
