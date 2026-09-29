@@ -33,6 +33,14 @@ export function createOverlayRoot(doc = document) {
     position: 'fixed',
     inset: '0',
     pointerEvents: 'none',
+    // Transparent, and stated rather than assumed.
+    //
+    // Chrome implements dom-overlay by fullscreening this element, and the
+    // user-agent stylesheet gives a fullscreened element a black background.
+    // Left at the default the overlay is an opaque black sheet with the HUD
+    // on it and the camera nowhere to be seen — which is not what anybody
+    // means by augmented reality.
+    background: 'transparent',
     // Above the app's own chrome, since in a session it is the only thing on
     // screen anyway, and out of a session the library keeps it display: none.
     zIndex: '1000'
