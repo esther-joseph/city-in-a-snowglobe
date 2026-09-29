@@ -39,6 +39,7 @@ import './App.css'
 import { launchParams } from './utils/launchParams'
 import { reloadTarget, worthWarningAbout } from './utils/arRecovery'
 import { arOverlayRoot, hudPortalTarget } from './utils/arOverlayRoot'
+import { explainSessionEnd, noteAR, shouldStartOver } from './utils/arDiagnostics'
 import { AD_INTERSTITIALS } from './services/ads/adConfig'
 import { adsEnabled } from './services/ads/adProvider'
 import { prepareInterstitial, showInterstitial } from './services/ads/nativeInterstitial'
@@ -1020,6 +1021,9 @@ function App() {
   const arEndedByApp = useRef(false)
   /** Set when a session is interrupted, read when the reader comes back. */
   const resumeNeedsReload = useRef(false)
+  /** When the running session began, and anything thrown while it ran. */
+  const sessionStartedAt = useRef(0)
+  const sessionError = useRef(null)
   /**
    * Whether the HUD is the interface right now.
    *
@@ -1355,19 +1359,32 @@ function App() {
     if (renderMode !== 'ar') return undefined
 
     return watchARSession(xrStore, () => {
+      const ranMs = sessionStartedAt.current ? Date.now() - sessionStartedAt.current : 0
+      const how = {
+        ranMs,
+        endedByApp: arEndedByApp.current,
+        hidden: document.visibilityState === 'hidden',
+        error: sessionError.current
+      }
+      noteAR('session-end', how)
+
       // A session that ended without the app asking, while nobody was
       // looking, is the interruption the reload exists for: the phone was
       // put down, a call came in, the browser went away.
       //
-      // Both halves matter. One the app ended itself — the exit button, the
-      // back button — is an ordinary return to 3D. And one that ended in
-      // front of the reader is something they watched happen, with a working
-      // 3D view on the other side of it; marking that for a reload would
-      // leave the flag lying about, to go off at whatever unrelated moment
-      // they next put the phone down.
-      if (!arEndedByApp.current && document.visibilityState === 'hidden') {
-        resumeNeedsReload.current = true
-      }
+      // A session that dies the moment it opens is not that, and reloading
+      // into a failure that happens every time is a loop — worse than the
+      // failure, which at least leaves a working 3D view and something to
+      // read. See shouldStartOver.
+      if (shouldStartOver(how)) resumeNeedsReload.current = true
+
+      // And when it went too fast to be anybody's doing, say so, with
+      // whatever was thrown while it ran.
+      const explanation = explainSessionEnd(how)
+      if (explanation) setArNotice(explanation)
+
+      sessionStartedAt.current = 0
+      sessionError.current = null
       leaveAR()
     })
   }, [renderMode, leaveAR])
@@ -1385,10 +1402,56 @@ function App() {
       return undefined
     }
 
-    const read = () => setArDomOverlay(compositesDom(xrStore.getState().session))
+    const read = () => {
+      const { session } = xrStore.getState()
+      setArDomOverlay(compositesDom(session))
+
+      // The clock the session's lifetime is measured against, started once
+      // per session. What it is for: telling an interruption apart from a
+      // session that never really got going.
+      if (session && !sessionStartedAt.current) {
+        sessionStartedAt.current = Date.now()
+        sessionError.current = null
+        noteAR('session-start', {
+          compositing: compositesDom(session),
+          mode: session.environmentBlendMode ?? null,
+          visibility: session.visibilityState ?? null
+        })
+      }
+    }
 
     read()
     return xrStore.subscribe(read)
+  }, [renderMode])
+
+  /**
+   * Anything thrown while a session is running, kept for the account of how
+   * it ended.
+   *
+   * A session dies with the canvas that drives it, and the canvas dies with
+   * the React tree. So an error anywhere in the app can end a session, and
+   * arrives as a session ending for no visible reason — which is the least
+   * useful thing a phone can report. Whatever was thrown last is held here
+   * and read when the session goes.
+   */
+  useEffect(() => {
+    if (renderMode !== 'ar') return undefined
+
+    const remember = (message) => {
+      if (!message) return
+      sessionError.current = String(message).slice(0, 160)
+      noteAR('error', { message: sessionError.current })
+    }
+
+    const onError = (event) => remember(event.message || event.error?.message)
+    const onRejection = (event) => remember(event.reason?.message ?? event.reason)
+
+    window.addEventListener('error', onError)
+    window.addEventListener('unhandledrejection', onRejection)
+    return () => {
+      window.removeEventListener('error', onError)
+      window.removeEventListener('unhandledrejection', onRejection)
+    }
   }, [renderMode])
 
   /**
