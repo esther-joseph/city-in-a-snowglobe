@@ -1353,7 +1353,23 @@ function App() {
    */
   useEffect(() => {
     if (renderMode !== 'ar') return undefined
-    return watchARSession(xrStore, () => leaveAR())
+
+    return watchARSession(xrStore, () => {
+      // A session that ended without the app asking, while nobody was
+      // looking, is the interruption the reload exists for: the phone was
+      // put down, a call came in, the browser went away.
+      //
+      // Both halves matter. One the app ended itself — the exit button, the
+      // back button — is an ordinary return to 3D. And one that ended in
+      // front of the reader is something they watched happen, with a working
+      // 3D view on the other side of it; marking that for a reload would
+      // leave the flag lying about, to go off at whatever unrelated moment
+      // they next put the phone down.
+      if (!arEndedByApp.current && document.visibilityState === 'hidden') {
+        resumeNeedsReload.current = true
+      }
+      leaveAR()
+    })
   }, [renderMode, leaveAR])
 
   /**
@@ -1401,12 +1417,28 @@ function App() {
     }
   }, [renderMode, leaveAR])
 
-  /** Leaving the screen leaves AR: a session nobody is looking at is a drain. */
+  /**
+   * Leaving the screen leaves AR: a session nobody is looking at is a drain.
+   *
+   * With one exception, and it is not a small one. Starting an immersive
+   * session makes the page itself hidden — the document is no longer what is
+   * on screen, the session is, and the browser says so. Read naively that
+   * looks exactly like somebody putting the phone down, so the app tore down
+   * the session it had just been asked for: the HUD appeared for a frame and
+   * the app reloaded.
+   *
+   * A live session is therefore the signal that this hiding is the session's
+   * own doing. While one is running the app leaves it alone and lets the
+   * session report for itself — a session that really is going away ends,
+   * and the watcher above catches that.
+   */
   useEffect(() => {
     if (renderMode !== 'ar') return undefined
 
     const onHide = () => {
       if (document.visibilityState !== 'hidden') return
+      if (xrStore.getState?.().session) return
+
       // Noted for the return. The 3D view is about to be rebuilt on a page
       // nobody is looking at, which is the worst moment to rebuild anything.
       resumeNeedsReload.current = true
