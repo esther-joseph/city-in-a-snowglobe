@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
@@ -36,6 +37,8 @@ import {
 import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
+import { reloadTarget, worthWarningAbout } from './utils/arRecovery'
+import { arOverlayRoot, hudPortalTarget } from './utils/arOverlayRoot'
 import { AD_INTERSTITIALS } from './services/ads/adConfig'
 import { adsEnabled } from './services/ads/adProvider'
 import { prepareInterstitial, showInterstitial } from './services/ads/nativeInterstitial'
@@ -74,7 +77,18 @@ const wantsXREmulator =
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).has('xr-emulator')
 
-const xrStore = createXRStore({ emulate: wantsXREmulator ? 'metaQuest3' : false })
+/**
+ * The session is told which element to composite, rather than left to invent
+ * one.
+ *
+ * Without this the library makes an empty div of its own and that is what the
+ * session shows: the HUD, being a sibling of it rather than a child, is not
+ * composited at all and the controls vanish on a phone. See arOverlayRoot.js.
+ */
+const xrStore = createXRStore({
+  emulate: wantsXREmulator ? 'metaQuest3' : false,
+  domOverlay: arOverlayRoot ?? undefined
+})
 
 // Observational AR: the globe as an object in the room. Roughly the size of a
 // real snow globe, set down about an arm's length ahead at the height of a
@@ -997,6 +1011,16 @@ function App() {
   // own, which is what every other screen wants.
   const [hudDrawerOpen, setHudDrawerOpen] = useState(false)
   /**
+   * Whether the app, rather than the device, is why there is no session.
+   *
+   * Set whenever the app tears one down on purpose — the exit button, the
+   * back button, leaving the browser — and read by the entry path, which
+   * would otherwise blame the phone for something the app chose to do.
+   */
+  const arEndedByApp = useRef(false)
+  /** Set when a session is interrupted, read when the reader comes back. */
+  const resumeNeedsReload = useRef(false)
+  /**
    * Whether the HUD is the interface right now.
    *
    * True wherever the page can be drawn over the room: the camera fallback,
@@ -1166,6 +1190,9 @@ function App() {
    * looking straight down.
    */
   const leaveAR = useCallback(() => {
+    // Anything still trying to open a session is about to fail because of
+    // this, not because of the device. See the catch in handleRenderModeChange.
+    arEndedByApp.current = true
     resetGesture()
     setPreparing(PREPARING_3D)
     endARSession(xrStore)
@@ -1192,6 +1219,10 @@ function App() {
         return
       }
 
+      // A fresh attempt: whatever ended the last session is history, and a
+      // refusal from here really is the device refusing.
+      arEndedByApp.current = false
+
       // Up before anything else. Everything below this either takes a moment
       // or asks the reader for something, and the cover is what says the app
       // heard the tap.
@@ -1215,6 +1246,11 @@ function App() {
         // session can attach, and that does not happen until React has
         // committed this canvas. enterARWhenReady waits for it.
         enterARWhenReady(xrStore).catch((error) => {
+          // A session that failed because the app had just ended it is not a
+          // device that would not start one, and saying so over a working 3D
+          // view is a false alarm the reader cannot act on.
+          if (!worthWarningAbout({ endedByApp: arEndedByApp.current })) return
+
           console.warn('Could not start the AR session:', error)
           setArNotice(
             'Your device would not start an AR session. Check that the site has camera permission, then try again.'
@@ -1370,12 +1406,75 @@ function App() {
     if (renderMode !== 'ar') return undefined
 
     const onHide = () => {
-      if (document.visibilityState === 'hidden') leaveAR()
+      if (document.visibilityState !== 'hidden') return
+      // Noted for the return. The 3D view is about to be rebuilt on a page
+      // nobody is looking at, which is the worst moment to rebuild anything.
+      resumeNeedsReload.current = true
+      leaveAR()
     }
 
     document.addEventListener('visibilitychange', onHide)
     return () => document.removeEventListener('visibilitychange', onHide)
   }, [renderMode, leaveAR])
+
+  /**
+   * Coming back after a session was interrupted: start again from scratch.
+   *
+   * Mounted always, not only while AR is on, because by the time anyone comes
+   * back the app has already left AR — an effect that only ran in AR would
+   * have taken its listener with it on the way out.
+   *
+   * What is being avoided is a scene rebuilt on a hidden page. Frames stop
+   * when a page is hidden and the planting runs on frames, so the park can
+   * come back half built; on some devices the WebGL context is gone and it
+   * comes back not at all. A reload costs a few seconds and is certain. The
+   * city rides along in the URL so that certainty does not cost the reader
+   * the place they were looking at.
+   */
+  /**
+   * A lost graphics context is not something to nurse back.
+   *
+   * The GPU can take its context away — another app wanting it, a driver
+   * reset, a phone that has been in AR for a while and is warm. Everything in
+   * the scene is uploaded to that context: geometry, textures, every compiled
+   * shader. When it goes the canvas is black and stays black, and a reload is
+   * the only thing that brings the city back.
+   *
+   * preventDefault is what asks the browser for a restore event at all;
+   * without it there is not even the option. There is no listener for that
+   * event because rebuilding the scene from a restore is the same work as a
+   * reload with more ways to be subtly wrong.
+   */
+  const watchForContextLoss = useCallback(
+    (gl) => {
+      const canvas = gl?.domElement
+      if (!canvas) return
+
+      canvas.addEventListener(
+        'webglcontextlost',
+        (event) => {
+          event.preventDefault()
+          console.warn('The graphics context was lost; reloading.')
+          window.location.replace(reloadTarget({ city }))
+        },
+        { once: true }
+      )
+    },
+    [city]
+  )
+
+  useEffect(() => {
+    const onShow = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!resumeNeedsReload.current) return
+
+      resumeNeedsReload.current = false
+      window.location.replace(reloadTarget({ city }))
+    }
+
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [city])
 
   /**
    * The mode cover lets go once the view behind it is standing.
@@ -1674,6 +1773,66 @@ function App() {
     ]
   )
 
+  /**
+   * Where the HUD and the drawer are rendered.
+   *
+   * A session compositing the DOM shows one element and nothing else — the
+   * overlay root it was given — so in that session everything the reader can
+   * touch has to be inside it, and a portal is how React puts it there
+   * without moving it in the tree. Everywhere else, including the camera
+   * fallback, they render exactly where they are written.
+   */
+  const hudHome = hudPortalTarget({
+    compositing: arMode === AR_MODES.WEBXR && arDomOverlay
+  })
+  const renderHud = useCallback(
+    (node) => (hudHome ? createPortal(node, hudHome) : node),
+    [hudHome]
+  )
+
+  const weatherDrawer = (
+    <WeatherDrawer
+      // In AR the drawer is part of the HUD: the top rail carries its
+      // handle, and it slides out under the rail in the same glass.
+      hud={hudActive}
+      open={hudActive ? hudDrawerOpen : undefined}
+      onOpenChange={setHudDrawerOpen}
+      weatherData={weatherData}
+      hourlyForecast={hourlyForecast}
+      weeklyForecast={weeklyForecast}
+      uvIndex={uvIndex}
+      celestialData={celestialData}
+      loading={loading}
+      error={error}
+      onSearch={handleSearch}
+      currentCity={city}
+      onTimeAdjust={(value) => {
+        if (value === null || Number.isNaN(value)) {
+          setManualHour(null)
+          setTimeTick(Date.now())
+        } else {
+          setManualHour(value)
+        }
+      }}
+      timeOverride={manualHour}
+      displayHour={displayHour}
+      onThunderToggle={setForceThunder}
+      forceThunder={forceThunder}
+      onSnowToggle={setForceSnow}
+      forceSnow={forceSnow}
+          onRainToggle={setForceRain}
+          forceRain={forceRain}
+      renderMode={renderMode}
+      arView={arView}
+      arSpot={arSpot}
+      onArViewChange={setArView}
+      onArSpotChange={setArSpot}
+      initiallyOpen={drawerStartsOpen}
+      onRenderModeChange={handleRenderModeChange}
+      weatherService={weatherService}
+    />
+  )
+
   return (
     <div
       style={{
@@ -1704,46 +1863,7 @@ function App() {
       {preparing && (
         <LoadingScreen visible message={preparing.message} progress={preparing.progress} />
       )}
-      <WeatherDrawer
-        // In AR the drawer is part of the HUD: the top rail carries its
-        // handle, and it slides out under the rail in the same glass.
-        hud={hudActive}
-        open={hudActive ? hudDrawerOpen : undefined}
-        onOpenChange={setHudDrawerOpen}
-        weatherData={weatherData}
-        hourlyForecast={hourlyForecast}
-        weeklyForecast={weeklyForecast}
-        uvIndex={uvIndex}
-        celestialData={celestialData}
-        loading={loading}
-        error={error}
-        onSearch={handleSearch}
-        currentCity={city}
-        onTimeAdjust={(value) => {
-          if (value === null || Number.isNaN(value)) {
-            setManualHour(null)
-            setTimeTick(Date.now())
-          } else {
-            setManualHour(value)
-          }
-        }}
-        timeOverride={manualHour}
-        displayHour={displayHour}
-        onThunderToggle={setForceThunder}
-        forceThunder={forceThunder}
-        onSnowToggle={setForceSnow}
-        forceSnow={forceSnow}
-            onRainToggle={setForceRain}
-            forceRain={forceRain}
-        renderMode={renderMode}
-        arView={arView}
-        arSpot={arSpot}
-        onArViewChange={setArView}
-        onArSpotChange={setArSpot}
-        initiallyOpen={drawerStartsOpen}
-        onRenderModeChange={handleRenderModeChange}
-        weatherService={weatherService}
-      />
+      {renderHud(weatherDrawer)}
 
       <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
         {renderMode === 'ar' && arMode === AR_MODES.CAMERA && (
@@ -1759,6 +1879,7 @@ function App() {
             key={`scene-${sceneKey}`}
             camera={{ position: [120, 86, 120], fov: 28, near: 0.1, far: 360 }}
             onCreated={({ gl }) => {
+              watchForContextLoss(gl)
               // Optimize for mobile performance
               const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
               if (isMobile) {
@@ -1832,6 +1953,7 @@ function App() {
             // arCamera.js.
             camera={AR_CAMERA}
             onCreated={({ gl, scene }) => {
+              watchForContextLoss(gl)
               // <XR> (v6) enables gl.xr and manages the session/reference space
               // itself; we only need to guarantee a transparent framebuffer so
               // the camera passthrough shows through behind the scene.
@@ -1957,7 +2079,7 @@ function App() {
         {/* The HUD, wherever HTML can be drawn over the room: the camera
             fallback, and any session compositing the page over its own view.
             A headset gets the in-scene column instead, above. */}
-        {hudActive && (
+        {hudActive && renderHud(
           <ARHud
             city={weatherData?.name || city}
             temperature={
