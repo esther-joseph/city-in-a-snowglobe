@@ -8,15 +8,15 @@ import './ForecastCards.css'
 /**
  * The next two days, hour by hour, as rows you scroll down.
  *
- * A caveat worth knowing before reading the numbers: OpenWeather's free
- * forecast is three-hourly, not hourly. Forty entries at three hours each is
- * five days, so covering 48 hours means sixteen rows rather than forty-eight.
- * Filling the gaps by interpolation would look like more data than was
- * actually forecast, so the rows show the hours the forecast actually has.
+ * How many rows that is depends on what the account can ask for. One Call 3.0
+ * has every hour, so 48 hours is 48 rows; the free three-hourly forecast has
+ * sixteen points in the same window. Either way these are hours somebody
+ * forecast — the gaps are never filled by interpolation, which would draw
+ * two thirds of a strip out of numbers nobody predicted.
  *
- * Laid out as rows in a column rather than cards in a row: there are sixteen
- * of them carrying four fields each, and read down a column the fields line
- * up with one another instead of being read one card at a time.
+ * Laid out as rows in a column rather than cards in a row: they carry four
+ * fields each, and read down a column the fields line up with one another
+ * instead of being read one card at a time.
  */
 const HOURS_COVERED = 48
 
@@ -63,13 +63,20 @@ function HourlyForecast({
 
   const span = Math.round((hours[hours.length - 1].dt - hours[0].dt) / 3600)
 
+  // Read off the rows rather than declared, so the label cannot claim a step
+  // the data does not have. One Call 3.0 answers hourly and the free
+  // forecast answers three-hourly, and which one arrived is not this
+  // component's business to know.
+  const step =
+    hours.length > 1 ? Math.max(1, Math.round((hours[1].dt - hours[0].dt) / 3600)) : 1
+
   return (
     <div className="forecast-card" data-testid="hourly-forecast">
       <div className="forecast-card-header">
         {/* Counts the hours actually covered rather than claiming 48 when the
             forecast ran out early. */}
         <h3>{`${span}-Hour Forecast`}</h3>
-        <span>Every 3 hours</span>
+        <span>{step === 1 ? 'Every hour' : `Every ${step} hours`}</span>
       </div>
 
       <ScrollStrip axis="y" testId="hourly-scroller">
@@ -124,7 +131,7 @@ function HourlyForecast({
 }
 
 HourlyForecast.propTypes = {
-  /** Raw three-hourly entries straight from the forecast payload. */
+  /** Raw entries straight from the forecast payload, hourly or three-hourly. */
   entries: PropTypes.arrayOf(
     PropTypes.shape({
       dt: PropTypes.number.isRequired,

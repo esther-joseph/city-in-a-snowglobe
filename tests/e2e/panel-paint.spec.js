@@ -45,4 +45,61 @@ test.describe('Panel paint cost', () => {
     })
     expect(alpha).toBeGreaterThanOrEqual(0.75)
   })
+
+  test('the aura is lit by gradients and moved by transform alone', async ({ page }) => {
+    await openDrawer(page)
+
+    const aura = await page.evaluate(() => {
+      const pools = [...document.querySelectorAll('.drawer-aura__pool')]
+      const frame = document.querySelector('[data-testid="drawer-aura"]')
+      if (!pools.length || !frame) return null
+
+      return {
+        count: pools.length,
+        // Not one of them blurred. A filter: blur() over a live canvas is
+        // re-rendered every frame it moves, which is the cost this whole
+        // panel was rebuilt once to avoid; a radial gradient is soft for
+        // free.
+        filters: pools.map((pool) => getComputedStyle(pool).filter),
+        backdrops: pools.map((pool) => getComputedStyle(pool).backdropFilter),
+        // Long, uneven periods, so three pools never line up into a pulse.
+        durations: pools.map((pool) => getComputedStyle(pool).animationDuration),
+        // Decorative: announced to nobody, and it swallows no taps meant for
+        // the cards above it.
+        hidden: frame.getAttribute('aria-hidden'),
+        pointerEvents: getComputedStyle(frame).pointerEvents,
+        // Behind the content, which sits on its own layer above it.
+        auraZ: getComputedStyle(frame).zIndex
+      }
+    })
+
+    expect(aura, 'the aura is in the panel').not.toBeNull()
+    expect(aura.count).toBeGreaterThanOrEqual(2)
+    for (const filter of aura.filters) expect(filter).toBe('none')
+    for (const backdrop of aura.backdrops) expect(['none', '']).toContain(backdrop)
+
+    const seconds = aura.durations.map((value) => parseFloat(value))
+    // Slow enough to be noticed once and then forgotten.
+    for (const duration of seconds) expect(duration).toBeGreaterThan(20)
+    expect(new Set(seconds).size, 'no two share a period').toBe(seconds.length)
+
+    expect(aura.hidden).toBe('true')
+    expect(aura.pointerEvents).toBe('none')
+    expect(Number(aura.auraZ)).toBe(0)
+  })
+
+  test('a reader who asked for stillness gets stillness', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.reload()
+    await openDrawer(page)
+
+    const animations = await page.evaluate(() =>
+      [...document.querySelectorAll('.drawer-aura__pool')].map(
+        (pool) => getComputedStyle(pool).animationName
+      )
+    )
+
+    // The colour stays — the colour is not the animation.
+    for (const name of animations) expect(name).toBe('none')
+  })
 })

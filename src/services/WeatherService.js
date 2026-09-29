@@ -53,6 +53,69 @@ class WeatherService {
   }
 
   /**
+   * The next two days, an entry per hour.
+   *
+   * The free 2.5 forecast is three-hourly — sixteen points across 48 hours —
+   * and the only way to get the other thirty-two is One Call 3.0, which is a
+   * separate subscription on the OpenWeather account. The alternative would
+   * be interpolating between the three-hourly points, and that would draw
+   * forty-eight rows of which two thirds were invented: a temperature nobody
+   * forecast, under an icon copied from the nearest bucket.
+   *
+   * So: ask, and if the key is not subscribed, say so by returning null and
+   * let the caller keep the three-hourly rows it already has. A missing
+   * subscription answers 401; an unauthorised one answers 403.
+   *
+   * Only `hourly` is asked for. The rest of the One Call payload duplicates
+   * what current conditions and the weekly forecast already have, and it is
+   * billed by the call either way.
+   *
+   * @param {number} lat
+   * @param {number} lon
+   * @returns {Promise<Array|null>} Entries shaped like the 2.5 forecast list,
+   *   so that everything downstream reads them the same way.
+   */
+  async getHourly(lat, lon) {
+    const url = this.buildUrl('data/3.0/onecall', {
+      lat,
+      lon,
+      units: UNITS,
+      exclude: 'current,minutely,daily,alerts'
+    })
+
+    try {
+      const response = await fetch(url)
+      if (!response.ok) return null
+
+      const payload = await response.json()
+      if (!Array.isArray(payload?.hourly) || payload.hourly.length === 0) return null
+
+      // One Call puts the temperature at the top of each entry; the 2.5 list
+      // nests it under `main`. The strip, the timeline and the scene all read
+      // the 2.5 shape, so that is the shape this returns.
+      return payload.hourly.map((hour) => ({
+        dt: hour.dt,
+        main: {
+          temp: hour.temp,
+          feels_like: hour.feels_like,
+          humidity: hour.humidity,
+          pressure: hour.pressure
+        },
+        weather: hour.weather ?? [],
+        wind: { speed: hour.wind_speed, deg: hour.wind_deg },
+        clouds: { all: hour.clouds },
+        pop: hour.pop ?? 0,
+        visibility: hour.visibility
+      }))
+    } catch (error) {
+      // Optional data. A forecast strip with wider steps is worth more than
+      // a panel that failed to load.
+      console.warn('Hourly forecast unavailable, falling back to three-hourly:', error.message)
+      return null
+    }
+  }
+
+  /**
    * CRUD: Read - Get current weather data for a city
    * @param {string} cityName - Name of the city
    * @returns {Promise<Object>} Current weather data
@@ -345,6 +408,19 @@ class WeatherService {
       } catch (error) {
         // Forecast is optional, continue with current weather only
         console.warn('Forecast fetch failed, continuing with current weather only:', error)
+      }
+
+      // An hour at a time where the account can have it, three where it
+      // cannot. The weekly forecast is left on the 2.5 payload either way:
+      // it groups the same points into days and does not need the detail.
+      if (forecast.hourly) {
+        const byTheHour = await this.getHourly(lat, lon)
+        if (byTheHour) {
+          forecast = {
+            ...forecast,
+            hourly: { ...forecast.hourly, entries: byTheHour, step: 'hour' }
+          }
+        }
       }
       
       try {

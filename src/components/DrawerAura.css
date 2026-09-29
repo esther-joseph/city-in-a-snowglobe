@@ -1,0 +1,115 @@
+/**
+ * The light behind the panel.
+ *
+ * Three soft pools of blue and violet, drifting slowly past one another. What
+ * they are drawn with matters as much as how they look: this panel sits on
+ * top of a live WebGL canvas, and anything that repaints here makes the
+ * compositor redo the scene underneath it.
+ *
+ * So: no filter: blur(). A blurred element is re-rendered and re-blurred on
+ * every frame it moves, and a full-height blur over the canvas is exactly the
+ * cost this drawer already went to the trouble of removing once. A radial
+ * gradient with a soft stop is blurry by construction and costs nothing, and
+ * transform is the one property that animates on the compositor without
+ * repainting anything at all. Everything here moves by transform alone.
+ */
+
+.drawer-aura {
+  /* Sticky with no height: it holds its place at the top of the panel while
+     the content scrolls past, without taking part in the layout. Absolute
+     positioning would scroll away with the first screenful. */
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.drawer-aura__stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.drawer-aura__pool {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  will-change: transform;
+  /* Transparent at the rim, so the three of them bleed into one another
+     rather than reading as three circles. */
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--pool-colour) 0%,
+    color-mix(in srgb, var(--pool-colour) 45%, transparent) 38%,
+    transparent 70%
+  );
+}
+
+.drawer-aura__pool--one {
+  --pool-colour: rgba(88, 118, 255, 0.72);
+  width: 150%;
+  aspect-ratio: 1;
+  top: -22%;
+  left: -38%;
+  animation: drawer-aura-drift-one 34s ease-in-out infinite alternate;
+}
+
+.drawer-aura__pool--two {
+  --pool-colour: rgba(146, 96, 255, 0.64);
+  width: 130%;
+  aspect-ratio: 1;
+  top: 22%;
+  left: 6%;
+  animation: drawer-aura-drift-two 41s ease-in-out infinite alternate;
+}
+
+.drawer-aura__pool--three {
+  --pool-colour: rgba(64, 140, 255, 0.5);
+  width: 115%;
+  aspect-ratio: 1;
+  top: 58%;
+  left: -26%;
+  animation: drawer-aura-drift-three 47s ease-in-out infinite alternate;
+}
+
+/* Long, uneven periods that do not divide into one another, so the three
+   never line up into a pulse. */
+@keyframes drawer-aura-drift-one {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(14%, 9%, 0) scale(1.18);
+  }
+}
+
+@keyframes drawer-aura-drift-two {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.08);
+  }
+  to {
+    transform: translate3d(-17%, -12%, 0) scale(0.92);
+  }
+}
+
+@keyframes drawer-aura-drift-three {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.96);
+  }
+  to {
+    transform: translate3d(12%, -16%, 0) scale(1.22);
+  }
+}
+
+/* Asked not to move, it does not move. The colour stays, because the colour
+   is not the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .drawer-aura__pool {
+    animation: none;
+  }
+}

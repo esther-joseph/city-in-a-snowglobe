@@ -3,6 +3,7 @@ import WeatherUI from './WeatherUI'
 import ModeToggle from './ModeToggle'
 import AdSlot from './ads/AdSlot'
 import ARViewpoints from './ar/ARViewpoints'
+import DrawerAura from './DrawerAura'
 
 function WeatherDrawer({
   weatherData,
@@ -94,7 +95,10 @@ function WeatherDrawer({
           willChange: 'transform'
         }}
       >
-        <div className={`${hud ? 'pt-24' : 'pt-20'} px-6 pb-6 flex flex-col gap-5`}>
+        <DrawerAura />
+        <div
+          className={`${hud ? 'pt-24' : 'pt-20'} px-6 pb-6 flex flex-col gap-5 relative z-[1]`}
+        >
           {/* Weather UI Components */}
           <WeatherUI
             weatherData={weatherData}
