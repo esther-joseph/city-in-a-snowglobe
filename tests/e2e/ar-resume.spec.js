@@ -200,3 +200,60 @@ test.describe('The overlay a session composites', () => {
     expect(source).toContain('hudActive && renderHud(')
   })
 })
+
+/**
+ * Starting a session hides the page, and that is not the reader leaving.
+ *
+ * Reported from a phone: the AR button was pressed, the HUD appeared for a
+ * frame, and the app reloaded.
+ *
+ * An immersive session takes over the screen, so the browser marks the
+ * document hidden — the page is not what anybody is looking at any more, the
+ * session is. The handler that ends AR when somebody puts the phone down read
+ * that as somebody putting the phone down, tore down the session that had
+ * just started, and the reload on the way back finished the job.
+ *
+ * A live session is what tells the two apart, and it is checked in the
+ * handler rather than assumed.
+ */
+test.describe('Entering a session', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+  })
+
+  test('is not mistaken for the reader walking away', async ({ page }) => {
+    const source = await page.evaluate(async () => {
+      const module = await import('/src/App.jsx?raw')
+      return module.default
+    })
+
+    const handler = source.slice(
+      source.indexOf('const onHide = () => {'),
+      source.indexOf('document.addEventListener(\'visibilitychange\', onHide)')
+    )
+
+    // The hidden page is only the reader's doing when no session is running.
+    expect(handler).toContain("document.visibilityState !== 'hidden'")
+    expect(handler).toContain('xrStore.getState?.().session')
+    // And that check comes before anything is torn down.
+    expect(handler.indexOf('session')).toBeLessThan(handler.indexOf('leaveAR()'))
+  })
+
+  test('a session that ends in front of the reader does not arm a reload', async ({ page }) => {
+    const source = await page.evaluate(async () => {
+      const module = await import('/src/App.jsx?raw')
+      return module.default
+    })
+
+    const watcher = source.slice(
+      source.indexOf('return watchARSession(xrStore, () => {'),
+      source.indexOf('}, [renderMode, leaveAR])', source.indexOf('return watchARSession'))
+    )
+
+    // Two conditions, not one: the app did not end it, and nobody was
+    // watching. Either alone leaves a flag lying about to go off at some
+    // unrelated moment later.
+    expect(watcher).toContain('!arEndedByApp.current')
+    expect(watcher).toContain("document.visibilityState === 'hidden'")
+  })
+})
