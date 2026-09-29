@@ -5,7 +5,7 @@ import { gotoApp, openDrawer } from './support/app.js'
  * The two forecast strips.
  *
  * The day strip is cards in a row you scroll sideways. The hourly strip is
- * rows in a column you scroll down, because there are sixteen of them and
+ * rows in a column you scroll down, because there are many of them and
  * four fields each, and read down a column those fields line up.
  *
  * Both draw their own scrollbar rather than borrowing one. The native bar is
@@ -83,10 +83,12 @@ test.describe('Forecast strips', () => {
 
   test('the hour strip reads time, icon, temperature, precipitation', async ({ page }) => {
     await expect(hourly(page)).toBeVisible()
-    // The free forecast is three-hourly, so 48 hours is sixteen or so rows
-    // rather than forty-eight. The heading says what is actually covered.
+    // How many rows depends on what the account can ask for: One Call 3.0
+    // answers every hour, the free forecast every three. The heading says
+    // what is actually covered and the step is read off the rows, so neither
+    // can claim data that did not arrive.
     await expect(hourly(page).locator('h3')).toHaveText(/\d+-Hour Forecast/)
-    await expect(hourly(page)).toContainText('Every 3 hours')
+    await expect(hourly(page)).toContainText(/Every (hour|\d+ hours)/)
 
     const first = hourly(page).locator('.forecast-row').first()
     await expect(first.locator('.forecast-row__when')).not.toHaveText('')
