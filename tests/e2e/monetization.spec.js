@@ -213,6 +213,24 @@ test.describe('Monetisation endpoints', () => {
     )
   })
 
+  test('the edge answers for us, and never caches a failure', async ({ request }) => {
+    const good = await request.get('/api/weather?city=Boston')
+    expect(good.status()).toBe(200)
+
+    // Ten minutes at the edge, which is about how often the observations
+    // upstream change. Below that, invocations are spent re-fetching the
+    // same numbers.
+    const header = good.headers()['cache-control']
+    expect(header).toContain('s-maxage=600')
+    expect(header).toContain('stale-while-revalidate')
+
+    // A refusal is nobody else's answer: cached, one bad minute would be
+    // served to everyone for the next ten.
+    const bad = await request.get('/api/weather')
+    expect(bad.status()).toBe(400)
+    expect(bad.headers()['cache-control']).toBe('no-store')
+  })
+
   test('/api/weather refuses a request with no city', async ({ request }) => {
     const response = await request.get('/api/weather')
     expect(response.status()).toBe(400)

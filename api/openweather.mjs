@@ -54,8 +54,25 @@ export async function proxyOpenWeather(searchParams, apiKey) {
   }
 }
 
+/**
+ * How long the edge may answer for us.
+ *
+ * Ten minutes, which is roughly how often OpenWeather's own observations
+ * change — a shorter window spends function invocations and upstream calls on
+ * data that is the same data. The browser already keeps its own fifteen
+ * minutes in localStorage (see weatherCache.js), so a reader who reloads is
+ * not hitting this at all; what this covers is everybody else asking for the
+ * same city, which for a handful of popular cities is most of the traffic.
+ *
+ * stale-while-revalidate keeps the window: for ten minutes past expiry the
+ * edge serves the old answer and fetches the new one behind it, so nobody
+ * waits on a cold upstream.
+ *
+ * Errors are never cached. A rate-limited minute would otherwise be served to
+ * everyone for the next ten.
+ */
 export function cacheHeaderFor(status) {
-  return status === 200 ? 'public, s-maxage=120, stale-while-revalidate=600' : 'no-store'
+  return status === 200 ? 'public, s-maxage=600, stale-while-revalidate=600' : 'no-store'
 }
 
 export default async function handler(req, res) {
