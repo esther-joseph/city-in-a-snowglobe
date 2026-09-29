@@ -1,4 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
@@ -37,6 +38,7 @@ import { openInQuickLook, USDZ_ROOT_NAME } from './utils/usdzExport'
 import './App.css'
 import { launchParams } from './utils/launchParams'
 import { reloadTarget, worthWarningAbout } from './utils/arRecovery'
+import { arOverlayRoot, hudPortalTarget } from './utils/arOverlayRoot'
 import { AD_INTERSTITIALS } from './services/ads/adConfig'
 import { adsEnabled } from './services/ads/adProvider'
 import { prepareInterstitial, showInterstitial } from './services/ads/nativeInterstitial'
@@ -75,7 +77,18 @@ const wantsXREmulator =
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).has('xr-emulator')
 
-const xrStore = createXRStore({ emulate: wantsXREmulator ? 'metaQuest3' : false })
+/**
+ * The session is told which element to composite, rather than left to invent
+ * one.
+ *
+ * Without this the library makes an empty div of its own and that is what the
+ * session shows: the HUD, being a sibling of it rather than a child, is not
+ * composited at all and the controls vanish on a phone. See arOverlayRoot.js.
+ */
+const xrStore = createXRStore({
+  emulate: wantsXREmulator ? 'metaQuest3' : false,
+  domOverlay: arOverlayRoot ?? undefined
+})
 
 // Observational AR: the globe as an object in the room. Roughly the size of a
 // real snow globe, set down about an arm's length ahead at the height of a
@@ -1760,6 +1773,66 @@ function App() {
     ]
   )
 
+  /**
+   * Where the HUD and the drawer are rendered.
+   *
+   * A session compositing the DOM shows one element and nothing else — the
+   * overlay root it was given — so in that session everything the reader can
+   * touch has to be inside it, and a portal is how React puts it there
+   * without moving it in the tree. Everywhere else, including the camera
+   * fallback, they render exactly where they are written.
+   */
+  const hudHome = hudPortalTarget({
+    compositing: arMode === AR_MODES.WEBXR && arDomOverlay
+  })
+  const renderHud = useCallback(
+    (node) => (hudHome ? createPortal(node, hudHome) : node),
+    [hudHome]
+  )
+
+  const weatherDrawer = (
+    <WeatherDrawer
+      // In AR the drawer is part of the HUD: the top rail carries its
+      // handle, and it slides out under the rail in the same glass.
+      hud={hudActive}
+      open={hudActive ? hudDrawerOpen : undefined}
+      onOpenChange={setHudDrawerOpen}
+      weatherData={weatherData}
+      hourlyForecast={hourlyForecast}
+      weeklyForecast={weeklyForecast}
+      uvIndex={uvIndex}
+      celestialData={celestialData}
+      loading={loading}
+      error={error}
+      onSearch={handleSearch}
+      currentCity={city}
+      onTimeAdjust={(value) => {
+        if (value === null || Number.isNaN(value)) {
+          setManualHour(null)
+          setTimeTick(Date.now())
+        } else {
+          setManualHour(value)
+        }
+      }}
+      timeOverride={manualHour}
+      displayHour={displayHour}
+      onThunderToggle={setForceThunder}
+      forceThunder={forceThunder}
+      onSnowToggle={setForceSnow}
+      forceSnow={forceSnow}
+          onRainToggle={setForceRain}
+          forceRain={forceRain}
+      renderMode={renderMode}
+      arView={arView}
+      arSpot={arSpot}
+      onArViewChange={setArView}
+      onArSpotChange={setArSpot}
+      initiallyOpen={drawerStartsOpen}
+      onRenderModeChange={handleRenderModeChange}
+      weatherService={weatherService}
+    />
+  )
+
   return (
     <div
       style={{
@@ -1790,46 +1863,7 @@ function App() {
       {preparing && (
         <LoadingScreen visible message={preparing.message} progress={preparing.progress} />
       )}
-      <WeatherDrawer
-        // In AR the drawer is part of the HUD: the top rail carries its
-        // handle, and it slides out under the rail in the same glass.
-        hud={hudActive}
-        open={hudActive ? hudDrawerOpen : undefined}
-        onOpenChange={setHudDrawerOpen}
-        weatherData={weatherData}
-        hourlyForecast={hourlyForecast}
-        weeklyForecast={weeklyForecast}
-        uvIndex={uvIndex}
-        celestialData={celestialData}
-        loading={loading}
-        error={error}
-        onSearch={handleSearch}
-        currentCity={city}
-        onTimeAdjust={(value) => {
-          if (value === null || Number.isNaN(value)) {
-            setManualHour(null)
-            setTimeTick(Date.now())
-          } else {
-            setManualHour(value)
-          }
-        }}
-        timeOverride={manualHour}
-        displayHour={displayHour}
-        onThunderToggle={setForceThunder}
-        forceThunder={forceThunder}
-        onSnowToggle={setForceSnow}
-        forceSnow={forceSnow}
-            onRainToggle={setForceRain}
-            forceRain={forceRain}
-        renderMode={renderMode}
-        arView={arView}
-        arSpot={arSpot}
-        onArViewChange={setArView}
-        onArSpotChange={setArSpot}
-        initiallyOpen={drawerStartsOpen}
-        onRenderModeChange={handleRenderModeChange}
-        weatherService={weatherService}
-      />
+      {renderHud(weatherDrawer)}
 
       <div style={{ flex: 1, position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
         {renderMode === 'ar' && arMode === AR_MODES.CAMERA && (
@@ -2045,7 +2079,7 @@ function App() {
         {/* The HUD, wherever HTML can be drawn over the room: the camera
             fallback, and any session compositing the page over its own view.
             A headset gets the in-scene column instead, above. */}
-        {hudActive && (
+        {hudActive && renderHud(
           <ARHud
             city={weatherData?.name || city}
             temperature={

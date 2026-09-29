@@ -116,3 +116,87 @@ test.describe('A lost graphics context', () => {
     await expect(page.locator('canvas').first()).toBeAttached()
   })
 })
+
+/**
+ * The element a session is allowed to draw the page into.
+ *
+ * WebXR's dom-overlay does not composite the page over the camera view. It
+ * composites one element — the overlay root named when the session is
+ * requested — and shows nothing else at all. Left to itself the library makes
+ * an empty div for this and appends it to the body, which is what happened
+ * here: the session faithfully composited an empty div while the HUD, a
+ * sibling of it, was outside the only element on screen. On a phone that
+ * reads as "the AR UI is missing", because it is.
+ */
+test.describe('The overlay a session composites', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+  })
+
+  test('is the app’s own element, and it is on the page', async ({ page }) => {
+    const root = await page.evaluate(() => {
+      const element = document.getElementById('ar-dom-overlay')
+      if (!element) return null
+      const style = getComputedStyle(element)
+      return {
+        attached: element.isConnected,
+        position: style.position,
+        // Out of a session the library keeps it hidden, so nothing of it
+        // leaks onto the ordinary app screen.
+        display: style.display,
+        // The room shows through everywhere the HUD is not.
+        pointerEvents: style.pointerEvents
+      }
+    })
+
+    expect(root, 'the app made an overlay root of its own').not.toBeNull()
+    expect(root.attached).toBe(true)
+    expect(root.position).toBe('fixed')
+    expect(root.display).toBe('none')
+    expect(root.pointerEvents).toBe('none')
+  })
+
+  test('is handed to the session rather than left to the library', async ({ page }) => {
+    const source = await page.evaluate(async () => {
+      const module = await import('/src/App.jsx?raw')
+      return module.default
+    })
+
+    // Without this the library invents its own root and the HUD is not in it.
+    expect(source).toContain('domOverlay: arOverlayRoot')
+  })
+
+  test('is where the HUD goes, but only while a session is compositing', async ({ page }) => {
+    const targets = await page.evaluate(async () => {
+      const { hudPortalTarget, createOverlayRoot } = await import('/src/utils/arOverlayRoot.js')
+      const root = createOverlayRoot()
+
+      return {
+        // In a session that composites the DOM: into the overlay, or it is
+        // not on screen at all.
+        compositing: hudPortalTarget({ compositing: true, root })?.id ?? null,
+        // The camera fallback is an ordinary page. Rendering its controls
+        // into a display:none root would lose them completely.
+        fallback: hudPortalTarget({ compositing: false, root }),
+        // A headset with no overlay at all: render in place, and the in-scene
+        // column is what it actually gets.
+        noRoot: hudPortalTarget({ compositing: true, root: null })
+      }
+    })
+
+    expect(targets.compositing).toBe('ar-dom-overlay')
+    expect(targets.fallback).toBeNull()
+    expect(targets.noRoot).toBeNull()
+  })
+
+  test('the drawer and the HUD go to the same place', async ({ page }) => {
+    const source = await page.evaluate(async () => {
+      const module = await import('/src/App.jsx?raw')
+      return module.default
+    })
+
+    // Both, or the drawer is a panel nobody in a session can open.
+    expect(source).toContain('renderHud(weatherDrawer)')
+    expect(source).toContain('hudActive && renderHud(')
+  })
+})
