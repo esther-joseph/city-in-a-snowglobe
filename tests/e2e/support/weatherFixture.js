@@ -87,9 +87,60 @@ export const GEOCODE = [
  * Intercept the proxy so every spec sees the same weather.
  * @param {import('@playwright/test').Page} page
  */
+/**
+ * One Call 3.0's hourly block, forty-eight entries of it.
+ *
+ * Shaped as the upstream sends it — temperature at the top of each entry
+ * rather than under `main` — so that the mapping in WeatherService.getHourly
+ * is exercised rather than bypassed.
+ *
+ * @param {number} [hours]
+ */
+export function oneCallHourly(hours = 48) {
+  return {
+    lat: 40.7143,
+    lon: -74.006,
+    timezone: 'America/New_York',
+    timezone_offset: -14400,
+    hourly: Array.from({ length: hours }, (unused, index) => ({
+      dt: NOW + index * 3600,
+      temp: 72.4 - index * 0.4,
+      feels_like: 71.8 - index * 0.4,
+      pressure: 1015,
+      humidity: 46 + index,
+      clouds: index * 2,
+      visibility: 10000,
+      wind_speed: 8.05,
+      wind_deg: 210,
+      weather: [{ id: 800, main: 'Clear', description: 'clear sky', icon: '01d' }],
+      pop: index / 100
+    }))
+  }
+}
+
+/**
+ * Intercept the proxy so every spec sees the same weather.
+ *
+ * One Call 3.0 is refused by default, because that is what a key without the
+ * subscription gets and it is the path most runs should be exercising: the
+ * fall back to the three-hourly forecast. A spec that wants the hourly strip
+ * asks for it with stubHourlyForecast below.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
 export async function stubWeatherApi(page) {
   await page.route('**/api/openweather**', async (route) => {
     const path = new URL(route.request().url()).searchParams.get('path')
+
+    if (path === 'data/3.0/onecall') {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ cod: 401, message: 'One Call 3.0 not subscribed' })
+      })
+      return
+    }
+
     const body =
       path === 'data/2.5/forecast'
         ? FORECAST
@@ -103,6 +154,32 @@ export async function stubWeatherApi(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(body)
+    })
+  })
+}
+
+/**
+ * Answer One Call 3.0 as a subscribed key would, for the specs that care.
+ *
+ * Registered after stubWeatherApi, so it takes precedence for that one path
+ * and everything else still comes from the canned responses above.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {{ hours?: number }} [options]
+ */
+export async function stubHourlyForecast(page, { hours = 48 } = {}) {
+  // Matched by reading the query rather than by a glob: the path travels
+  // percent-encoded (`path=data%2F3.0%2Fonecall`), and a pattern written the
+  // readable way silently matches nothing.
+  const isOneCall = (url) =>
+    url.pathname.includes('/api/openweather') &&
+    url.searchParams.get('path') === 'data/3.0/onecall'
+
+  await page.route(isOneCall, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(oneCallHourly(hours))
     })
   })
 }

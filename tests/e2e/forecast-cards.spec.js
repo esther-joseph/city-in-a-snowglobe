@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { gotoApp, openDrawer } from './support/app.js'
+import { stubHourlyForecast } from './support/weatherFixture.js'
 
 /**
  * The two forecast strips.
@@ -200,5 +201,50 @@ test.describe('Forecast strips', () => {
   test('the 12-hour chart is gone, replaced by the hour strip', async ({ page }) => {
     await expect(page.locator('.temperature-card')).toHaveCount(0)
     await expect(hourly(page)).toBeVisible()
+  })
+})
+
+/**
+ * The same strip, when the account can ask for every hour.
+ *
+ * The free forecast is three-hourly and the strip has always shown what it
+ * was given. One Call 3.0 answers hourly, and this is that path: the rows,
+ * the label, and the mapping from One Call's shape into the one the rest of
+ * the app reads.
+ */
+test.describe('The hour strip, with One Call 3.0 on the account', () => {
+  test.beforeEach(async ({ page }) => {
+    await gotoApp(page)
+    await stubHourlyForecast(page)
+    // The first load took the fallback and wrote what it got to the client
+    // cache, which is good for fifteen minutes and would serve the same
+    // three-hourly rows straight back. Clearing it is what makes the reload
+    // actually ask again.
+    await page.evaluate(() => window.localStorage.clear())
+    await page.reload()
+    await openDrawer(page)
+  })
+
+  test('shows an hour a row, and says so', async ({ page }) => {
+    await expect(hourly(page)).toBeVisible()
+    await expect(hourly(page)).toContainText('Every hour')
+
+    // Forty-eight of them, where the three-hourly forecast gives sixteen.
+    await expect(hourly(page).locator('.forecast-row')).toHaveCount(48)
+
+    // An hour apart, read off the labels rather than assumed.
+    const when = await hourly(page).locator('.forecast-row__when').allTextContents()
+    expect(when[0]).not.toBe(when[1])
+    expect(new Set(when.slice(0, 12)).size, 'twelve different hours').toBe(12)
+  })
+
+  test('the temperature survives the change of shape', async ({ page }) => {
+    // One Call puts the temperature at the top of each entry; the 2.5 list
+    // nests it under main. If the mapping were wrong this cell would be
+    // empty rather than obviously incorrect, which is why it is checked.
+    const first = hourly(page).locator('.forecast-row').first()
+    await expect(first.locator('.forecast-row__temp')).toContainText(/\d+°/)
+    await expect(first.locator('.forecast-row__pop')).toContainText('%')
+    await expect(first.locator('.forecast-row__icon')).toBeVisible()
   })
 })
